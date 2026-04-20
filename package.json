@@ -1,0 +1,25 @@
+{
+  "name": "growie_app",
+  "version": "1.0.0",
+  "description": "Growie is a modern, open-source, self-hosted analytics platform built with Next.js and TypeScript. It provides a user-friendly interface for tracking and analyzing website traffic, user behavior, and other key metrics. With its powerful features and customizable dashboards, Growie helps businesses make data-driven decisions to optimize their online presence.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "postinstall": "cd frontend && npm install",
+    "dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "dev": "cd frontend && npm run dev"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
+
+
+
+
+
+
+
+
+

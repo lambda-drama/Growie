@@ -11,15 +11,20 @@ app_license = "mit"
 # required_apps = []
 
 # Each item in the list will be shown as an app in the apps page
-# add_to_apps_screen = [
-# 	{
-# 		"name": "growie_app",
-# 		"logo": "/assets/growie_app/logo.png",
-# 		"title": "Investment App",
-# 		"route": "/growie_app",
-# 		"has_permission": "growie_app.api.permission.has_app_permission"
-# 	}
-# ]
+add_to_apps_screen = [
+	{
+		"name": "growie_app",
+		"logo": "/assets/growie_app/logo.png",
+		"title": "Investment App",
+		"route": "/growie",
+	}
+]
+
+# Route all /growie/* requests to the growie_frontend www page
+website_route_rules = [
+	{"from_route": "/growie", "to_route": "growie_frontend"},
+	{"from_route": "/growie/<path:app_path>", "to_route": "growie_frontend"},
+]
 
 # Includes in <head>
 # ------------------
