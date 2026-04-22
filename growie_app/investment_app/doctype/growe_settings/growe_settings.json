@@ -1,0 +1,130 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-04-23 01:13:35.005967",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "active_ai_provider",
+  "paystack_section",
+  "paystack_public_key",
+  "column_break_pakd",
+  "paystack_secret_key",
+  "pricing_section",
+  "pro_tier_price_kes",
+  "column_break_ebrg",
+  "coached_tier_price_kes",
+  "limits_section",
+  "free_tier_insight_limit",
+  "column_break_imww",
+  "free_tier_ai_limit",
+  "column_break_lwjo",
+  "pro_tier_ai_limit"
+ ],
+ "fields": [
+  {
+   "description": "Which AI config is currently active",
+   "fieldname": "active_ai_provider",
+   "fieldtype": "Link",
+   "label": "Default AI Provider",
+   "options": "Growe AI Provider"
+  },
+  {
+   "fieldname": "paystack_section",
+   "fieldtype": "Section Break",
+   "label": "Paystack"
+  },
+  {
+   "fieldname": "paystack_public_key",
+   "fieldtype": "Data",
+   "label": "Paystack Public Key"
+  },
+  {
+   "fieldname": "paystack_secret_key",
+   "fieldtype": "Password",
+   "label": "Paystack Secret Key"
+  },
+  {
+   "fieldname": "pricing_section",
+   "fieldtype": "Section Break",
+   "label": "Pricing"
+  },
+  {
+   "default": "1500",
+   "fieldname": "pro_tier_price_kes",
+   "fieldtype": "Currency",
+   "label": "Pro Tier Price (KES)"
+  },
+  {
+   "default": "8500",
+   "fieldname": "coached_tier_price_kes",
+   "fieldtype": "Currency",
+   "label": "Coached Tier Price (KES)"
+  },
+  {
+   "fieldname": "limits_section",
+   "fieldtype": "Section Break",
+   "label": "Feature Limits"
+  },
+  {
+   "default": "1",
+   "fieldname": "free_tier_insight_limit",
+   "fieldtype": "Int",
+   "label": "Free Tier \u2014 Insights per Week"
+  },
+  {
+   "default": "2",
+   "fieldname": "free_tier_ai_limit",
+   "fieldtype": "Int",
+   "label": "Free Tier \u2014 AI Analyses per Month"
+  },
+  {
+   "default": "10",
+   "fieldname": "pro_tier_ai_limit",
+   "fieldtype": "Int",
+   "label": "Pro Tier \u2014 AI Analyses per Day"
+  },
+  {
+   "fieldname": "column_break_pakd",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_ebrg",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_imww",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_lwjo",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-04-23 01:23:22.154815",
+ "modified_by": "Administrator",
+ "module": "Investment App",
+ "name": "Growe Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
