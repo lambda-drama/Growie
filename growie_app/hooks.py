@@ -1,7 +1,7 @@
 app_name = "growie_app"
-app_title = "Investment App"
+app_title = "Growe"
 app_publisher = "Mania"
-app_description = "Growie"
+app_description = "AI-powered investment tracker for Kenyans at home and in the diaspora."
 app_email = "martialmania19@gmail.com"
 app_license = "mit"
 
@@ -14,8 +14,8 @@ app_license = "mit"
 add_to_apps_screen = [
 	{
 		"name": "growie_app",
-		"logo": "/assets/growie_app/logo.png",
-		"title": "Investment App",
+		"logo": "/assets/growie_app/image/logo.png",
+		"title": "Growe",
 		"route": "/growie",
 	}
 ]

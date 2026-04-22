@@ -1,0 +1,95 @@
+{
+ "actions": [],
+ "autoname": "field:user",
+ "creation": "2026-04-23 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "full_name",
+  "column_break_1",
+  "subscription_tier",
+  "preferred_currency",
+  "section_break_identity",
+  "id_documents"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "User",
+   "options": "User",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fetch_from": "user.full_name",
+   "fieldname": "full_name",
+   "fieldtype": "Data",
+   "label": "Full Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "free",
+   "fieldname": "subscription_tier",
+   "fieldtype": "Select",
+   "label": "Subscription Tier",
+   "options": "free\npro\ncoached"
+  },
+  {
+   "default": "KES",
+   "fieldname": "preferred_currency",
+   "fieldtype": "Select",
+   "label": "Preferred Currency",
+   "options": "KES\nUSD\nEUR\nGBP"
+  },
+  {
+   "fieldname": "section_break_identity",
+   "fieldtype": "Section Break",
+   "label": "Identity Documents"
+  },
+  {
+   "fieldname": "id_documents",
+   "fieldtype": "Table",
+   "label": "ID Documents",
+   "options": "Growe Member ID"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-04-23 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Investment App",
+ "name": "Growe Member",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Website Manager",
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "full_name",
+ "track_changes": 1
+}
