@@ -5,10 +5,6 @@ app_description = "AI-powered investment tracker for Kenyans at home and in the 
 app_email = "martialmania19@gmail.com"
 app_license = "mit"
 
-# Fixtures — loaded automatically on bench migrate / bench install-app
-fixtures = [
-	{"dt": "Growe ID Type", "filters": []},
-]
 
 # Apps
 # ------------------

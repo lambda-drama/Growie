@@ -15,7 +15,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "ID Type",
-   "options": "Growe ID Type",
+   "options": "Document Type",
    "reqd": 1
   },
   {
