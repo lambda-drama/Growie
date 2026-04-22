@@ -4,9 +4,21 @@ from frappe.utils import validate_email_address
 
 
 @frappe.whitelist(allow_guest=True)
+def get_id_types():
+	"""Return all active Growe ID Types for the signup form."""
+	types = frappe.get_all(
+		"Growe ID Type",
+		filters={"is_active": 1},
+		fields=["type_code", "label"],
+		order_by="creation asc",
+	)
+	return types
+
+
+@frappe.whitelist(allow_guest=True)
 def signup(full_name: str, email: str, password: str, id_type: str, id_number: str, preferred_currency: str = "KES"):
-	"""Register a new Growe user, create Frappe User + Growe Member linked record."""
-	# Basic validation
+	"""Register a new Growe user — creates a Frappe User and a linked Growe Member."""
+	# ── Validation ───────────────────────────────────────────────────────────
 	if not validate_email_address(email):
 		frappe.throw(_("Please enter a valid email address."))
 
@@ -16,22 +28,22 @@ def signup(full_name: str, email: str, password: str, id_type: str, id_number: s
 	if not id_number or not id_number.strip():
 		frappe.throw(_("ID number is required."))
 
-	if id_type not in ("national_id", "passport"):
-		frappe.throw(_("Invalid ID type. Must be 'national_id' or 'passport'."))
+	# Validate that the id_type exists in Growe ID Type
+	if not frappe.db.exists("Growe ID Type", {"type_code": id_type}):
+		frappe.throw(_("Invalid ID type selected."))
 
 	if preferred_currency not in ("KES", "USD", "EUR", "GBP"):
 		preferred_currency = "KES"
 
-	# Check duplicate email
+	# Check for duplicate email
 	if frappe.db.exists("User", {"email": email}):
 		frappe.throw(_("An account with this email already exists. Please sign in instead."))
 
-	# Split full name
+	# ── Create Frappe User ────────────────────────────────────────────────────
 	parts = full_name.strip().split(" ", 1)
 	first_name = parts[0]
 	last_name = parts[1] if len(parts) > 1 else ""
 
-	# Create Frappe User (Website User type)
 	user = frappe.get_doc(
 		{
 			"doctype": "User",
@@ -47,7 +59,7 @@ def signup(full_name: str, email: str, password: str, id_type: str, id_number: s
 	user.flags.ignore_password_policy = True
 	user.insert()
 
-	# Create Growe Member linked to the new user
+	# ── Create Growe Member ───────────────────────────────────────────────────
 	member = frappe.get_doc(
 		{
 			"doctype": "Growe Member",
@@ -68,7 +80,7 @@ def signup(full_name: str, email: str, password: str, id_type: str, id_number: s
 
 	frappe.db.commit()
 
-	# Auto-login the newly created user
+	# ── Auto-login ────────────────────────────────────────────────────────────
 	frappe.local.login_manager.login_as(email)
 	frappe.db.commit()
 

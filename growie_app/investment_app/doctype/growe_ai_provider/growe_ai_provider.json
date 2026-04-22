@@ -1,0 +1,112 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:provider_name",
+ "creation": "2026-04-23 01:18:19.960198",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "provider_name",
+  "is_active",
+  "api_key",
+  "model",
+  "column_break_ywtf",
+  "api_base_url",
+  "temperature",
+  "max_tokens",
+  "section_break_wupa",
+  "notes"
+ ],
+ "fields": [
+  {
+   "description": "e.g., Claude, OpenAI, Groq",
+   "fieldname": "provider_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Provider Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Active"
+  },
+  {
+   "fieldname": "api_key",
+   "fieldtype": "Password",
+   "label": "API Key",
+   "reqd": 1
+  },
+  {
+   "description": "e.g., claude-3-sonnet-20241022, gpt-4o, llama-3.3-70b",
+   "fieldname": "model",
+   "fieldtype": "Data",
+   "label": "Model",
+   "reqd": 1
+  },
+  {
+   "description": "Leave blank for default. For self-hosted or proxies",
+   "fieldname": "api_base_url",
+   "fieldtype": "Data",
+   "label": "API Base URL (Optional)"
+  },
+  {
+   "default": "0.7",
+   "description": "0 = deterministic, 1 = creative",
+   "fieldname": "temperature",
+   "fieldtype": "Float",
+   "label": "Temperature"
+  },
+  {
+   "default": "1000",
+   "fieldname": "max_tokens",
+   "fieldtype": "Int",
+   "label": "Max Tokens"
+  },
+  {
+   "description": "e.g., Free tier, slow but cheap",
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "column_break_ywtf",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_wupa",
+   "fieldtype": "Section Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-04-23 01:22:30.825692",
+ "modified_by": "Administrator",
+ "module": "Investment App",
+ "name": "Growe AI Provider",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
