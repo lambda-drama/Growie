@@ -9,9 +9,9 @@
  {
   "docstatus": 0,
   "doctype": "Growe Sector",
-  "growe_sector": "Telecom",
+  "growe_sector": "Telecommunications",
   "modified": "2026-04-24 15:49:17.564540",
-  "name": "Telecom"
+  "name": "Telecommunications"
  },
  {
   "docstatus": 0,
@@ -37,16 +37,16 @@
  {
   "docstatus": 0,
   "doctype": "Growe Sector",
-  "growe_sector": "Agricultural",
+  "growe_sector": "Agriculture",
   "modified": "2026-04-24 17:14:15.727234",
-  "name": "Agricultural"
+  "name": "Agriculture"
  },
  {
   "docstatus": 0,
   "doctype": "Growe Sector",
-  "growe_sector": "Investment Services",
+  "growe_sector": "Investment",
   "modified": "2026-04-24 17:14:26.300037",
-  "name": "Investment Services"
+  "name": "Investment"
  },
  {
   "docstatus": 0,
@@ -58,16 +58,16 @@
  {
   "docstatus": 0,
   "doctype": "Growe Sector",
-  "growe_sector": "Commercial & Services",
+  "growe_sector": "Commercial",
   "modified": "2026-04-24 17:14:43.947203",
-  "name": "Commercial & Services"
+  "name": "Commercial"
  },
  {
   "docstatus": 0,
   "doctype": "Growe Sector",
-  "growe_sector": "Automobiles & Accessories",
+  "growe_sector": "Automobiles",
   "modified": "2026-04-24 17:14:52.527700",
-  "name": "Automobiles & Accessories"
+  "name": "Automobiles"
  },
  {
   "docstatus": 0,
@@ -75,5 +75,75 @@
   "growe_sector": "Real Estate Investment Trust",
   "modified": "2026-04-24 17:15:07.848960",
   "name": "Real Estate Investment Trust"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Technology",
+  "modified": "2026-04-24 23:41:07.998243",
+  "name": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "ETF",
+  "modified": "2026-04-24 23:50:45.547928",
+  "name": "ETF"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Financials",
+  "modified": "2026-04-24 23:51:07.648563",
+  "name": "Financials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Healthcare",
+  "modified": "2026-04-24 23:51:17.972122",
+  "name": "Healthcare"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Consumer Goods",
+  "modified": "2026-04-24 23:51:28.319156",
+  "name": "Consumer Goods"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Pharmaceuticals",
+  "modified": "2026-04-24 23:51:49.181324",
+  "name": "Pharmaceuticals"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "E-commerce",
+  "modified": "2026-04-24 23:53:10.378183",
+  "name": "E-commerce"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Semiconductors",
+  "modified": "2026-04-24 23:53:26.248112",
+  "name": "Semiconductors"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Automotive",
+  "modified": "2026-04-24 23:54:18.619617",
+  "name": "Automotive"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "MMF",
+  "modified": "2026-04-24 23:57:11.285250",
+  "name": "MMF"
  }
 ]
