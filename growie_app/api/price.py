@@ -229,9 +229,19 @@ def _fetch_fcs(provider: dict, symbols: list, market: str = "Global") -> dict:
 # NSE Kenya stocks use the ".NBO" suffix on Alpha Vantage, e.g. SCOM.NBO
 # Global stocks use plain ticker, e.g. AAPL, MSFT, TSLA
 
-_AV_NSE_SUFFIX = ".NBO"       # Nairobi Stock Exchange suffix on Alpha Vantage
+# Alpha Vantage uses .NR for Nairobi Stock Exchange (NSE Kenya)
+_AV_NSE_SUFFIX = ".NR"
 
-def _fetch_alpha_vantage(provider: dict, symbols: list, market: str = "Global") -> dict:
+def _fetch_alpha_vantage(
+	provider: dict,
+	symbols: list,
+	market: str = "Global",
+	symbol_override_map: dict | None = None,
+) -> dict:
+	"""
+	symbol_override_map: optional {ticker → api_symbol} from Growe Stock.api_symbol.
+	When provided, uses the stored api_symbol instead of guessing the suffix.
+	"""
 	"""
 	Fetch prices one symbol at a time from Alpha Vantage GLOBAL_QUOTE.
 
@@ -251,8 +261,13 @@ def _fetch_alpha_vantage(provider: dict, symbols: list, market: str = "Global") 
 	results: dict = {}
 
 	for symbol in symbols:
-		# Alpha Vantage uses exchange-specific suffix for non-US stocks
-		av_symbol = f"{symbol.upper()}{_AV_NSE_SUFFIX}" if market == "NSE" else symbol.upper()
+		# Prefer api_symbol from Growe Stock; fall back to suffix logic
+		if symbol_override_map and symbol.upper() in symbol_override_map:
+			av_symbol = symbol_override_map[symbol.upper()]
+		elif market == "NSE":
+			av_symbol = f"{symbol.upper()}{_AV_NSE_SUFFIX}"
+		else:
+			av_symbol = symbol.upper()
 
 		params = {
 			"function": "GLOBAL_QUOTE",
@@ -558,6 +573,147 @@ def _save_test_result(provider_name: str, message: str):
 		frappe.db.commit()
 	except Exception:
 		pass
+
+
+@frappe.whitelist(allow_guest=True)
+def get_stocks_with_prices(market: str = None, sector: str = None, limit: int = 200):
+	"""
+	Return all active Growe Stock records joined with their cached prices.
+	Used by the Markets page to display the full stock list with live prices.
+	"""
+	filters = {"is_active": 1}
+	if market:
+		filters["market"] = market
+	if sector:
+		filters["sector"] = sector
+
+	stocks = frappe.get_all(
+		"Growe Stock",
+		filters=filters,
+		fields=["name", "ticker", "company_name", "market", "sector", "currency", "api_symbol"],
+		order_by="market asc, sector asc, ticker asc",
+		limit=int(limit),
+	)
+
+	# Bulk-load all relevant cached prices (safe — table may not exist yet)
+	tickers = [s.ticker for s in stocks if s.ticker]
+	price_map: dict = {}
+	if tickers:
+		try:
+			cache_rows = frappe.get_all(
+				"Growe Price Cache",
+				filters=[["ticker", "in", tickers]],
+				fields=["ticker", "price_kes", "price_usd", "change_percent", "source", "fetched_at"],
+			)
+			price_map = {r.ticker: r for r in cache_rows}
+		except Exception:
+			pass  # Price Cache table may not exist yet; stocks will show without prices
+
+	result = []
+	for s in stocks:
+		cache = price_map.get(s.ticker) or {}
+		result.append({
+			"name":          s.name,
+			"ticker":        s.ticker,
+			"companyName":   s.company_name or s.ticker,
+			"market":        s.market,
+			"sector":        s.sector or "",
+			"currency":      s.currency or "KES",
+			"apiSymbol":     s.api_symbol or "",
+			"priceKES":      float(cache.get("price_kes") or 0),
+			"priceUSD":      float(cache.get("price_usd") or 0),
+			"changePercent": float(cache.get("change_percent") or 0),
+			"source":        cache.get("source") or "",
+			"fetchedAt":     str(cache.get("fetched_at") or ""),
+			"hasPrice":      bool(cache.get("price_kes")),
+		})
+
+	return result
+
+
+@frappe.whitelist()
+def refresh_stock_prices():
+	"""
+	Fetch live prices for ALL active Growe Stock records (not just holdings).
+	Uses api_symbol when set so Alpha Vantage gets the correct exchange-suffixed symbol.
+	"""
+	all_stocks = frappe.get_all(
+		"Growe Stock",
+		filters={"is_active": 1},
+		fields=["ticker", "api_symbol", "market", "currency"],
+	)
+
+	# Build {ticker → api_symbol} maps per market for AV dispatch
+	nse_symbol_map: dict = {}
+	global_symbol_map: dict = {}
+	nse_tickers: list = []
+	global_tickers: list = []
+
+	for s in all_stocks:
+		t = (s.ticker or "").upper()
+		if not t:
+			continue
+		if s.market == "NSE":
+			nse_tickers.append(t)
+			if s.api_symbol:
+				nse_symbol_map[t] = s.api_symbol
+		else:
+			global_tickers.append(t)
+			if s.api_symbol:
+				global_symbol_map[t] = s.api_symbol
+
+	usd_to_kes = _get_usd_to_kes()
+	nse_updated = 0
+	global_updated = 0
+
+	def _fetch_market(market: str, tickers: list, sym_map: dict) -> int:
+		if not tickers:
+			return 0
+		providers = _get_providers(market)
+		remaining = list(tickers)
+		count = 0
+
+		for provider in providers:
+			if not remaining:
+				break
+			api_prov = (provider.get("api_provider") or "").lower()
+			prov_name = (provider.get("provider_name") or "").lower()
+
+			# For Alpha Vantage, pass the symbol override map
+			if "alpha" in api_prov or "alpha" in prov_name:
+				fetched = _fetch_alpha_vantage(
+					provider, remaining, market,
+					symbol_override_map=sym_map,
+				)
+			else:
+				fetched = _fetch_from_provider(provider, remaining, market)
+
+			_usd = _get_usd_to_kes()
+			for ticker, data in fetched.items():
+				_upsert_cache(ticker, market, data, _usd, provider["provider_name"])
+				if ticker in remaining:
+					remaining.remove(ticker)
+				count += 1
+
+		return count
+
+	nse_updated = _fetch_market("NSE", nse_tickers, nse_symbol_map)
+	global_updated = _fetch_market("Global", global_tickers, global_symbol_map)
+
+	# Also update any holdings whose value_kes can be recomputed
+	for ticker_entry in all_stocks:
+		t = (ticker_entry.ticker or "").upper()
+		cache = frappe.db.get_value("Growe Price Cache", t, "price_kes")
+		if cache:
+			_update_holdings_for_ticker(t, float(cache))
+
+	frappe.db.commit()
+
+	return {
+		"nse_updated": nse_updated,
+		"global_updated": global_updated,
+		"total": nse_updated + global_updated,
+	}
 
 
 @frappe.whitelist(allow_guest=True)

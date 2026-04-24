@@ -10,6 +10,7 @@
   "is_active",
   "api_key",
   "model",
+  "provider",
   "column_break_ywtf",
   "api_base_url",
   "temperature",
@@ -79,12 +80,18 @@
   {
    "fieldname": "section_break_wupa",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "provider",
+   "fieldtype": "Select",
+   "label": "Provider",
+   "options": "\nClaude\nOpenAI\nGroq\nGemini\nDeepSeek\nMistral\nCohere\nTogether AI\nPerplexity\nAI21 Labs\nAWS Bedrock\nAzure OpenAI\nLocal\nNone"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-23 01:22:30.825692",
+ "modified": "2026-04-25 01:04:42.120036",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe AI Provider",
