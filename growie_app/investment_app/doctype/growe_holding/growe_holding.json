@@ -5,26 +5,105 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "section_break_pzyi"
+  "investor",
+  "asset_class",
+  "asset_name",
+  "column_break_xvhk",
+  "value_kes",
+  "date_added",
+  "notes",
+  "optional_section",
+  "ticker",
+  "quantity",
+  "column_break_bdig",
+  "cost_basis_kes",
+  "last_updated"
  ],
  "fields": [
-    {"fieldname": "investor", "label": "Investor", "fieldtype": "Link", "options": "Growe Member", "in_list_view": 1, "reqd": 1},
-    {"fieldname": "asset_class", "label": "Asset Class", "fieldtype": "Select", "options": "MMF\nReal Estate\nNSE\nGlobal", "in_list_view": 1, "reqd": 1},
-    {"fieldname": "asset_name", "label": "Asset Name", "fieldtype": "Data", "in_list_view": 1, "reqd": 1},
-    {"fieldname": "value_kes", "label": "Value (KES)", "fieldtype": "Currency", "in_list_view": 1, "reqd": 1},
-    {"fieldname": "date_added", "label": "Date Added", "fieldtype": "Date", "default": "Today", "in_list_view": 1},
-    {"fieldname": "notes", "label": "Notes", "fieldtype": "Small Text"},
-    
-    {"fieldname": "optional_section", "label": "Optional Details", "fieldtype": "Section Break"},
-    {"fieldname": "ticker", "label": "Ticker (for stocks)", "fieldtype": "Data", "description": "e.g., SCOM, AAPL"},
-    {"fieldname": "quantity", "label": "Quantity", "fieldtype": "Float", "description": "Number of shares/units"},
-    {"fieldname": "cost_basis_kes", "label": "Cost Basis (KES)", "fieldtype": "Currency", "description": "What you originally paid"},
-    {"fieldname": "last_updated", "label": "Last Updated", "fieldtype": "Datetime", "read_only": 1}
-  ],
+  {
+   "fieldname": "investor",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Investor",
+   "options": "Growe Member",
+   "reqd": 1
+  },
+  {
+   "fieldname": "asset_class",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Asset Class",
+   "options": "MMF\nReal Estate\nNSE\nGlobal",
+   "reqd": 1
+  },
+  {
+   "fieldname": "asset_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Asset Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "value_kes",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Value (KES)",
+   "reqd": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "date_added",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date Added"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "optional_section",
+   "fieldtype": "Section Break",
+   "label": "Optional Details"
+  },
+  {
+   "description": "e.g., SCOM, AAPL",
+   "fieldname": "ticker",
+   "fieldtype": "Data",
+   "label": "Ticker (for stocks)"
+  },
+  {
+   "description": "Number of shares/units",
+   "fieldname": "quantity",
+   "fieldtype": "Float",
+   "label": "Quantity"
+  },
+  {
+   "description": "What you originally paid",
+   "fieldname": "cost_basis_kes",
+   "fieldtype": "Currency",
+   "label": "Cost Basis (KES)"
+  },
+  {
+   "fieldname": "last_updated",
+   "fieldtype": "Datetime",
+   "label": "Last Updated",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_xvhk",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_bdig",
+   "fieldtype": "Column Break"
+  }
+ ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-24 14:15:01.894424",
+ "modified": "2026-04-24 14:48:01.444101",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Holding",

@@ -5,27 +5,97 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "section_break_mist"
+  "title",
+  "topic_tag",
+  "explanation",
+  "source_section",
+  "linked_insight",
+  "column_break_miuq",
+  "month_year",
+  "metadata_section",
+  "difficulty",
+  "estimated_read_time",
+  "column_break_gxan",
+  "order"
  ],
-"fields": [
-    {"fieldname": "title", "label": "Title", "fieldtype": "Data", "in_list_view": 1, "reqd": 1},
-    {"fieldname": "topic_tag", "label": "Topic Tag", "fieldtype": "Data", "in_list_view": 1, "reqd": 1, "description": "e.g., Valuation, Dividends, Risk"},
-    {"fieldname": "explanation", "label": "Explanation", "fieldtype": "Text Editor", "reqd": 1},
-    
-    {"fieldname": "source_section", "label": "Source", "fieldtype": "Section Break"},
-    {"fieldname": "linked_insight", "label": "Linked Insight", "fieldtype": "Link", "options": "Growe Insight", "description": "Which insight generated this bite"},
-    {"fieldname": "month_year", "label": "Month/Year", "fieldtype": "Data", "in_list_view": 1, "description": "e.g., April 2026"},
-    
-    {"fieldname": "metadata_section", "label": "Metadata", "fieldtype": "Section Break"},
-    {"fieldname": "difficulty", "label": "Difficulty", "fieldtype": "Select", "options": "Beginner\nIntermediate", "default": "Beginner"},
-    {"fieldname": "estimated_read_time", "label": "Est. Read Time (minutes)", "fieldtype": "Int", "default": 2},
-    {"fieldname": "order", "label": "Display Order", "fieldtype": "Int", "default": 0}
-  ],
-  
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "description": "e.g., Valuation, Dividends, Risk",
+   "fieldname": "topic_tag",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Topic Tag",
+   "reqd": 1
+  },
+  {
+   "fieldname": "explanation",
+   "fieldtype": "Text Editor",
+   "label": "Explanation",
+   "reqd": 1
+  },
+  {
+   "fieldname": "source_section",
+   "fieldtype": "Section Break",
+   "label": "Source"
+  },
+  {
+   "description": "Which insight generated this bite",
+   "fieldname": "linked_insight",
+   "fieldtype": "Link",
+   "label": "Linked Insight",
+   "options": "Growe Insight"
+  },
+  {
+   "description": "e.g., April 2026",
+   "fieldname": "month_year",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Month/Year"
+  },
+  {
+   "fieldname": "metadata_section",
+   "fieldtype": "Section Break",
+   "label": "Metadata"
+  },
+  {
+   "default": "Beginner",
+   "fieldname": "difficulty",
+   "fieldtype": "Select",
+   "label": "Difficulty",
+   "options": "Beginner\nIntermediate"
+  },
+  {
+   "default": "2",
+   "fieldname": "estimated_read_time",
+   "fieldtype": "Int",
+   "label": "Est. Read Time (minutes)"
+  },
+  {
+   "default": "0",
+   "fieldname": "order",
+   "fieldtype": "Int",
+   "label": "Display Order"
+  },
+  {
+   "fieldname": "column_break_miuq",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_gxan",
+   "fieldtype": "Column Break"
+  }
+ ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-24 14:34:16.432368",
+ "modified": "2026-04-24 14:47:01.446657",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe LearningBite",
