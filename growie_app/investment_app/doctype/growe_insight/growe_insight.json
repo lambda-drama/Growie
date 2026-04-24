@@ -1,6 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "GI-.#####",
  "creation": "2026-04-24 14:32:02.920344",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -40,9 +41,10 @@
   {
    "description": "e.g., SCOM, AAPL",
    "fieldname": "ticker",
-   "fieldtype": "Data",
+   "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Ticker"
+   "label": "Ticker",
+   "options": "Growe Stock"
   },
   {
    "fieldname": "sentiment",
@@ -89,7 +91,7 @@
    "label": "Published Date"
   },
   {
-   "default": "1",
+   "default": "0",
    "description": "If checked, only Pro/Coached users see this",
    "fieldname": "is_pro_only",
    "fieldtype": "Check",
@@ -121,10 +123,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-24 14:47:21.358024",
+ "modified": "2026-04-24 19:36:24.374945",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Insight",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {
@@ -142,6 +145,10 @@
   {
    "read": 1,
    "role": "Website User"
+  },
+  {
+   "read": 1,
+   "role": "Guest"
   }
  ],
  "row_format": "Dynamic",

@@ -6,6 +6,8 @@
  "engine": "InnoDB",
  "field_order": [
   "active_ai_provider",
+  "column_break_qsfs",
+  "default_stock_api",
   "pricing_section",
   "pro_tier_price_kes",
   "column_break_ebrg",
@@ -99,14 +101,24 @@
   {
    "fieldname": "column_break_lwjo",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_qsfs",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "default_stock_api",
+   "fieldtype": "Link",
+   "label": "Default Stock API",
+   "options": "Growe Price API"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-04-23 01:45:36.252576",
- "modified_by": "Administrator",
+ "modified": "2026-04-24 23:37:47.133092",
+ "modified_by": "martialmania19@gmail.com",
  "module": "Investment App",
  "name": "Growe Settings",
  "owner": "Administrator",

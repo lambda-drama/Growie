@@ -31,7 +31,10 @@ fixtures = [
 	},
 	{
 		"doctype": "Growe Sector",
-	}
+	},
+ {
+	 "doctype":"Growe Stock"
+ },
 ]
 
 # Route all /growie/* requests to the growie_frontend www page

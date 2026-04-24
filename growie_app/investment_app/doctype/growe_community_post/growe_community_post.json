@@ -1,0 +1,137 @@
+{
+ "actions": [],
+ "autoname": "GCP-.#####",
+ "creation": "2026-04-24 20:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "author",
+  "category",
+  "column_break_meta",
+  "published_at",
+  "is_pinned",
+  "content_section",
+  "content",
+  "tags",
+  "stats_section",
+  "likes_count",
+  "column_break_stats",
+  "comments_count"
+ ],
+ "fields": [
+  {
+   "fieldname": "author",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Author",
+   "options": "Growe Member",
+   "reqd": 1
+  },
+  {
+   "default": "General",
+   "fieldname": "category",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Category",
+   "options": "General\nNSE Stocks\nGlobal Stocks\nMMF\nQuestion\nWin"
+  },
+  {
+   "fieldname": "column_break_meta",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Now",
+   "fieldname": "published_at",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Published At"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_pinned",
+   "fieldtype": "Check",
+   "label": "Pinned"
+  },
+  {
+   "fieldname": "content_section",
+   "fieldtype": "Section Break",
+   "label": "Content"
+  },
+  {
+   "fieldname": "content",
+   "fieldtype": "Text",
+   "label": "Content",
+   "reqd": 1
+  },
+  {
+   "description": "Comma-separated, e.g. SCOM, dividends, NSE",
+   "fieldname": "tags",
+   "fieldtype": "Data",
+   "label": "Tags"
+  },
+  {
+   "fieldname": "stats_section",
+   "fieldtype": "Section Break",
+   "label": "Stats"
+  },
+  {
+   "default": "0",
+   "fieldname": "likes_count",
+   "fieldtype": "Int",
+   "label": "Likes",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_stats",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "comments_count",
+   "fieldtype": "Int",
+   "label": "Comments",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-04-24 20:10:59.791761",
+ "modified_by": "Administrator",
+ "module": "Investment App",
+ "name": "Growe Community Post",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "if_owner": 1,
+   "read": 1,
+   "role": "Website User",
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Guest"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "published_at",
+ "sort_order": "DESC",
+ "states": []
+}
