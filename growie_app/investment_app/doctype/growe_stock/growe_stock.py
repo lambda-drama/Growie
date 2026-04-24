@@ -4,6 +4,8 @@
 # import frappe
 from frappe.model.document import Document
 
-
 class GroweStock(Document):
-	pass
+	def autoname(self):
+		ticker = self.ticker or "UNIT"
+		company_name = self.company_name or "GEN"
+		self.name = f"{ticker}-{company_name}"

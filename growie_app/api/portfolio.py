@@ -1,6 +1,6 @@
 """
-Portfolio API — CRUD for Growe Holding + portfolio summary.
-All endpoints require an authenticated session.
+Portfolio API — CRUD for Growe Holding + portfolio summary + stock search.
+All endpoints require an authenticated session unless noted.
 """
 
 import frappe
@@ -32,14 +32,30 @@ _ASSET_CLASS_REVERSE = {v: k for k, v in _ASSET_CLASS_MAP.items()}
 
 
 def _holding_to_dict(h) -> dict:
-	"""Convert a Frappe Growe Holding document or get_all row to the frontend shape."""
-	# Lookup latest cached price for this ticker
+	"""Convert a Frappe Growe Holding row to the frontend shape."""
+	# Resolve ticker and display name from the linked Growe Stock
+	stock_name = h.get("asset_name") or ""
+	display_name = stock_name
+	ticker = h.get("ticker") or ""
+
+	if stock_name:
+		stock = frappe.db.get_value(
+			"Growe Stock",
+			stock_name,
+			["ticker", "company_name", "market"],
+			as_dict=True,
+		)
+		if stock:
+			display_name = stock.company_name or stock_name
+			ticker = ticker or stock.ticker or ""
+
+	# Latest cached price for this ticker
 	price_kes = None
 	change_percent = None
-	if h.get("ticker"):
+	if ticker:
 		cache = frappe.db.get_value(
 			"Growe Price Cache",
-			h.get("ticker"),
+			ticker,
 			["price_kes", "change_percent"],
 			as_dict=True,
 		)
@@ -49,18 +65,63 @@ def _holding_to_dict(h) -> dict:
 
 	return {
 		"id": h.get("name"),
-		"name": h.get("asset_name"),
+		"name": display_name,
+		"stockName": stock_name,           # the Link value (Growe Stock name)
 		"assetClass": _ASSET_CLASS_MAP.get(h.get("asset_class"), "mmf"),
 		"valueKES": float(h.get("value_kes") or 0),
 		"costBasisKES": float(h.get("cost_basis_kes") or 0),
 		"quantity": float(h.get("quantity") or 0),
-		"ticker": h.get("ticker") or "",
+		"ticker": ticker,
 		"dateAdded": str(h.get("date_added") or today()),
 		"lastUpdated": str(h.get("last_updated") or ""),
 		"notes": h.get("notes") or "",
 		"currentPriceKES": float(price_kes or 0),
 		"changePercent": float(change_percent or 0),
 	}
+
+
+# ── Stock search ──────────────────────────────────────────────────────────────
+
+@frappe.whitelist()
+def search_stocks(query: str = "", market: str = None, limit: int = 20):
+	"""
+	Search Growe Stock by ticker or company name.
+	Used by the frontend searchable combobox on the Add Holding dialog.
+	"""
+	filters = {"is_active": 1}
+	if market:
+		filters["market"] = market
+
+	# Build OR conditions for ticker + company_name search
+	if query:
+		results = frappe.db.sql(
+			"""
+			SELECT name, ticker, company_name, market, currency
+			FROM `tabGrowe Stock`
+			WHERE is_active = 1
+			  AND (
+			        ticker       LIKE %(q)s
+			     OR company_name LIKE %(q)s
+			  )
+			  {market_clause}
+			ORDER BY ticker ASC
+			LIMIT %(limit)s
+			""".format(
+				market_clause=f"AND market = %(market)s" if market else ""
+			),
+			{"q": f"%{query}%", "market": market, "limit": int(limit)},
+			as_dict=True,
+		)
+	else:
+		results = frappe.get_all(
+			"Growe Stock",
+			filters=filters,
+			fields=["name", "ticker", "company_name", "market", "currency"],
+			order_by="ticker asc",
+			limit=int(limit),
+		)
+
+	return results
 
 
 # ── Read ──────────────────────────────────────────────────────────────────────
@@ -91,7 +152,7 @@ def get_portfolio_summary():
 	rows = frappe.get_all(
 		"Growe Holding",
 		filters={"investor": member},
-		fields=["asset_class", "value_kes", "cost_basis_kes", "quantity", "ticker"],
+		fields=["asset_class", "value_kes", "cost_basis_kes"],
 	)
 
 	total_value = 0.0
@@ -109,7 +170,6 @@ def get_portfolio_summary():
 	gain = total_value - total_cost
 	gain_percent = (gain / total_cost * 100) if total_cost > 0 else 0.0
 
-	# Convert allocation to percentage
 	alloc_pct = {
 		k: round(v / total_value * 100, 1) if total_value > 0 else 0
 		for k, v in allocation.items()
@@ -131,17 +191,20 @@ def get_portfolio_summary():
 @frappe.whitelist()
 def add_holding(
 	asset_class: str,
-	asset_name: str,
+	asset_name: str,           # Growe Stock name (Link field value)
 	value_kes: float,
 	cost_basis_kes: float = None,
 	quantity: float = None,
-	ticker: str = None,
 	notes: str = None,
 	date_added: str = None,
 ):
 	member = _member_name()
 
-	# Map frontend asset class key → doctype select value
+	# Validate the stock exists and resolve ticker
+	if not frappe.db.exists("Growe Stock", asset_name):
+		frappe.throw(_(f"Stock '{asset_name}' not found. Please select a valid stock."))
+
+	ticker = frappe.db.get_value("Growe Stock", asset_name, "ticker") or ""
 	ac_label = _ASSET_CLASS_REVERSE.get(asset_class, asset_class)
 
 	doc = frappe.get_doc({
@@ -149,10 +212,10 @@ def add_holding(
 		"investor": member,
 		"asset_class": ac_label,
 		"asset_name": asset_name,
+		"ticker": ticker,
 		"value_kes": float(value_kes),
 		"cost_basis_kes": float(cost_basis_kes or value_kes),
 		"quantity": float(quantity or 0),
-		"ticker": (ticker or "").upper() or None,
 		"notes": notes or "",
 		"date_added": date_added or today(),
 		"last_updated": now_datetime(),
@@ -168,11 +231,10 @@ def add_holding(
 @frappe.whitelist()
 def update_holding(
 	holding_name: str,
-	asset_name: str = None,
+	asset_name: str = None,    # Growe Stock name
 	value_kes: float = None,
 	cost_basis_kes: float = None,
 	quantity: float = None,
-	ticker: str = None,
 	notes: str = None,
 ):
 	member = _member_name()
@@ -182,15 +244,17 @@ def update_holding(
 		frappe.throw(_("You are not authorised to edit this holding."), frappe.PermissionError)
 
 	if asset_name is not None:
+		if not frappe.db.exists("Growe Stock", asset_name):
+			frappe.throw(_(f"Stock '{asset_name}' not found."))
 		doc.asset_name = asset_name
+		doc.ticker = frappe.db.get_value("Growe Stock", asset_name, "ticker") or ""
+
 	if value_kes is not None:
 		doc.value_kes = float(value_kes)
 	if cost_basis_kes is not None:
 		doc.cost_basis_kes = float(cost_basis_kes)
 	if quantity is not None:
 		doc.quantity = float(quantity)
-	if ticker is not None:
-		doc.ticker = ticker.upper() or None
 	if notes is not None:
 		doc.notes = notes
 

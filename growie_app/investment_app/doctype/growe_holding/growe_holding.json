@@ -9,16 +9,15 @@
   "investor",
   "asset_class",
   "asset_name",
-  "stock",
+  "ticker",
   "column_break_xvhk",
   "value_kes",
   "date_added",
   "notes",
   "optional_section",
-  "ticker",
   "quantity",
-  "column_break_bdig",
   "cost_basis_kes",
+  "column_break_bdig",
   "last_updated"
  ],
  "fields": [
@@ -40,9 +39,10 @@
   },
   {
    "fieldname": "asset_name",
-   "fieldtype": "Data",
+   "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Asset Name",
+   "label": "Stock",
+   "options": "Growe Stock",
    "reqd": 1
   },
   {
@@ -71,6 +71,7 @@
   },
   {
    "description": "e.g., SCOM, AAPL",
+   "fetch_from": "asset_name.ticker",
    "fieldname": "ticker",
    "fieldtype": "Data",
    "label": "Ticker (for stocks)"
@@ -100,18 +101,12 @@
   {
    "fieldname": "column_break_bdig",
    "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "stock",
-   "fieldtype": "Link",
-   "label": "Stock",
-   "options": "Growe Stock"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-24 15:42:30.349649",
+ "modified": "2026-04-24 15:57:06.544352",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Holding",

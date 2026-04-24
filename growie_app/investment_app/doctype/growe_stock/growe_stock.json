@@ -23,6 +23,7 @@
    "fieldname": "ticker",
    "fieldtype": "Data",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Ticker Symbol",
    "reqd": 1,
    "unique": 1
@@ -32,6 +33,7 @@
    "fieldname": "company_name",
    "fieldtype": "Data",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Company Name",
    "reqd": 1
   },
@@ -40,6 +42,7 @@
    "fieldname": "market",
    "fieldtype": "Select",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Market",
    "options": "NSE\nGlobal"
   },
@@ -48,6 +51,7 @@
    "fieldname": "sector",
    "fieldtype": "Link",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Sector",
    "options": "Growe Sector"
   },
@@ -94,7 +98,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-24 15:45:32.815232",
+ "modified": "2026-04-24 15:47:39.696001",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Stock",
@@ -111,6 +115,14 @@
    "role": "System Manager",
    "share": 1,
    "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Website User"
+  },
+  {
+   "read": 1,
+   "role": "Guest"
   }
  ],
  "row_format": "Dynamic",

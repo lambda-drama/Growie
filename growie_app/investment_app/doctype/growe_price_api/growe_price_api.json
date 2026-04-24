@@ -1,33 +1,118 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "field:provider_name",
  "creation": "2026-04-24 14:53:31.822003",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "section_break_t0bi"
+  "provider_name",
+  "api_provider",
+  "column_break_agno",
+  "is_active",
+  "market_type",
+  "api_section",
+  "api_base_url",
+  "api_key",
+  "column_break_cdlh",
+  "endpoint_prices",
+  "limits_section",
+  "calls_per_month",
+  "column_break_rzna",
+  "refresh_rate_seconds"
  ],
  "fields": [
-    {"fieldname": "provider_name", "label": "Provider Name", "fieldtype": "Data", "in_list_view": 1, "reqd": 1},
-    {"fieldname": "market_type", "label": "Market Type", "fieldtype": "Select", "options": "NSE\nGlobal\nBoth", "in_list_view": 1},
-    {"fieldname": "is_active", "label": "Active", "fieldtype": "Check", "default": 0, "in_list_view": 1},
-    
-    {"fieldname": "api_section", "label": "API Configuration", "fieldtype": "Section Break"},
-    {"fieldname": "api_base_url", "label": "API Base URL", "fieldtype": "Data", "reqd": 1},
-    {"fieldname": "api_key", "label": "API Key", "fieldtype": "Password"},
-    {"fieldname": "endpoint_prices", "label": "Prices Endpoint", "fieldtype": "Data", "description": "e.g., /stock/price"},
-    
-    {"fieldname": "limits_section", "label": "Rate Limits", "fieldtype": "Section Break"},
-    {"fieldname": "calls_per_month", "label": "Calls per Month Limit", "fieldtype": "Int", "default": 500},
-    {"fieldname": "refresh_rate_seconds", "label": "Refresh Rate (seconds)", "fieldtype": "Int", "default": 900, "description": "How often to fetch new prices"}
-  ],
+  {
+   "fieldname": "provider_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Provider Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "market_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Market Type",
+   "options": "NSE\nGlobal\nBoth"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Active"
+  },
+  {
+   "fieldname": "api_section",
+   "fieldtype": "Section Break",
+   "label": "API Configuration"
+  },
+  {
+   "fieldname": "api_base_url",
+   "fieldtype": "Data",
+   "label": "API Base URL",
+   "reqd": 1
+  },
+  {
+   "fieldname": "api_key",
+   "fieldtype": "Password",
+   "label": "API Key"
+  },
+  {
+   "description": "e.g., /stock/price",
+   "fieldname": "endpoint_prices",
+   "fieldtype": "Data",
+   "label": "Prices Endpoint"
+  },
+  {
+   "fieldname": "limits_section",
+   "fieldtype": "Section Break",
+   "label": "Rate Limits"
+  },
+  {
+   "default": "500",
+   "fieldname": "calls_per_month",
+   "fieldtype": "Int",
+   "label": "Calls per Month Limit"
+  },
+  {
+   "default": "900",
+   "description": "How often to fetch new prices",
+   "fieldname": "refresh_rate_seconds",
+   "fieldtype": "Int",
+   "label": "Refresh Rate (seconds)"
+  },
+  {
+   "fieldname": "column_break_agno",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_cdlh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_rzna",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "api_provider",
+   "fieldtype": "Select",
+   "label": "API provider",
+   "options": "\nMansa Markets\nNSE Data API (Open Source)\nAfrimarket (Python)\nFCS API\nAlpha Vantage\nYahoo Finance\nTwelve Data\nIntrinio\nICE Data Services\nNone (Manual Entry)"
+  }
+ ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-24 14:53:31.822003",
+ "modified": "2026-04-24 16:05:39.887684",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Price API",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
