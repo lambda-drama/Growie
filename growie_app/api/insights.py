@@ -58,7 +58,6 @@ def get_insights(limit: int = 20, market: str = None):
 		limit=int(limit),
 	)
 
-	# For each insight, attach linked learning bites (if the user is pro)
 	result = []
 	for r in rows:
 		item = dict(r)
@@ -69,7 +68,18 @@ def get_insights(limit: int = 20, market: str = None):
 		item["weekStarting"] = str(item.pop("week_starting") or "")
 		item["learningBiteContent"] = item.pop("learning_bite_content") or ""
 
-		# Attach linked learning bite if any
+		# Lowercase sentiment so frontend config keys match ("buy" not "Buy")
+		item["sentiment"] = (item.get("sentiment") or "watch").lower()
+
+		# ticker is a Link to Growe Stock — resolve to the actual ticker symbol
+		stock_ref = item.get("ticker") or ""
+		if stock_ref:
+			actual_ticker = frappe.db.get_value("Growe Stock", stock_ref, "ticker")
+			item["ticker"] = actual_ticker or stock_ref
+		else:
+			item["ticker"] = ""
+
+		# Attach linked learning bite (matched by linked_insight field)
 		bite = frappe.db.get_value(
 			"Growe LearningBite",
 			{"linked_insight": r.get("name")},
