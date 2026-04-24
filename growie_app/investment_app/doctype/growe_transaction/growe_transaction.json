@@ -1,0 +1,152 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-04-24 14:20:21.281955",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "investor",
+  "paystack_reference",
+  "amount_kes",
+  "tier_purchased",
+  "status",
+  "payment_details",
+  "payment_method",
+  "currency",
+  "column_break_lpjt",
+  "transaction_date",
+  "webhook_section",
+  "webhook_raw",
+  "column_break_vubs",
+  "webhook_received_at",
+  "webhook_processed"
+ ],
+ "fields": [
+  {
+   "fieldname": "investor",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Investor",
+   "options": "Growe Member",
+   "reqd": 1
+  },
+  {
+   "fieldname": "paystack_reference",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Paystack Reference",
+   "unique": 1
+  },
+  {
+   "fieldname": "amount_kes",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount (KES)",
+   "reqd": 1
+  },
+  {
+   "fieldname": "tier_purchased",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Tier Purchased",
+   "options": "Pro\nCoached"
+  },
+  {
+   "default": "Pending",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Pending\nSuccess\nFailed\nRefunded"
+  },
+  {
+   "fieldname": "payment_details",
+   "fieldtype": "Section Break",
+   "label": "Payment Details"
+  },
+  {
+   "description": "From Paystack webhook",
+   "fieldname": "payment_method",
+   "fieldtype": "Select",
+   "label": "Payment Method",
+   "options": "M-PESA\nCard\nBank Transfer"
+  },
+  {
+   "default": "KES",
+   "fieldname": "currency",
+   "fieldtype": "Select",
+   "label": "Currency",
+   "options": "KES\nUSD\nEUR"
+  },
+  {
+   "fieldname": "transaction_date",
+   "fieldtype": "Datetime",
+   "label": "Transaction Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "webhook_section",
+   "fieldtype": "Section Break",
+   "label": "Webhook Data"
+  },
+  {
+   "fieldname": "webhook_raw",
+   "fieldtype": "Text",
+   "label": "Raw Webhook Payload",
+   "read_only": 1
+  },
+  {
+   "fieldname": "webhook_received_at",
+   "fieldtype": "Datetime",
+   "label": "Webhook Received At",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "webhook_processed",
+   "fieldtype": "Check",
+   "label": "Webhook Processed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_vubs",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_lpjt",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-04-24 14:47:43.135248",
+ "modified_by": "Administrator",
+ "module": "Investment App",
+ "name": "Growe Transaction",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "if_owner": 1,
+   "read": 1,
+   "role": "Website User"
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -1,0 +1,152 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-04-24 14:32:02.920344",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "market",
+  "column_break_utgz",
+  "ticker",
+  "sentiment",
+  "content_section",
+  "commentary",
+  "learning_bite_content",
+  "metadata_section",
+  "week_starting",
+  "published_date",
+  "is_pro_only",
+  "column_break_gxsh",
+  "scope_partner_tag",
+  "order"
+ ],
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "market",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Market",
+   "options": "NSE\nGlobal",
+   "reqd": 1
+  },
+  {
+   "description": "e.g., SCOM, AAPL",
+   "fieldname": "ticker",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Ticker"
+  },
+  {
+   "fieldname": "sentiment",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Sentiment",
+   "options": "Watch\nHold\nBuy",
+   "reqd": 1
+  },
+  {
+   "fieldname": "content_section",
+   "fieldtype": "Section Break",
+   "label": "Content"
+  },
+  {
+   "description": "What's moving, why it matters",
+   "fieldname": "commentary",
+   "fieldtype": "Text Editor",
+   "label": "Commentary",
+   "reqd": 1
+  },
+  {
+   "description": "Educational context, only visible to Pro users",
+   "fieldname": "learning_bite_content",
+   "fieldtype": "Text Editor",
+   "label": "Learning Bite (Pro only)"
+  },
+  {
+   "fieldname": "metadata_section",
+   "fieldtype": "Section Break",
+   "label": "Metadata"
+  },
+  {
+   "fieldname": "week_starting",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Week Starting",
+   "reqd": 1
+  },
+  {
+   "default": "Now",
+   "fieldname": "published_date",
+   "fieldtype": "Datetime",
+   "label": "Published Date"
+  },
+  {
+   "default": "1",
+   "description": "If checked, only Pro/Coached users see this",
+   "fieldname": "is_pro_only",
+   "fieldtype": "Check",
+   "label": "Pro Only"
+  },
+  {
+   "default": "0",
+   "description": "Show Scope Markets logo on this insight",
+   "fieldname": "scope_partner_tag",
+   "fieldtype": "Check",
+   "label": "Scope Markets Partner Tag"
+  },
+  {
+   "default": "0",
+   "description": "Lower numbers appear first",
+   "fieldname": "order",
+   "fieldtype": "Int",
+   "label": "Display Order"
+  },
+  {
+   "fieldname": "column_break_utgz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_gxsh",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-04-24 14:47:21.358024",
+ "modified_by": "Administrator",
+ "module": "Investment App",
+ "name": "Growe Insight",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Website User"
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

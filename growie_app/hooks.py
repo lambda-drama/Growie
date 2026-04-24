@@ -5,6 +5,8 @@ app_description = "AI-powered investment tracker for Kenyans at home and in the 
 app_email = "martialmania19@gmail.com"
 app_license = "mit"
 
+# Logo shown in the Frappe Desk top-left header
+app_logo_url = "/assets/growie_app/image/growie.jpg"
 
 # Apps
 # ------------------
@@ -15,10 +17,18 @@ app_license = "mit"
 add_to_apps_screen = [
 	{
 		"name": "growie_app",
-		"logo": "/assets/growie_app/image/logo.png",
+		"logo": "/assets/growie_app/image/growie.jpg",
 		"title": "Growe",
 		"route": "/growie",
 	}
+]
+
+# Fixtures — synced on bench migrate
+fixtures = [
+	{
+		"doctype": "Workspace",
+		"filters": [["name", "in", ["Growe"]]],
+	},
 ]
 
 # Route all /growie/* requests to the growie_frontend www page

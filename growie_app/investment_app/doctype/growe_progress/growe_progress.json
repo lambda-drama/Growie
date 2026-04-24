@@ -1,0 +1,96 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-04-24 14:35:00.546526",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "investor",
+  "learning_bite",
+  "column_break_atlh",
+  "is_read",
+  "read_date",
+  "meta_section",
+  "first_viewed"
+ ],
+ "fields": [
+  {
+   "fieldname": "investor",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Investor",
+   "options": "Growe Member",
+   "reqd": 1
+  },
+  {
+   "fieldname": "learning_bite",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Learning Bite",
+   "options": "Growe LearningBite",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "is_read",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Is Read"
+  },
+  {
+   "fieldname": "read_date",
+   "fieldtype": "Datetime",
+   "label": "Read Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "meta_section",
+   "fieldtype": "Section Break",
+   "label": "Metadata"
+  },
+  {
+   "fieldname": "first_viewed",
+   "fieldtype": "Datetime",
+   "label": "First Viewed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_atlh",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-04-24 14:46:42.019865",
+ "modified_by": "Administrator",
+ "module": "Investment App",
+ "name": "Growe Progress",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "if_owner": 1,
+   "read": 1,
+   "role": "Website User",
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
