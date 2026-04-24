@@ -8,11 +8,19 @@
   "section_break_t0bi"
  ],
  "fields": [
-  {
-   "fieldname": "section_break_t0bi",
-   "fieldtype": "Section Break"
-  }
- ],
+    {"fieldname": "provider_name", "label": "Provider Name", "fieldtype": "Data", "in_list_view": 1, "reqd": 1},
+    {"fieldname": "market_type", "label": "Market Type", "fieldtype": "Select", "options": "NSE\nGlobal\nBoth", "in_list_view": 1},
+    {"fieldname": "is_active", "label": "Active", "fieldtype": "Check", "default": 0, "in_list_view": 1},
+    
+    {"fieldname": "api_section", "label": "API Configuration", "fieldtype": "Section Break"},
+    {"fieldname": "api_base_url", "label": "API Base URL", "fieldtype": "Data", "reqd": 1},
+    {"fieldname": "api_key", "label": "API Key", "fieldtype": "Password"},
+    {"fieldname": "endpoint_prices", "label": "Prices Endpoint", "fieldtype": "Data", "description": "e.g., /stock/price"},
+    
+    {"fieldname": "limits_section", "label": "Rate Limits", "fieldtype": "Section Break"},
+    {"fieldname": "calls_per_month", "label": "Calls per Month Limit", "fieldtype": "Int", "default": 500},
+    {"fieldname": "refresh_rate_seconds", "label": "Refresh Rate (seconds)", "fieldtype": "Int", "default": 900, "description": "How often to fetch new prices"}
+  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],

@@ -1,0 +1,104 @@
+{
+ "actions": [],
+ "autoname": "field:ticker",
+ "creation": "2026-04-23 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "ticker",
+  "market",
+  "column_break_1",
+  "price_kes",
+  "price_usd",
+  "change_percent",
+  "meta_section",
+  "source",
+  "fetched_at"
+ ],
+ "fields": [
+  {
+   "fieldname": "ticker",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Ticker",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "market",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Market",
+   "options": "NSE\nGlobal"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "price_kes",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Price (KES)",
+   "precision": "4"
+  },
+  {
+   "fieldname": "price_usd",
+   "fieldtype": "Float",
+   "label": "Price (USD)",
+   "precision": "4"
+  },
+  {
+   "fieldname": "change_percent",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Change %",
+   "precision": "2"
+  },
+  {
+   "fieldname": "meta_section",
+   "fieldtype": "Section Break",
+   "label": "Metadata"
+  },
+  {
+   "fieldname": "source",
+   "fieldtype": "Data",
+   "label": "Source API"
+  },
+  {
+   "fieldname": "fetched_at",
+   "fieldtype": "Datetime",
+   "label": "Fetched At",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-04-23 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Investment App",
+ "name": "Growe Price Cache",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Website User"
+  },
+  {
+   "read": 1,
+   "role": "Guest"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "ticker",
+ "sort_order": "ASC",
+ "states": []
+}
