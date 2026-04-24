@@ -1,0 +1,121 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-04-24 15:40:26.806940",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "ticker",
+  "company_name",
+  "market",
+  "column_break_enxt",
+  "sector",
+  "currency",
+  "is_active",
+  "api_section",
+  "api_symbol",
+  "column_break_ogtr",
+  "isin"
+ ],
+ "fields": [
+  {
+   "description": "e.g., KPLC, SCOM, EQTY",
+   "fieldname": "ticker",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Ticker Symbol",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "description": "e.g., Kenya Power and Lighting Company Plc",
+   "fieldname": "company_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Company Name",
+   "reqd": 1
+  },
+  {
+   "default": "NSE",
+   "fieldname": "market",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Market",
+   "options": "NSE\nGlobal"
+  },
+  {
+   "description": "e.g., Energy, Banking, Telecom",
+   "fieldname": "sector",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Sector",
+   "options": "Growe Sector"
+  },
+  {
+   "default": "KES",
+   "fieldname": "currency",
+   "fieldtype": "Select",
+   "label": "Trading Currency",
+   "options": "KES\nUSD\nEUR"
+  },
+  {
+   "default": "1",
+   "description": "Uncheck to hide delisted stocks",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Active"
+  },
+  {
+   "fieldname": "api_section",
+   "fieldtype": "Section Break",
+   "label": "API Mapping (For Live Prices)"
+  },
+  {
+   "description": "The symbol used by your price API (e.g., KPLC.NR for NSE, or AAPL for Global)",
+   "fieldname": "api_symbol",
+   "fieldtype": "Data",
+   "label": "External API Symbol"
+  },
+  {
+   "description": "International Securities Identification Number (Optional)",
+   "fieldname": "isin",
+   "fieldtype": "Data",
+   "label": "ISIN Code"
+  },
+  {
+   "fieldname": "column_break_enxt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_ogtr",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-04-24 15:45:32.815232",
+ "modified_by": "Administrator",
+ "module": "Investment App",
+ "name": "Growe Stock",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

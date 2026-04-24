@@ -1,6 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "GH-.#####",
  "creation": "2026-04-24 14:15:01.894424",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -8,6 +9,7 @@
   "investor",
   "asset_class",
   "asset_name",
+  "stock",
   "column_break_xvhk",
   "value_kes",
   "date_added",
@@ -98,15 +100,22 @@
   {
    "fieldname": "column_break_bdig",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "stock",
+   "fieldtype": "Link",
+   "label": "Stock",
+   "options": "Growe Stock"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-24 14:48:01.444101",
+ "modified": "2026-04-24 15:42:30.349649",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Holding",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {
