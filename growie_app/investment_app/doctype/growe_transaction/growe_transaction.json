@@ -1,0 +1,54 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-04-24 14:20:21.281955",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_xdhm"
+ ],
+ "fields": [
+    {"fieldname": "investor", "label": "Investor", "fieldtype": "Link", "options": "Growe Member", "in_list_view": 1, "reqd": 1},
+    {"fieldname": "paystack_reference", "label": "Paystack Reference", "fieldtype": "Data", "unique": 1, "in_list_view": 1},
+    {"fieldname": "amount_kes", "label": "Amount (KES)", "fieldtype": "Currency", "in_list_view": 1, "reqd": 1},
+    {"fieldname": "tier_purchased", "label": "Tier Purchased", "fieldtype": "Select", "options": "Pro\nCoached", "in_list_view": 1},
+    {"fieldname": "status", "label": "Status", "fieldtype": "Select", "options": "Pending\nSuccess\nFailed\nRefunded", "default": "Pending", "in_list_view": 1},
+    
+    {"fieldname": "payment_details", "label": "Payment Details", "fieldtype": "Section Break"},
+    {"fieldname": "payment_method", "label": "Payment Method", "fieldtype": "Select", "options": "M-PESA\nCard\nBank Transfer", "description": "From Paystack webhook"},
+    {"fieldname": "currency", "label": "Currency", "fieldtype": "Select", "options": "KES\nUSD\nEUR", "default": "KES"},
+    {"fieldname": "transaction_date", "label": "Transaction Date", "fieldtype": "Datetime", "reqd": 1},
+    
+    {"fieldname": "webhook_section", "label": "Webhook Data", "fieldtype": "Section Break"},
+    {"fieldname": "webhook_raw", "label": "Raw Webhook Payload", "fieldtype": "Text", "read_only": 1},
+    {"fieldname": "webhook_received_at", "label": "Webhook Received At", "fieldtype": "Datetime", "read_only": 1},
+    {"fieldname": "webhook_processed", "label": "Webhook Processed", "fieldtype": "Check", "default": 0, "read_only": 1}
+  ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-04-24 14:20:21.281955",
+ "modified_by": "Administrator",
+ "module": "Investment App",
+ "name": "Growe Transaction",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

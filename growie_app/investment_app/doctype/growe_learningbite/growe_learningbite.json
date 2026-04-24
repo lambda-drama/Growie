@@ -1,0 +1,52 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-04-24 14:34:16.432368",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_mist"
+ ],
+"fields": [
+    {"fieldname": "title", "label": "Title", "fieldtype": "Data", "in_list_view": 1, "reqd": 1},
+    {"fieldname": "topic_tag", "label": "Topic Tag", "fieldtype": "Data", "in_list_view": 1, "reqd": 1, "description": "e.g., Valuation, Dividends, Risk"},
+    {"fieldname": "explanation", "label": "Explanation", "fieldtype": "Text Editor", "reqd": 1},
+    
+    {"fieldname": "source_section", "label": "Source", "fieldtype": "Section Break"},
+    {"fieldname": "linked_insight", "label": "Linked Insight", "fieldtype": "Link", "options": "Growe Insight", "description": "Which insight generated this bite"},
+    {"fieldname": "month_year", "label": "Month/Year", "fieldtype": "Data", "in_list_view": 1, "description": "e.g., April 2026"},
+    
+    {"fieldname": "metadata_section", "label": "Metadata", "fieldtype": "Section Break"},
+    {"fieldname": "difficulty", "label": "Difficulty", "fieldtype": "Select", "options": "Beginner\nIntermediate", "default": "Beginner"},
+    {"fieldname": "estimated_read_time", "label": "Est. Read Time (minutes)", "fieldtype": "Int", "default": 2},
+    {"fieldname": "order", "label": "Display Order", "fieldtype": "Int", "default": 0}
+  ],
+  
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-04-24 14:34:16.432368",
+ "modified_by": "Administrator",
+ "module": "Investment App",
+ "name": "Growe LearningBite",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

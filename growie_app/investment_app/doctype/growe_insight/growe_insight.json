@@ -1,0 +1,55 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-04-24 14:32:02.920344",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_yilx"
+ ],
+"fields": [
+    {"fieldname": "title", "label": "Title", "fieldtype": "Data", "in_list_view": 1, "reqd": 1},
+    {"fieldname": "market", "label": "Market", "fieldtype": "Select", "options": "NSE\nGlobal", "in_list_view": 1, "reqd": 1},
+    {"fieldname": "ticker", "label": "Ticker", "fieldtype": "Data", "in_list_view": 1, "description": "e.g., SCOM, AAPL"},
+    {"fieldname": "sentiment", "label": "Sentiment", "fieldtype": "Select", "options": "Watch\nHold\nBuy", "in_list_view": 1, "reqd": 1},
+    
+    {"fieldname": "content_section", "label": "Content", "fieldtype": "Section Break"},
+    {"fieldname": "commentary", "label": "Commentary", "fieldtype": "Text Editor", "reqd": 1, "description": "What's moving, why it matters"},
+    {"fieldname": "learning_bite_content", "label": "Learning Bite (Pro only)", "fieldtype": "Text Editor", "description": "Educational context, only visible to Pro users"},
+    
+    {"fieldname": "metadata_section", "label": "Metadata", "fieldtype": "Section Break"},
+    {"fieldname": "week_starting", "label": "Week Starting", "fieldtype": "Date", "in_list_view": 1, "reqd": 1},
+    {"fieldname": "published_date", "label": "Published Date", "fieldtype": "Datetime", "default": "Now"},
+    {"fieldname": "is_pro_only", "label": "Pro Only", "fieldtype": "Check", "default": 1, "description": "If checked, only Pro/Coached users see this"},
+    {"fieldname": "scope_partner_tag", "label": "Scope Markets Partner Tag", "fieldtype": "Check", "default": 0, "description": "Show Scope Markets logo on this insight"},
+    {"fieldname": "order", "label": "Display Order", "fieldtype": "Int", "default": 0, "description": "Lower numbers appear first"}
+  ],
+  
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-04-24 14:32:02.920344",
+ "modified_by": "Administrator",
+ "module": "Investment App",
+ "name": "Growe Insight",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
