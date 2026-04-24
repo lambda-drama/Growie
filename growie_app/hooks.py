@@ -29,6 +29,9 @@ fixtures = [
 		"doctype": "Workspace",
 		"filters": [["name", "in", ["Growe"]]],
 	},
+	{
+		"doctype": "Growe Sector",
+	}
 ]
 
 # Route all /growie/* requests to the growie_frontend www page

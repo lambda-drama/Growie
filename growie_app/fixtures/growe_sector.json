@@ -1,0 +1,79 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Banking",
+  "modified": "2026-04-24 15:45:18.266288",
+  "name": "Banking"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Telecom",
+  "modified": "2026-04-24 15:49:17.564540",
+  "name": "Telecom"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Energy",
+  "modified": "2026-04-24 17:13:05.246428",
+  "name": "Energy"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Manufacturing",
+  "modified": "2026-04-24 17:13:50.475758",
+  "name": "Manufacturing"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Construction",
+  "modified": "2026-04-24 17:14:04.479645",
+  "name": "Construction"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Agricultural",
+  "modified": "2026-04-24 17:14:15.727234",
+  "name": "Agricultural"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Investment Services",
+  "modified": "2026-04-24 17:14:26.300037",
+  "name": "Investment Services"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Insurance",
+  "modified": "2026-04-24 17:14:35.273793",
+  "name": "Insurance"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Commercial & Services",
+  "modified": "2026-04-24 17:14:43.947203",
+  "name": "Commercial & Services"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Automobiles & Accessories",
+  "modified": "2026-04-24 17:14:52.527700",
+  "name": "Automobiles & Accessories"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Real Estate Investment Trust",
+  "modified": "2026-04-24 17:15:07.848960",
+  "name": "Real Estate Investment Trust"
+ }
+]
