@@ -25,8 +25,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Ticker Symbol",
-   "reqd": 1,
-   "unique": 1
+   "reqd": 1
   },
   {
    "description": "e.g., Kenya Power and Lighting Company Plc",
@@ -58,9 +57,9 @@
   {
    "default": "KES",
    "fieldname": "currency",
-   "fieldtype": "Select",
+   "fieldtype": "Link",
    "label": "Trading Currency",
-   "options": "KES\nUSD\nEUR"
+   "options": "Currency"
   },
   {
    "default": "1",
@@ -98,7 +97,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-24 15:47:39.696001",
+ "modified": "2026-04-24 23:52:52.766831",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Stock",

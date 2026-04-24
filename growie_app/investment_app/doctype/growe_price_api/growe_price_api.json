@@ -19,7 +19,11 @@
   "limits_section",
   "calls_per_month",
   "column_break_rzna",
-  "refresh_rate_seconds"
+  "refresh_rate_seconds",
+  "test_section",
+  "last_test_result",
+  "column_break_test",
+  "last_test_at"
  ],
  "fields": [
   {
@@ -101,8 +105,30 @@
   {
    "fieldname": "api_provider",
    "fieldtype": "Select",
-   "label": "API provider",
-   "options": "\nMansa Markets\nNSE Data API (Open Source)\nAfrimarket (Python)\nFCS API\nAlpha Vantage\nYahoo Finance\nTwelve Data\nIntrinio\nICE Data Services\nNone (Manual Entry)"
+   "in_list_view": 1,
+   "label": "API Provider",
+   "options": "\nMansa Markets\nFCS API\nNSE Data API (Open Source)\nAfrimarket (Python)\nAlpha Vantage\nYahoo Finance\nTwelve Data\nIntrinio\nICE Data Services\nNone (Manual Entry)"
+  },
+  {
+   "fieldname": "test_section",
+   "fieldtype": "Section Break",
+   "label": "Last Test"
+  },
+  {
+   "fieldname": "last_test_result",
+   "fieldtype": "Small Text",
+   "label": "Last Test Result",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_test",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "last_test_at",
+   "fieldtype": "Datetime",
+   "label": "Tested At",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
