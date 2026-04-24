@@ -49,8 +49,28 @@ def _get_active_provider():
 	return provider
 
 
+def _raise_api_error(resp, provider_name: str = ""):
+	"""Extract the API error body and raise a meaningful Frappe exception."""
+	try:
+		body = resp.json()
+		# Anthropic: {"error": {"type": "...", "message": "..."}}
+		if "error" in body:
+			err = body["error"]
+			msg = err.get("message") or str(err)
+		# OpenAI / Groq / DeepSeek: {"error": {"message": "..."}}
+		elif "message" in body:
+			msg = body["message"]
+		else:
+			msg = resp.text[:500]
+	except Exception:
+		msg = resp.text[:500]
+	prefix = f"[{provider_name}] " if provider_name else ""
+	frappe.throw(f"{prefix}HTTP {resp.status_code}: {msg}")
+
+
 def _call_openai_compat(base_url: str, api_key: str, model: str, messages: list,
-						temperature: float, max_tokens: int) -> str:
+						temperature: float, max_tokens: int,
+						provider_label: str = "OpenAI-compat") -> str:
 	"""Generic OpenAI-compatible chat/completions call (works for OpenAI, Groq, DeepSeek)."""
 	import requests
 	resp = requests.post(
@@ -67,7 +87,8 @@ def _call_openai_compat(base_url: str, api_key: str, model: str, messages: list,
 		},
 		timeout=45,
 	)
-	resp.raise_for_status()
+	if not resp.ok:
+		_raise_api_error(resp, provider_label)
 	data = resp.json()
 	return data["choices"][0]["message"]["content"]
 
@@ -75,6 +96,22 @@ def _call_openai_compat(base_url: str, api_key: str, model: str, messages: list,
 def _call_claude(api_key: str, model: str, system: str, messages: list,
 				 temperature: float, max_tokens: int) -> str:
 	import requests
+	body: dict = {
+		"model": model,
+		"max_tokens": max_tokens,
+		"system": system,
+		"messages": messages,   # only user/assistant roles here
+	}
+	# Claude 4+ (claude-opus-4-*, claude-sonnet-4-*, etc.) deprecated temperature
+	model_lower = model.lower()
+	is_claude4 = (
+		"claude-opus-4" in model_lower
+		or "claude-sonnet-4" in model_lower
+		or "claude-haiku-4" in model_lower
+	)
+	if not is_claude4:
+		body["temperature"] = temperature
+
 	resp = requests.post(
 		"https://api.anthropic.com/v1/messages",
 		headers={
@@ -82,16 +119,11 @@ def _call_claude(api_key: str, model: str, system: str, messages: list,
 			"anthropic-version": "2023-06-01",
 			"Content-Type": "application/json",
 		},
-		json={
-			"model": model,
-			"max_tokens": max_tokens,
-			"temperature": temperature,
-			"system": system,
-			"messages": messages,   # only user/assistant roles here
-		},
+		json=body,
 		timeout=45,
 	)
-	resp.raise_for_status()
+	if not resp.ok:
+		_raise_api_error(resp, f"Claude ({model})")
 	return resp.json()["content"][0]["text"]
 
 
@@ -123,7 +155,8 @@ def _call_gemini(api_key: str, model: str, system: str, messages: list,
 		json=body,
 		timeout=45,
 	)
-	resp.raise_for_status()
+	if not resp.ok:
+		_raise_api_error(resp, f"Gemini ({model_id})")
 	return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
 
 
@@ -143,7 +176,7 @@ def _dispatch(provider, system: str, user_messages: list) -> str:
 
 	elif "openai" in prov:
 		base = provider.api_base_url or "https://api.openai.com/v1"
-		return _call_openai_compat(base, api_key, model, full_msgs, temp, max_tok)
+		return _call_openai_compat(base, api_key, model, full_msgs, temp, max_tok, "OpenAI")
 
 	elif "gemini" in prov:
 		return _call_gemini(api_key, model, system, user_messages, temp, max_tok,
@@ -151,15 +184,52 @@ def _dispatch(provider, system: str, user_messages: list) -> str:
 
 	elif "groq" in prov:
 		base = provider.api_base_url or "https://api.groq.com/openai/v1"
-		return _call_openai_compat(base, api_key, model, full_msgs, temp, max_tok)
+		return _call_openai_compat(base, api_key, model, full_msgs, temp, max_tok, "Groq")
 
 	elif "deepseek" in prov:
 		base = provider.api_base_url or "https://api.deepseek.com/v1"
-		return _call_openai_compat(base, api_key, model, full_msgs, temp, max_tok)
+		return _call_openai_compat(base, api_key, model, full_msgs, temp, max_tok, "DeepSeek")
 
 	else:
 		frappe.throw(f"Provider type '{provider.provider}' is not yet supported. "
 					 "Supported: Claude, OpenAI, Gemini, Groq, DeepSeek.")
+
+
+# ─── Conversation persistence ─────────────────────────────────────────────────
+
+def _get_member() -> str | None:
+	"""Return the Growe Member name for the current session user, or None."""
+	return frappe.db.get_value("Growe Member", {"user": frappe.session.user}, "name")
+
+
+def _save_conversation(
+	question: str,
+	answer: str,
+	provider_name: str,
+	model: str,
+	conversation_type: str = "Chat",
+	holding: str = "",
+) -> None:
+	"""Persist a Q&A pair to Growe AI Conversation (best-effort, never blocks response)."""
+	try:
+		member = _get_member()
+		if not member:
+			return
+		doc = frappe.get_doc({
+			"doctype": "Growe AI Conversation",
+			"member": member,
+			"conversation_type": conversation_type,
+			"provider_name": provider_name,
+			"model_used": model,
+			"question": question[:10000],   # Long Text cap
+			"answer": answer[:10000],
+			"asked_at": frappe.utils.now(),
+			**({"holding": holding} if holding else {}),
+		})
+		doc.insert(ignore_permissions=True)
+		frappe.db.commit()
+	except Exception:
+		pass  # Never let storage failure break the AI response
 
 
 # ─── Context builders ─────────────────────────────────────────────────────────
@@ -225,6 +295,15 @@ def chat(question: str, context: str = ""):
 		system=SYSTEM_PROMPT,
 		user_messages=[{"role": "user", "content": user_content}],
 	)
+
+	_save_conversation(
+		question=question.strip(),
+		answer=reply,
+		provider_name=provider.provider_name,
+		model=provider.model,
+		conversation_type="Chat",
+	)
+
 	return {
 		"reply": reply,
 		"provider": provider.provider_name,
@@ -255,6 +334,15 @@ def analyse_portfolio():
 		system=SYSTEM_PROMPT,
 		user_messages=[{"role": "user", "content": f"{question}\n\n{ctx}"}],
 	)
+
+	_save_conversation(
+		question="Portfolio Analysis",
+		answer=reply,
+		provider_name=provider.provider_name,
+		model=provider.model,
+		conversation_type="Portfolio Analysis",
+	)
+
 	return {
 		"reply": reply,
 		"provider": provider.provider_name,
@@ -314,11 +402,58 @@ def analyse_holding(holding_name: str):
 		system=SYSTEM_PROMPT,
 		user_messages=[{"role": "user", "content": f"{question}\n\n{ctx}"}],
 	)
+
+	_save_conversation(
+		question=question,
+		answer=reply,
+		provider_name=provider.provider_name,
+		model=provider.model,
+		conversation_type="Holding Analysis",
+		holding=holding_name,
+	)
+
 	return {
 		"reply": reply,
 		"provider": provider.provider_name,
 		"model": provider.model,
 	}
+
+
+@frappe.whitelist()
+def get_conversation_history(limit: int = 20, conversation_type: str = ""):
+	"""
+	Return the authenticated user's AI conversation history, newest first.
+	Optionally filter by conversation_type (Chat / Portfolio Analysis / Holding Analysis).
+	"""
+	member_name = _get_member()
+	if not member_name:
+		return []
+
+	filters: dict = {"member": member_name}
+	if conversation_type:
+		filters["conversation_type"] = conversation_type
+
+	rows = frappe.get_all(
+		"Growe AI Conversation",
+		filters=filters,
+		fields=["name", "conversation_type", "question", "answer",
+				"provider_name", "model_used", "asked_at", "holding"],
+		order_by="asked_at desc",
+		limit=int(limit),
+	)
+	return [
+		{
+			"id": r.name,
+			"type": r.conversation_type,
+			"question": r.question,
+			"answer": r.answer,
+			"provider": r.provider_name,
+			"model": r.model_used,
+			"askedAt": str(r.asked_at),
+			"holding": r.holding or "",
+		}
+		for r in rows
+	]
 
 
 @frappe.whitelist(allow_guest=False)
@@ -340,11 +475,31 @@ def get_provider_status():
 		return {"configured": False, "reason": str(e)}
 
 
+def _list_claude_models(api_key: str) -> list:
+	"""Fetch the list of models available for this Anthropic API key."""
+	import requests
+	try:
+		resp = requests.get(
+			"https://api.anthropic.com/v1/models",
+			headers={
+				"x-api-key": api_key,
+				"anthropic-version": "2023-06-01",
+			},
+			timeout=15,
+		)
+		if resp.ok:
+			data = resp.json()
+			return [m.get("id") for m in data.get("data", []) if m.get("id")]
+	except Exception:
+		pass
+	return []
+
+
 @frappe.whitelist()
 def test_provider(provider_name: str = ""):
 	"""
 	Test the connection to a specific (or the active) AI provider.
-	Called from the Growe AI Provider form.
+	For Claude: also lists which models are available for the API key.
 	"""
 	if provider_name:
 		if not frappe.db.exists("Growe AI Provider", provider_name):
@@ -353,20 +508,46 @@ def test_provider(provider_name: str = ""):
 	else:
 		provider = _get_active_provider()
 
+	prov = (provider.provider or "").lower()
+	result: dict = {}
+
+	# For Claude: list available models first so the user knows what to enter
+	available_models: list = []
+	if "claude" in prov:
+		api_key = provider.get_password("api_key")
+		available_models = _list_claude_models(api_key)
+
 	try:
 		reply = _dispatch(
 			provider,
 			system="You are a helpful assistant.",
 			user_messages=[{"role": "user", "content": "Say exactly: 'Growe AI connection successful.'"}],
 		)
-		result = {"success": True, "reply": reply, "model": provider.model}
+		result = {
+			"success": True,
+			"reply": reply,
+			"model": provider.model,
+			"available_models": available_models,
+		}
 	except Exception as e:
-		result = {"success": False, "error": str(e)}
+		error_msg = str(e)
+		hint = ""
+		if available_models:
+			hint = f" | Models available for your key: {', '.join(available_models)}"
+		elif "claude" in prov and "404" in error_msg:
+			hint = " | Could not list models — key may be unverified or restricted."
+		result = {
+			"success": False,
+			"error": error_msg + hint,
+			"available_models": available_models,
+		}
 
-	# Save test result back to the provider doc
+	# Save note back to the provider doc
 	try:
+		status = "OK" if result["success"] else f"FAIL: {result.get('error', '')[:200]}"
+		existing = provider.notes or ""
 		frappe.db.set_value("Growe AI Provider", provider.name, {
-			"notes": (provider.notes or "") + f"\n[Test {frappe.utils.now()}] {'OK' if result['success'] else 'FAIL: ' + result.get('error','')}"
+			"notes": f"{existing}\n[Test {frappe.utils.now()}] {status}".strip()
 		})
 		frappe.db.commit()
 	except Exception:
