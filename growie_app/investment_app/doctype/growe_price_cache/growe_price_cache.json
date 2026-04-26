@@ -1,10 +1,11 @@
 {
  "actions": [],
  "autoname": "field:ticker",
- "creation": "2026-04-23 00:00:00.000000",
+ "creation": "2026-04-23 00:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "stock",
   "ticker",
   "market",
   "column_break_1",
@@ -13,10 +14,12 @@
   "change_percent",
   "meta_section",
   "source",
+  "column_break_qstu",
   "fetched_at"
  ],
  "fields": [
   {
+   "fetch_from": "stock.ticker",
    "fieldname": "ticker",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -71,14 +74,24 @@
    "in_list_view": 1,
    "label": "Fetched At",
    "read_only": 1
+  },
+  {
+   "fieldname": "stock",
+   "fieldtype": "Link",
+   "label": "Growe Stock",
+   "options": "Growe Stock"
+  },
+  {
+   "fieldname": "column_break_qstu",
+   "fieldtype": "Column Break"
   }
  ],
- "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-04-26 12:00:00.000000",
+ "modified": "2026-04-27 00:07:13.403471",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Price Cache",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
