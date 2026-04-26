@@ -20,7 +20,7 @@
   "is_pro_only",
   "column_break_gxsh",
   "scope_partner_tag",
-  "order"
+  "display_order"
  ],
  "fields": [
   {
@@ -105,25 +105,25 @@
    "label": "Scope Markets Partner Tag"
   },
   {
-   "default": "0",
-   "description": "Lower numbers appear first",
-   "fieldname": "order",
-   "fieldtype": "Int",
-   "label": "Display Order"
-  },
-  {
    "fieldname": "column_break_utgz",
    "fieldtype": "Column Break"
   },
   {
    "fieldname": "column_break_gxsh",
    "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Lower numbers appear first",
+   "fieldname": "display_order",
+   "fieldtype": "Int",
+   "label": "Display Order"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-24 19:36:24.374945",
+ "modified": "2026-04-26 23:48:50.964388",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Insight",

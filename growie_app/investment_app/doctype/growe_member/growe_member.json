@@ -4,12 +4,14 @@
  "creation": "2026-04-23 00:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
- "field_order": [
+  "field_order": [
   "full_name",
   "user",
   "column_break_1",
   "subscription_tier",
   "preferred_currency",
+  "section_break_inbox",
+  "last_support_inbox_read_at",
   "section_break_identity",
   "id_documents"
  ],
@@ -34,11 +36,11 @@
    "fieldtype": "Column Break"
   },
   {
-   "default": "free",
+   "default": "Free",
    "fieldname": "subscription_tier",
    "fieldtype": "Select",
    "label": "Subscription Tier",
-   "options": "free\npro\ncoached"
+   "options": "Free\nPro\nCoached"
   },
   {
    "default": "KES",
@@ -46,6 +48,16 @@
    "fieldtype": "Select",
    "label": "Preferred Currency",
    "options": "KES\nUSD\nEUR\nGBP"
+  },
+  {
+   "fieldname": "section_break_inbox",
+   "fieldtype": "Section Break",
+   "label": "In-app"
+  },
+  {
+   "fieldname": "last_support_inbox_read_at",
+   "fieldtype": "Datetime",
+   "label": "Last support inbox read"
   },
   {
    "fieldname": "section_break_identity",
@@ -61,8 +73,8 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-23 01:54:39.764950",
- "modified_by": "martialmania19@gmail.com",
+ "modified": "2026-04-26 23:05:26.514667",
+ "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Member",
  "naming_rule": "By fieldname",

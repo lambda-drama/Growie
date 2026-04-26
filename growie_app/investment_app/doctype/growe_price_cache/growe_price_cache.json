@@ -46,7 +46,7 @@
    "fieldname": "price_usd",
    "fieldtype": "Float",
    "label": "Price (USD)",
-   "precision": "4"
+   "precision": "6"
   },
   {
    "fieldname": "change_percent",
@@ -68,13 +68,14 @@
   {
    "fieldname": "fetched_at",
    "fieldtype": "Datetime",
+   "in_list_view": 1,
    "label": "Fetched At",
    "read_only": 1
   }
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-04-23 00:00:00.000000",
+ "modified": "2026-04-26 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Price Cache",

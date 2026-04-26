@@ -23,8 +23,8 @@ def _member_name() -> str | None:
 def _is_pro(member: str | None) -> bool:
 	if not member:
 		return False
-	tier = frappe.db.get_value("Growe Member", member, "subscription_tier") or "free"
-	return tier in ("pro", "coached")
+	tier = (frappe.db.get_value("Growe Member", member, "subscription_tier") or "free")
+	return str(tier).lower() in ("pro", "coached")
 
 
 # ── Weekly Insights (Stock Picks) ─────────────────────────────────────────────
@@ -51,10 +51,10 @@ def get_insights(limit: int = 20, market: str = None):
 		fields=[
 			"name", "title", "market", "ticker", "sentiment",
 			"commentary", "week_starting", "published_date",
-			"is_pro_only", "scope_partner_tag", "order",
+			"is_pro_only", "scope_partner_tag", "display_order",
 			"learning_bite_content",
 		],
-		order_by="week_starting desc, `order` asc",
+		order_by="week_starting desc, display_order asc",
 		limit=int(limit),
 	)
 
@@ -115,9 +115,9 @@ def get_learning_bites(limit: int = 50):
 		fields=[
 			"name", "title", "topic_tag", "explanation",
 			"linked_insight", "month_year", "difficulty",
-			"estimated_read_time", "order",
+			"estimated_read_time", "display_order",
 		],
-		order_by="`order` asc, creation asc",
+		order_by="display_order asc, creation asc",
 		limit=int(limit),
 	)
 
