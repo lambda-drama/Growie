@@ -19,7 +19,7 @@
   "difficulty",
   "estimated_read_time",
   "column_break_gxan",
-  "order"
+  "display_order"
  ],
  "fields": [
   {
@@ -81,12 +81,6 @@
    "label": "Est. Read Time (minutes)"
   },
   {
-   "default": "0",
-   "fieldname": "order",
-   "fieldtype": "Int",
-   "label": "Display Order"
-  },
-  {
    "fieldname": "column_break_miuq",
    "fieldtype": "Column Break"
   },
@@ -101,12 +95,18 @@
   {
    "fieldname": "section_break_puxx",
    "fieldtype": "Section Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "display_order",
+   "fieldtype": "Int",
+   "label": "Display Order"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-24 19:33:28.606813",
+ "modified": "2026-04-26 23:56:02.180457",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe LearningBite",

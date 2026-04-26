@@ -162,6 +162,24 @@ def _fcs_change_pct(c: float, ch: float) -> float:
 	return 0.0
 
 
+def _fcs_match_ticker_to_batch(raw_response_symbol: str, batch_requests: list) -> str | None:
+	"""
+	Map FCS response `symbol` to our tickers in this request batch.
+	Handles SCOM vs NSE:SCOM, AAPL vs NASDAQ:AAPL, etc.
+	"""
+	raw = (raw_response_symbol or "").upper().strip()
+	if not raw:
+		return None
+	base = raw.split(":")[-1] if ":" in raw else raw
+	for want in batch_requests:
+		wu = (want or "").upper()
+		if not wu:
+			continue
+		if raw == wu or base == wu or raw.endswith(f":{wu}"):
+			return wu
+	return None
+
+
 def _fetch_fcs(provider: dict, symbols: list, market: str = "Global") -> dict:
 	"""
 	Fetch prices from FCS API.
@@ -184,7 +202,8 @@ def _fetch_fcs(provider: dict, symbols: list, market: str = "Global") -> dict:
 	# FCS allows up to 30 symbols per request; batch to be safe
 	batch_size = 20
 	for i in range(0, len(sym_list), batch_size):
-		batch = sym_list[i:i + batch_size]
+		batch = sym_list[i : i + batch_size]
+		batch_requests = [s.upper() for s in symbols[i : i + batch_size]]
 		params = {
 			"symbol": ",".join(batch),
 			"access_key": access_key,
@@ -206,16 +225,19 @@ def _fetch_fcs(provider: dict, symbols: list, market: str = "Global") -> dict:
 				raw_ch = item.get("ch", 0)
 				c = float(raw_c or 0)
 				ch = float(raw_ch or 0)
-				symbol = (item.get("symbol") or "").upper()
+				raw_sym = (item.get("symbol") or "").upper()
 				currency = (item.get("currency") or "USD").upper()
 				change_pct = _fcs_change_pct(c, ch)
 
-				if symbol and c:
-					results[symbol] = {
-						"price": c,
-						"change_percent": change_pct,
-						"currency": currency,
-					}
+				# FCS may return "AAPL", "NASDAQ:AAPL", "SCOM" or "NSE:SCOM" — key cache by our ticker
+				matched = _fcs_match_ticker_to_batch(raw_sym, batch_requests)
+				if not c or not matched:
+					continue
+				results[matched] = {
+					"price": c,
+					"change_percent": change_pct,
+					"currency": currency,
+				}
 
 		except Exception as e:
 			frappe.log_error(title="FCS price fetch error", message=str(e))
@@ -431,12 +453,36 @@ def _fetch_and_store(market: str, tickers: list) -> dict:
 
 		fetched = _fetch_from_provider(provider, remaining, market)
 		for ticker, data in fetched.items():
-			_upsert_cache(ticker, market, data, usd_to_kes, provider["provider_name"])
+			tu = (ticker or "").upper()
+			if tu not in remaining:
+				continue
+			_upsert_cache(tu, market, data, usd_to_kes, provider["provider_name"])
 			currency = (data.get("currency") or "KES").upper()
 			price_kes = data["price"] if currency == "KES" else data["price"] * usd_to_kes
-			prices[ticker] = price_kes
-			if ticker in remaining:
-				remaining.remove(ticker)
+			prices[tu] = price_kes
+			remaining.remove(tu)
+
+	# One ticker at a time if batch did not return some symbols
+	if remaining and providers:
+		for provider in providers:
+			if not remaining:
+				break
+			api_prov = (provider.get("api_provider") or "").lower()
+			if "mansa" in api_prov or "mansa" in (provider.get("provider_name") or "").lower():
+				live_rate = _mansa_kes_usd_rate(provider)
+				if live_rate:
+					usd_to_kes = live_rate
+			for alone in list(remaining):
+				fetched = _fetch_from_provider(provider, [alone], market)
+				for ticker, data in fetched.items():
+					tu = (ticker or "").upper()
+					if tu not in remaining:
+						continue
+					_upsert_cache(tu, market, data, usd_to_kes, provider["provider_name"])
+					currency = (data.get("currency") or "KES").upper()
+					price_kes = data["price"] if currency == "KES" else data["price"] * usd_to_kes
+					prices[tu] = price_kes
+					remaining.remove(tu)
 
 	return prices
 
@@ -631,78 +677,133 @@ def get_stocks_with_prices(market: str = None, sector: str = None, limit: int = 
 	return result
 
 
-@frappe.whitelist()
-def refresh_stock_prices():
+def _collect_tickers_for_live_prices() -> tuple[list, list, dict, dict]:
 	"""
-	Fetch live prices for ALL active Growe Stock records (not just holdings).
-	Uses api_symbol when set so Alpha Vantage gets the correct exchange-suffixed symbol.
+	Build NSE / Global ticker lists from:
+	1) Active Growe Stock (with api_symbol map for AV)
+	2) Growe Holding — any ticker in a portfolio that is not already covered by
+	   the stock master, so "Refresh all prices" still works without a row in Growe Stock.
 	"""
-	all_stocks = frappe.get_all(
+	nse: set = set()
+	global_: set = set()
+	nse_map: dict = {}
+	global_map: dict = {}
+
+	for s in frappe.get_all(
 		"Growe Stock",
 		filters={"is_active": 1},
-		fields=["ticker", "api_symbol", "market", "currency"],
-	)
-
-	# Build {ticker → api_symbol} maps per market for AV dispatch
-	nse_symbol_map: dict = {}
-	global_symbol_map: dict = {}
-	nse_tickers: list = []
-	global_tickers: list = []
-
-	for s in all_stocks:
+		fields=["ticker", "api_symbol", "market"],
+	):
 		t = (s.ticker or "").upper()
 		if not t:
 			continue
-		if s.market == "NSE":
-			nse_tickers.append(t)
+		raw = (s.market or "NSE").strip().upper()
+		if raw not in ("NSE", "GLOBAL"):
+			raw = "NSE"
+		if raw == "NSE":
+			nse.add(t)
 			if s.api_symbol:
-				nse_symbol_map[t] = s.api_symbol
+				nse_map[t] = s.api_symbol
 		else:
-			global_tickers.append(t)
+			global_.add(t)
 			if s.api_symbol:
-				global_symbol_map[t] = s.api_symbol
+				global_map[t] = s.api_symbol
 
-	usd_to_kes = _get_usd_to_kes()
-	nse_updated = 0
-	global_updated = 0
+	for h in frappe.get_all(
+		"Growe Holding",
+		filters=[["ticker", "!=", ""]],
+		fields=["ticker", "asset_class"],
+	):
+		t = (h.ticker or "").upper()
+		if not t:
+			continue
+		if t in nse or t in global_:
+			continue
+		ac = (h.asset_class or "").lower()
+		if "nse" in ac:
+			nse.add(t)
+		else:
+			global_.add(t)
 
-	def _fetch_market(market: str, tickers: list, sym_map: dict) -> int:
-		if not tickers:
-			return 0
-		providers = _get_providers(market)
-		remaining = list(tickers)
-		count = 0
+	return list(nse), list(global_), nse_map, global_map
 
+
+def _fetch_market_for_refresh(market: str, tickers: list, sym_map: dict) -> int:
+	"""
+	Fetch and upsert for one market. Batch first, then one symbol per call for stragglers
+	(helps FCS and providers that drop symbols in multi-symbol calls).
+	"""
+	if not tickers:
+		return 0
+	providers = _get_providers(market)
+	remaining = list(dict.fromkeys((t or "").upper() for t in tickers if (t or "").strip()))
+	if not remaining:
+		return 0
+	if not providers:
+		frappe.log_error(
+			title="Growe Price: no active API provider",
+			message=f"Market {market!r} has no active Growe Price API with matching market (NSE / Global / Both).",
+		)
+		return 0
+
+	started = len(remaining)
+
+	for provider in providers:
+		if not remaining:
+			break
+		api_prov = (provider.get("api_provider") or "").lower()
+		prov_name = (provider.get("provider_name") or "").lower()
+		if "alpha" in api_prov or "alpha" in prov_name:
+			fetched = _fetch_alpha_vantage(
+				provider, remaining, market, symbol_override_map=sym_map
+			)
+		else:
+			fetched = _fetch_from_provider(provider, remaining, market)
+		_usd = _get_usd_to_kes()
+		for ticker, data in list(fetched.items()):
+			tu = (ticker or "").upper()
+			if tu not in remaining:
+				continue
+			_upsert_cache(tu, market, data, _usd, provider["provider_name"])
+			remaining.remove(tu)
+
+	# One ticker at a time: improves hit rate for Alpha (already per-symbol) and flaky batch APIs
+	if remaining:
 		for provider in providers:
 			if not remaining:
 				break
 			api_prov = (provider.get("api_provider") or "").lower()
 			prov_name = (provider.get("provider_name") or "").lower()
+			for lone in list(remaining):
+				if "alpha" in api_prov or "alpha" in prov_name:
+					fetched = _fetch_alpha_vantage(
+						provider, [lone], market, symbol_override_map=sym_map
+					)
+				else:
+					fetched = _fetch_from_provider(provider, [lone], market)
+				_usd = _get_usd_to_kes()
+				for tk, data in list(fetched.items()):
+					tu = (tk or "").upper()
+					if tu in remaining:
+						_upsert_cache(tu, market, data, _usd, provider["provider_name"])
+						remaining.remove(tu)
+	return started - len(remaining)
 
-			# For Alpha Vantage, pass the symbol override map
-			if "alpha" in api_prov or "alpha" in prov_name:
-				fetched = _fetch_alpha_vantage(
-					provider, remaining, market,
-					symbol_override_map=sym_map,
-				)
-			else:
-				fetched = _fetch_from_provider(provider, remaining, market)
 
-			_usd = _get_usd_to_kes()
-			for ticker, data in fetched.items():
-				_upsert_cache(ticker, market, data, _usd, provider["provider_name"])
-				if ticker in remaining:
-					remaining.remove(ticker)
-				count += 1
+@frappe.whitelist()
+def refresh_stock_prices():
+	"""
+	Fetch live prices for every active Growe Stock ticker **and** any ticker held in
+		Growe Holding that is not in the stock master, so the cache is populated even
+		if you only have portfolio positions. Uses `api_symbol` for Alpha Vantage.
+	"""
+	nse_tickers, global_tickers, nse_map, gmap = _collect_tickers_for_live_prices()
 
-		return count
+	nse_updated = _fetch_market_for_refresh("NSE", nse_tickers, nse_map)
+	global_updated = _fetch_market_for_refresh("Global", global_tickers, gmap)
 
-	nse_updated = _fetch_market("NSE", nse_tickers, nse_symbol_map)
-	global_updated = _fetch_market("Global", global_tickers, global_symbol_map)
-
-	# Also update any holdings whose value_kes can be recomputed
-	for ticker_entry in all_stocks:
-		t = (ticker_entry.ticker or "").upper()
+	# Recompute holding values for any price we have for these tickers
+	for t in set(nse_tickers) | set(global_tickers):
 		cache = frappe.db.get_value("Growe Price Cache", t, "price_kes")
 		if cache:
 			_update_holdings_for_ticker(t, float(cache))
