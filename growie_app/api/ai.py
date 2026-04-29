@@ -364,44 +364,6 @@ def chat(question: str, context: str = ""):
 	}
 
 
-# @frappe.whitelist()
-# def analyse_portfolio():
-# 	"""Full portfolio analysis for the authenticated user."""
-# 	member_name = frappe.db.get_value("Growe Member", {"user": frappe.session.user}, "name")
-# 	if not member_name:
-# 		frappe.throw("Growe Member profile not found for your account.")
-# 	_enforce_portfolio_analysis_limit(member_name)
-
-# 	ctx = _build_portfolio_context(member_name)
-# 	if not ctx:
-# 		frappe.throw("No holdings found to analyse. Add holdings first.")
-
-# 	question = (
-# 		"Please analyse my overall investment portfolio. "
-# 		"Cover: (1) diversification quality, (2) top risks, "
-# 		"(3) what's working well, and (4) one clear recommended next step."
-# 	)
-
-# 	provider = _get_active_provider()
-# 	reply = _dispatch(
-# 		provider,
-# 		system=SYSTEM_PROMPT,
-# 		user_messages=[{"role": "user", "content": f"{question}\n\n{ctx}"}],
-# 	)
-
-# 	_save_conversation(
-# 		question="Portfolio Analysis",
-# 		answer=reply,
-# 		provider_name=provider.provider_name,
-# 		model=provider.model,
-# 		conversation_type="Portfolio Analysis",
-# 	)
-
-# 	return {
-# 		"reply": reply,
-# 		"provider": provider.provider_name,
-# 		"model": provider.model,
-# 	}
 
 @frappe.whitelist()
 def analyse_portfolio():

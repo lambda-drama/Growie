@@ -175,27 +175,53 @@ def get_currencies(query: str = "", limit: int = 100):
 	)
 
 
+def _kes_per_unit_of_foreign(foreign_currency: str, transaction_date=None) -> float:
+	"""
+	Return how many KES equal 1 unit of foreign_currency (using ERPNext exchange rates).
+
+	If only KES→foreign exists, use it directly (multiply amount_kes by it for foreign amount).
+	If only foreign→KES exists with rate R meaning 1 foreign = R KES, then 1 KES = 1/R foreign.
+	"""
+	d = transaction_date or today()
+	f = (foreign_currency or "").upper().strip()
+	if not f or f == "KES":
+		return 1.0
+
+	try:
+		from erpnext.setup.utils import get_exchange_rate
+	except ImportError:
+		return 0.0
+
+	direct = float(get_exchange_rate("KES", f, d) or 0)
+	if direct > 0:
+		return direct
+
+	inverse = float(get_exchange_rate(f, "KES", d) or 0)
+	if inverse > 0:
+		return 1.0 / inverse
+
+	return 0.0
+
+
 @frappe.whitelist()
 def get_kes_to_currency_multiplier(to_currency: str = "KES"):
 	"""
 	Return multiplier such that: amount_in_display_currency = amount_kes * multiplier.
-	Uses ERPNext get_exchange_rate (Currency Exchange), consistent with holdings valuation.
+
+	ERPNext Currency Exchange rows may list USD→KES only; we resolve via inverse when needed.
 	"""
 	c = (to_currency or "KES").upper().strip()
 	if c == "KES":
 		return {"multiplier": 1.0, "currency": c}
 
 	try:
-		from erpnext.setup.utils import get_exchange_rate
-
-		rate = float(get_exchange_rate("KES", c, today()) or 0)
-		if rate <= 0:
+		mult = _kes_per_unit_of_foreign(c, today())
+		if mult <= 0:
 			frappe.throw(
-				_("No exchange rate from KES to {0} on {1}. Configure Currency Exchange in ERPNext.").format(
-					c, today()
-				)
+				_("No exchange rate between KES and {0} on {1}. Configure Currency Exchange in ERPNext.")
+				.format(c, today())
 			)
-		return {"multiplier": rate, "currency": c}
+		return {"multiplier": mult, "currency": c}
 	except ImportError:
 		return {"multiplier": 1.0, "currency": c, "fallback": True}
 
