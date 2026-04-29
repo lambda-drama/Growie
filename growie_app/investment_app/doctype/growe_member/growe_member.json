@@ -4,7 +4,7 @@
  "creation": "2026-04-23 00:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
-  "field_order": [
+ "field_order": [
   "full_name",
   "user",
   "column_break_1",
@@ -38,9 +38,9 @@
   {
    "default": "Free",
    "fieldname": "subscription_tier",
-   "fieldtype": "Select",
+   "fieldtype": "Link",
    "label": "Subscription Tier",
-   "options": "Free\nPro\nCoached"
+   "options": "Subscription Tier"
   },
   {
    "default": "KES",
@@ -73,7 +73,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-26 23:05:26.514667",
+ "modified": "2026-04-29 22:11:26.647594",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Member",

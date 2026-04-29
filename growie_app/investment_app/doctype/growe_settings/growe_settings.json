@@ -12,6 +12,8 @@
   "pro_tier_price_kes",
   "column_break_ebrg",
   "coached_tier_price_kes",
+  "ai_rate_limiters_section",
+  "ai_limits",
   "limits_section",
   "free_tier_insight_limit",
   "column_break_imww",
@@ -111,14 +113,25 @@
    "fieldtype": "Link",
    "label": "Default Stock API",
    "options": "Growe Price API"
+  },
+  {
+   "fieldname": "ai_rate_limiters_section",
+   "fieldtype": "Section Break",
+   "label": "AI Rate Limiters"
+  },
+  {
+   "fieldname": "ai_limits",
+   "fieldtype": "Table",
+   "label": "AI Limits",
+   "options": "Subscription Details"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-04-24 23:37:47.133092",
- "modified_by": "martialmania19@gmail.com",
+ "modified": "2026-04-29 22:14:41.934589",
+ "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Settings",
  "owner": "Administrator",
