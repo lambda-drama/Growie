@@ -5,7 +5,7 @@ All endpoints require an authenticated session unless noted.
 
 import frappe
 from frappe import _
-from frappe.utils import now_datetime, today
+from frappe.utils import now_datetime, today, getdate
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -77,7 +77,30 @@ def _holding_to_dict(h) -> dict:
 		"notes": h.get("notes") or "",
 		"currentPriceKES": float(price_kes or 0),
 		"changePercent": float(change_percent or 0),
+		"currency": h.get("currency") or "KES",
 	}
+
+
+def _to_kes(amount: float, from_currency: str, on_date: str = None) -> float:
+	"""Convert amount from from_currency to KES via ERPNext exchange rates."""
+	src = (from_currency or "KES").upper().strip()
+	val = float(amount or 0)
+	if not val:
+		return 0.0
+	if src == "KES":
+		return val
+
+	try:
+		from erpnext.setup.utils import get_exchange_rate
+		rate = float(get_exchange_rate(src, "KES", on_date or today()) or 0)
+		if rate <= 0:
+			frappe.throw(
+				_("No exchange rate configured from {0} to KES on {1}. Please configure Currency Exchange in ERPNext.")
+				.format(src, on_date or today())
+			)
+		return val * rate
+	except ImportError:
+		frappe.throw(_("ERPNext exchange rate utilities are not available on this site."))
 
 
 # ── Stock search ──────────────────────────────────────────────────────────────
@@ -124,6 +147,59 @@ def search_stocks(query: str = "", market: str = None, limit: int = 20):
 	return results
 
 
+@frappe.whitelist()
+def get_currencies(query: str = "", limit: int = 100):
+	"""Return currencies from ERPNext/Frappe Currency doctype for searchable dropdowns."""
+	has_enabled = frappe.get_meta("Currency").has_field("enabled")
+	where_enabled = "AND enabled = 1" if has_enabled else ""
+	base_filters = {"enabled": 1} if has_enabled else {}
+	if query:
+		return frappe.db.sql(
+			"""
+			SELECT name
+			FROM `tabCurrency`
+			WHERE name LIKE %(q)s
+			  {where_enabled}
+			ORDER BY name ASC
+			LIMIT %(limit)s
+			""".format(where_enabled=where_enabled),
+			{"q": f"%{query}%", "limit": int(limit)},
+			as_dict=True,
+		)
+	return frappe.get_all(
+		"Currency",
+		filters=base_filters,
+		fields=["name"],
+		order_by="name asc",
+		limit=int(limit),
+	)
+
+
+@frappe.whitelist()
+def get_kes_to_currency_multiplier(to_currency: str = "KES"):
+	"""
+	Return multiplier such that: amount_in_display_currency = amount_kes * multiplier.
+	Uses ERPNext get_exchange_rate (Currency Exchange), consistent with holdings valuation.
+	"""
+	c = (to_currency or "KES").upper().strip()
+	if c == "KES":
+		return {"multiplier": 1.0, "currency": c}
+
+	try:
+		from erpnext.setup.utils import get_exchange_rate
+
+		rate = float(get_exchange_rate("KES", c, today()) or 0)
+		if rate <= 0:
+			frappe.throw(
+				_("No exchange rate from KES to {0} on {1}. Configure Currency Exchange in ERPNext.").format(
+					c, today()
+				)
+			)
+		return {"multiplier": rate, "currency": c}
+	except ImportError:
+		return {"multiplier": 1.0, "currency": c, "fallback": True}
+
+
 # ── Read ──────────────────────────────────────────────────────────────────────
 
 @frappe.whitelist()
@@ -136,7 +212,7 @@ def get_holdings():
 		fields=[
 			"name", "asset_class", "asset_name", "value_kes",
 			"cost_basis_kes", "quantity", "ticker",
-			"date_added", "last_updated", "notes",
+			"date_added", "last_updated", "notes", "currency",
 		],
 		order_by="date_added desc",
 	)
@@ -192,8 +268,7 @@ def get_portfolio_summary():
 def add_holding(
 	asset_class: str,
 	asset_name: str,           # Growe Stock name (Link field value)
-	value_kes: float,
-	cost_basis_kes: float = None,
+	currency: str = "KES",
 	quantity: float = None,
 	notes: str = None,
 	date_added: str = None,
@@ -206,6 +281,30 @@ def add_holding(
 
 	ticker = frappe.db.get_value("Growe Stock", asset_name, "ticker") or ""
 	ac_label = _ASSET_CLASS_REVERSE.get(asset_class, asset_class)
+	use_date = date_added or today()
+	qty = float(quantity or 0)
+
+	# Use cached market price to compute current and original values.
+	cache = frappe.db.get_value(
+		"Growe Price Cache",
+		ticker,
+		["price_kes", "price_usd"],
+		as_dict=True,
+	) if ticker else None
+	price_in_currency = 0.0
+	ccy = (currency or "KES").upper()
+	if cache:
+		if ccy == "KES":
+			price_in_currency = float(cache.price_kes or 0)
+		elif ccy == "USD":
+			price_in_currency = float(cache.price_usd or 0)
+		else:
+			kes_px = float(cache.price_kes or 0)
+			if kes_px > 0:
+				price_in_currency = kes_px / _to_kes(1, ccy, use_date)
+
+	value_in_currency = qty * price_in_currency
+	value_kes = _to_kes(value_in_currency, ccy, use_date) if value_in_currency else 0
 
 	doc = frappe.get_doc({
 		"doctype": "Growe Holding",
@@ -214,10 +313,11 @@ def add_holding(
 		"asset_name": asset_name,
 		"ticker": ticker,
 		"value_kes": float(value_kes),
-		"cost_basis_kes": float(cost_basis_kes or value_kes),
-		"quantity": float(quantity or 0),
+		"cost_basis_kes": float(value_kes),
+		"quantity": qty,
+		"currency": ccy,
 		"notes": notes or "",
-		"date_added": date_added or today(),
+		"date_added": use_date,
 		"last_updated": now_datetime(),
 	})
 	doc.flags.ignore_permissions = True
@@ -232,8 +332,8 @@ def add_holding(
 def update_holding(
 	holding_name: str,
 	asset_name: str = None,    # Growe Stock name
-	value_kes: float = None,
-	cost_basis_kes: float = None,
+	currency: str = None,
+	date_added: str = None,
 	quantity: float = None,
 	notes: str = None,
 ):
@@ -249,20 +349,66 @@ def update_holding(
 		doc.asset_name = asset_name
 		doc.ticker = frappe.db.get_value("Growe Stock", asset_name, "ticker") or ""
 
-	if value_kes is not None:
-		doc.value_kes = float(value_kes)
-	if cost_basis_kes is not None:
-		doc.cost_basis_kes = float(cost_basis_kes)
+	if currency is not None:
+		doc.currency = (currency or "KES").upper()
+	if date_added is not None:
+		doc.date_added = getdate(date_added)
 	if quantity is not None:
 		doc.quantity = float(quantity)
 	if notes is not None:
 		doc.notes = notes
+
+	# Recompute derived values from current cache and entered quantity.
+	ticker = doc.ticker or ""
+	cache = frappe.db.get_value(
+		"Growe Price Cache",
+		ticker,
+		["price_kes", "price_usd"],
+		as_dict=True,
+	) if ticker else None
+	ccy = (doc.currency or "KES").upper()
+	qty = float(doc.quantity or 0)
+	if cache and qty > 0:
+		if ccy == "KES":
+			price_in_currency = float(cache.price_kes or 0)
+		elif ccy == "USD":
+			price_in_currency = float(cache.price_usd or 0)
+		else:
+			kes_px = float(cache.price_kes or 0)
+			price_in_currency = kes_px / _to_kes(1, ccy, str(doc.date_added))
+		value_in_currency = qty * price_in_currency
+		doc.value_kes = _to_kes(value_in_currency, ccy, str(doc.date_added))
+		doc.cost_basis_kes = doc.value_kes
 
 	doc.last_updated = now_datetime()
 	doc.flags.ignore_permissions = True
 	doc.save()
 	frappe.db.commit()
 	return _holding_to_dict(doc)
+
+
+@frappe.whitelist()
+def get_holding_movement(holding_name: str, period: str = "1y"):
+	"""Return a simple two-point movement series for a selected holding."""
+	member = _member_name()
+	doc = frappe.get_doc("Growe Holding", holding_name)
+	if doc.investor != member:
+		frappe.throw(_("You are not authorised to view this holding."), frappe.PermissionError)
+
+	start_value = float(doc.cost_basis_kes or 0)
+	current_value = float(doc.value_kes or 0)
+	start_date = str(doc.date_added or today())
+	end_date = str(today())
+
+	return {
+		"holdingId": doc.name,
+		"holdingName": doc.asset_name,
+		"period": period,
+		"points": [
+			{"label": "Start", "date": start_date, "valueKES": start_value},
+			{"label": "Now", "date": end_date, "valueKES": current_value},
+		],
+	}
 
 
 # ── Delete ────────────────────────────────────────────────────────────────────

@@ -35,6 +35,12 @@ fixtures = [
  {
 	 "doctype":"Growe Stock"
  },
+ {
+	"doctype":"Subscription Tier"
+ },
+ {
+	 "doctype":"Video Category"
+ }
 ]
 
 # Route all /growie/* requests to the growie_frontend www page
@@ -165,23 +171,11 @@ website_route_rules = [
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"growie_app.tasks.all"
-# 	],
-# 	"daily": [
-# 		"growie_app.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"growie_app.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"growie_app.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"growie_app.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"daily": [
+		"growie_app.investment_app.doctype.news_settings.news_settings.daily_news_scrape"
+	]
+}
 
 # Testing
 # -------

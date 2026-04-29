@@ -12,6 +12,8 @@ The active provider is set in Growe Settings → Default AI Provider (Link to Gr
 """
 
 import frappe
+from frappe import _
+from frappe.utils import get_first_day, get_last_day, today
 
 # ─── System prompt ────────────────────────────────────────────────────────────
 
@@ -274,6 +276,39 @@ def _build_portfolio_context(member_name: str) -> str:
 	return ctx
 
 
+def _enforce_monthly_ai_limit(member_name: str):
+	"""Enforce per-tier monthly AI limits (Ask Growe + analyses) from Growe Settings.ai_limits."""
+	tier_raw = frappe.db.get_value("Growe Member", member_name, "subscription_tier")
+	tier = str(tier_raw or "").strip().lower()
+	settings = frappe.get_single("Growe Settings")
+	limit_rows = settings.get("ai_limits") or []
+	limit_value = None
+	for row in limit_rows:
+		row_tier = str(row.subscription_tier or "").strip().lower()
+		if row_tier == tier:
+			limit_value = int(row.ai_rate_limiter or 0)
+			break
+	if not limit_value or limit_value <= 0:
+		return
+
+	start = get_first_day(today())
+	end = get_last_day(today())
+	used = frappe.db.count(
+		"Growe AI Conversation",
+		{
+			"member": member_name,
+			"asked_at": ["between", [start, end]],
+		},
+	)
+	if used >= limit_value:
+		frappe.throw(
+			_(
+				"Monthly AI usage limit reached ({0}). This includes Ask Growe chat and portfolio analyses. "
+				"Please update your plan or wait until next month."
+			).format(limit_value)
+		)
+
+
 # ─── Public endpoints ─────────────────────────────────────────────────────────
 
 @frappe.whitelist()
@@ -282,6 +317,24 @@ def chat(question: str, context: str = ""):
 	General AI chat. Authenticated users only.
 	Optionally pass portfolio context for richer answers.
 	"""
+	if frappe.session.user == "Guest":
+		frappe.throw(_("Please log in."), frappe.AuthenticationError)
+
+	member_name = frappe.db.get_value("Growe Member", {"user": frappe.session.user}, "name")
+	if not member_name:
+		frappe.throw(_("Growe Member profile not found for your account."))
+
+	try:
+		_enforce_monthly_ai_limit(member_name)
+	except frappe.ValidationError as e:
+		# Return the limit message as a regular response instead of throwing
+		return {
+			"reply": str(e),
+			"provider": "System",
+			"model": "N/A"
+		}
+        
+
 	if not question or not question.strip():
 		frappe.throw("Question cannot be empty.")
 
@@ -311,43 +364,101 @@ def chat(question: str, context: str = ""):
 	}
 
 
+# @frappe.whitelist()
+# def analyse_portfolio():
+# 	"""Full portfolio analysis for the authenticated user."""
+# 	member_name = frappe.db.get_value("Growe Member", {"user": frappe.session.user}, "name")
+# 	if not member_name:
+# 		frappe.throw("Growe Member profile not found for your account.")
+# 	_enforce_portfolio_analysis_limit(member_name)
+
+# 	ctx = _build_portfolio_context(member_name)
+# 	if not ctx:
+# 		frappe.throw("No holdings found to analyse. Add holdings first.")
+
+# 	question = (
+# 		"Please analyse my overall investment portfolio. "
+# 		"Cover: (1) diversification quality, (2) top risks, "
+# 		"(3) what's working well, and (4) one clear recommended next step."
+# 	)
+
+# 	provider = _get_active_provider()
+# 	reply = _dispatch(
+# 		provider,
+# 		system=SYSTEM_PROMPT,
+# 		user_messages=[{"role": "user", "content": f"{question}\n\n{ctx}"}],
+# 	)
+
+# 	_save_conversation(
+# 		question="Portfolio Analysis",
+# 		answer=reply,
+# 		provider_name=provider.provider_name,
+# 		model=provider.model,
+# 		conversation_type="Portfolio Analysis",
+# 	)
+
+# 	return {
+# 		"reply": reply,
+# 		"provider": provider.provider_name,
+# 		"model": provider.model,
+# 	}
+
 @frappe.whitelist()
 def analyse_portfolio():
-	"""Full portfolio analysis for the authenticated user."""
-	member_name = frappe.db.get_value("Growe Member", {"user": frappe.session.user}, "name")
-	if not member_name:
-		frappe.throw("Growe Member profile not found for your account.")
+    """Full portfolio analysis for the authenticated user."""
+    try:
+        member_name = frappe.db.get_value("Growe Member", {"user": frappe.session.user}, "name")
+        if not member_name:
+            frappe.throw("Growe Member profile not found for your account.")
+        
+        # Try to enforce limit, but catch the limit error
+        try:
+            _enforce_monthly_ai_limit(member_name)
+        except frappe.ValidationError as e:
+            # Return the limit message as a regular response instead of throwing
+            return {
+                "reply": str(e),
+                "provider": "System",
+                "model": "N/A"
+            }
+        
+        ctx = _build_portfolio_context(member_name)
+        if not ctx:
+            frappe.throw("No holdings found to analyse. Add holdings first.")
 
-	ctx = _build_portfolio_context(member_name)
-	if not ctx:
-		frappe.throw("No holdings found to analyse. Add holdings first.")
+        question = (
+            "Please analyse my overall investment portfolio. "
+            "Cover: (1) diversification quality, (2) top risks, "
+            "(3) what's working well, and (4) one clear recommended next step."
+        )
 
-	question = (
-		"Please analyse my overall investment portfolio. "
-		"Cover: (1) diversification quality, (2) top risks, "
-		"(3) what's working well, and (4) one clear recommended next step."
-	)
+        provider = _get_active_provider()
+        reply = _dispatch(
+            provider,
+            system=SYSTEM_PROMPT,
+            user_messages=[{"role": "user", "content": f"{question}\n\n{ctx}"}],
+        )
 
-	provider = _get_active_provider()
-	reply = _dispatch(
-		provider,
-		system=SYSTEM_PROMPT,
-		user_messages=[{"role": "user", "content": f"{question}\n\n{ctx}"}],
-	)
+        _save_conversation(
+            question="Portfolio Analysis",
+            answer=reply,
+            provider_name=provider.provider_name,
+            model=provider.model,
+            conversation_type="Portfolio Analysis",
+        )
 
-	_save_conversation(
-		question="Portfolio Analysis",
-		answer=reply,
-		provider_name=provider.provider_name,
-		model=provider.model,
-		conversation_type="Portfolio Analysis",
-	)
-
-	return {
-		"reply": reply,
-		"provider": provider.provider_name,
-		"model": provider.model,
-	}
+        return {
+            "reply": reply,
+            "provider": provider.provider_name,
+            "model": provider.model,
+        }
+    except Exception as e:
+        frappe.log_error(f"Portfolio analysis error: {str(e)}", "Growe AI")
+        return {
+            "reply": f"⚠️ {str(e)}",
+            "provider": "System",
+            "model": "N/A"
+        }
 
 
 @frappe.whitelist()
@@ -360,6 +471,17 @@ def analyse_holding(holding_name: str):
 	member_name = frappe.db.get_value("Growe Member", {"user": frappe.session.user}, "name")
 	if not member_name or holding.investor != member_name:
 		frappe.throw("Not authorized.", frappe.PermissionError)
+
+	try:
+		_enforce_monthly_ai_limit(member_name)
+	except frappe.ValidationError as e:
+		# Return the limit message as a regular response instead of throwing
+		return {
+			"reply": str(e),
+			"provider": "System",
+			"model": "N/A"
+		}
+        
 
 	ticker = holding.ticker or holding.asset_name
 	cost   = float(holding.cost_basis_kes or 0)

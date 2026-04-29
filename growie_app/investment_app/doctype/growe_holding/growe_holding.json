@@ -10,6 +10,7 @@
   "asset_class",
   "asset_name",
   "ticker",
+  "currency",
   "column_break_xvhk",
   "value_kes",
   "date_added",
@@ -75,6 +76,13 @@
    "fieldname": "ticker",
    "fieldtype": "Data",
    "label": "Ticker (for stocks)"
+  },
+  {
+   "default": "KES",
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
   },
   {
    "description": "Number of shares/units",

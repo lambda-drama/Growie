@@ -1,0 +1,49 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-04-29 22:12:02.647396",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "subscription_tier",
+  "column_break_vxcr",
+  "ai_rate_limiter"
+ ],
+ "fields": [
+  {
+   "fieldname": "subscription_tier",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Subscription Tier",
+   "options": "Subscription Tier"
+  },
+  {
+   "fieldname": "ai_rate_limiter",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "AI Rate Limiter(Monthly)"
+  },
+  {
+   "fieldname": "column_break_vxcr",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-04-30 00:27:59.897585",
+ "modified_by": "Administrator",
+ "module": "Investment App",
+ "name": "Subscription Details",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
