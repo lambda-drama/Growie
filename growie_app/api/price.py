@@ -32,6 +32,7 @@ import frappe
 from frappe import _
 from frappe.utils import now_datetime
 import requests as _requests
+import time
 
 
 # ── KES/USD fallback rate ─────────────────────────────────────────────────────
@@ -79,7 +80,15 @@ def _get_providers(market_type: str) -> list:
 		],
 		order_by="creation asc",
 	)
-	return [p for p in providers if p.market_type in (market_type, "Both")]
+	filtered = [p for p in providers if p.market_type in (market_type, "Both")]
+	# Business rule: Alpha Vantage is Global-only.
+	if str(market_type).upper() == "NSE":
+		def _is_alpha(p: dict) -> bool:
+			api_prov = str(p.get("api_provider") or "").lower()
+			prov_name = str(p.get("provider_name") or "").lower().replace(" ", "")
+			return "alpha" in api_prov or "alphavantage" in prov_name
+		filtered = [p for p in filtered if not _is_alpha(p)]
+	return filtered
 
 
 # ── Mansa Markets ─────────────────────────────────────────────────────────────
@@ -282,7 +291,11 @@ def _fetch_alpha_vantage(
 	api_key = provider.get("api_key", "")
 	results: dict = {}
 
-	for symbol in symbols:
+	for idx, symbol in enumerate(symbols):
+		# Alpha free tier allows ~1 request/sec burst; enforce spacing.
+		if idx > 0:
+			time.sleep(1.05)
+
 		# Prefer api_symbol from Growe Stock; fall back to suffix logic
 		if symbol_override_map and symbol.upper() in symbol_override_map:
 			av_symbol = symbol_override_map[symbol.upper()]
@@ -305,6 +318,7 @@ def _fetch_alpha_vantage(
 			# Alpha Vantage returns a plaintext "Information" or "Note" key when rate-limited
 			if "Information" in body or "Note" in body:
 				limit_msg = body.get("Information") or body.get("Note", "")
+				provider["_alpha_rate_limited"] = 1
 				frappe.log_error(
 					title="Alpha Vantage rate limit hit",
 					message=limit_msg,
@@ -364,12 +378,16 @@ def _fetch_alpha_vantage(
 def _fetch_from_provider(provider: dict, symbols: list, market: str = "NSE") -> dict:
 	api_prov  = (provider.get("api_provider")  or "").lower()
 	prov_name = (provider.get("provider_name") or "").lower()
-
+	
 	if "mansa" in api_prov or "mansa" in prov_name:
 		return _fetch_mansa(provider, symbols, market)
 	if "fcs" in api_prov or "fcs" in prov_name:
 		return _fetch_fcs(provider, symbols, market)
 	if "alpha" in api_prov or "alphavantage" in prov_name.replace(" ", "") or "alpha vantage" in prov_name:
+		
+		if str(market).upper() != "GLOBAL":
+			return {}
+		
 		return _fetch_alpha_vantage(provider, symbols, market)
 
 	# Unknown — skip with a warning
@@ -452,6 +470,7 @@ def _fetch_and_store(market: str, tickers: list) -> dict:
 				usd_to_kes = live_rate
 
 		fetched = _fetch_from_provider(provider, remaining, market)
+		
 		for ticker, data in fetched.items():
 			tu = (ticker or "").upper()
 			if tu not in remaining:
@@ -576,6 +595,7 @@ def test_provider(provider_name: str, test_ticker: str = "SCOM", market: str = N
 
 	try:
 		results = _fetch_from_provider(dict(provider), [ticker], market)
+		
 	except Exception as e:
 		_save_test_result(provider_name, f"ERROR: {e}")
 		return {"success": False, "error": str(e)}
@@ -753,6 +773,8 @@ def _fetch_market_for_refresh(market: str, tickers: list, sym_map: dict) -> int:
 			break
 		api_prov = (provider.get("api_provider") or "").lower()
 		prov_name = (provider.get("provider_name") or "").lower()
+		if provider.get("_alpha_rate_limited"):
+			continue
 		if "alpha" in api_prov or "alpha" in prov_name:
 			fetched = _fetch_alpha_vantage(
 				provider, remaining, market, symbol_override_map=sym_map
@@ -774,6 +796,8 @@ def _fetch_market_for_refresh(market: str, tickers: list, sym_map: dict) -> int:
 				break
 			api_prov = (provider.get("api_provider") or "").lower()
 			prov_name = (provider.get("provider_name") or "").lower()
+			if provider.get("_alpha_rate_limited"):
+				continue
 			for lone in list(remaining):
 				if "alpha" in api_prov or "alpha" in prov_name:
 					fetched = _fetch_alpha_vantage(
@@ -801,7 +825,6 @@ def refresh_stock_prices():
 
 	nse_updated = _fetch_market_for_refresh("NSE", nse_tickers, nse_map)
 	global_updated = _fetch_market_for_refresh("Global", global_tickers, gmap)
-
 	# Recompute holding values for any price we have for these tickers
 	for t in set(nse_tickers) | set(global_tickers):
 		cache = frappe.db.get_value("Growe Price Cache", t, "price_kes")
