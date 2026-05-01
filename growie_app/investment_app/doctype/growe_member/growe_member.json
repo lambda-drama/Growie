@@ -43,7 +43,7 @@
    "options": "Subscription Tier"
   },
   {
-   "default": "KES",
+   "default": "USD",
    "fieldname": "preferred_currency",
    "fieldtype": "Select",
    "label": "Preferred Currency",

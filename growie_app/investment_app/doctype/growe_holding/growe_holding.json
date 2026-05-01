@@ -50,7 +50,8 @@
    "fieldname": "value_kes",
    "fieldtype": "Currency",
    "in_list_view": 1,
-   "label": "Value (KES)",
+   "label": "Value",
+   "options": "currency",
    "reqd": 1
   },
   {
@@ -78,7 +79,7 @@
    "label": "Ticker (for stocks)"
   },
   {
-   "default": "KES",
+   "default": "USD",
    "fieldname": "currency",
    "fieldtype": "Link",
    "label": "Currency",
@@ -94,7 +95,8 @@
    "description": "What you originally paid",
    "fieldname": "cost_basis_kes",
    "fieldtype": "Currency",
-   "label": "Cost Basis (KES)"
+   "label": "Cost Basis",
+   "options": "currency"
   },
   {
    "fieldname": "last_updated",
@@ -114,7 +116,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-24 15:57:06.544352",
+ "modified": "2026-05-01 13:05:08.404878",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Holding",

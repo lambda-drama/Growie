@@ -364,7 +364,6 @@ def chat(question: str, context: str = ""):
 	}
 
 
-
 @frappe.whitelist()
 def analyse_portfolio():
     """Full portfolio analysis for the authenticated user."""

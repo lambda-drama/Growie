@@ -69,7 +69,9 @@ def _holding_to_dict(h) -> dict:
 		"stockName": stock_name,           # the Link value (Growe Stock name)
 		"assetClass": _ASSET_CLASS_MAP.get(h.get("asset_class"), "mmf"),
 		"valueKES": float(h.get("value_kes") or 0),
+		"value": float(h.get("value_kes") or 0),  # forward-compatible alias
 		"costBasisKES": float(h.get("cost_basis_kes") or 0),
+		"costBasis": float(h.get("cost_basis_kes") or 0),  # forward-compatible alias
 		"quantity": float(h.get("quantity") or 0),
 		"ticker": ticker,
 		"dateAdded": str(h.get("date_added") or today()),
@@ -77,7 +79,7 @@ def _holding_to_dict(h) -> dict:
 		"notes": h.get("notes") or "",
 		"currentPriceKES": float(price_kes or 0),
 		"changePercent": float(change_percent or 0),
-		"currency": h.get("currency") or "KES",
+		"currency": h.get("currency") or "USD",
 	}
 
 
@@ -279,8 +281,11 @@ def get_portfolio_summary():
 
 	return {
 		"totalValueKES": round(total_value, 2),
+		"totalValue": round(total_value, 2),  # forward-compatible alias
 		"totalCostKES": round(total_cost, 2),
+		"totalCost": round(total_cost, 2),  # forward-compatible alias
 		"gainKES": round(gain, 2),
+		"gain": round(gain, 2),  # forward-compatible alias
 		"gainPercent": round(gain_percent, 2),
 		"holdingsCount": len(rows),
 		"allocation": allocation,
@@ -294,7 +299,7 @@ def get_portfolio_summary():
 def add_holding(
 	asset_class: str,
 	asset_name: str,           # Growe Stock name (Link field value)
-	currency: str = "KES",
+	currency: str = "USD",
 	quantity: float = None,
 	notes: str = None,
 	date_added: str = None,
@@ -318,7 +323,7 @@ def add_holding(
 		as_dict=True,
 	) if ticker else None
 	price_in_currency = 0.0
-	ccy = (currency or "KES").upper()
+	ccy = (currency or "USD").upper()
 	if cache:
 		if ccy == "KES":
 			price_in_currency = float(cache.price_kes or 0)
@@ -376,7 +381,7 @@ def update_holding(
 		doc.ticker = frappe.db.get_value("Growe Stock", asset_name, "ticker") or ""
 
 	if currency is not None:
-		doc.currency = (currency or "KES").upper()
+		doc.currency = (currency or "USD").upper()
 	if date_added is not None:
 		doc.date_added = getdate(date_added)
 	if quantity is not None:
@@ -392,7 +397,7 @@ def update_holding(
 		["price_kes", "price_usd"],
 		as_dict=True,
 	) if ticker else None
-	ccy = (doc.currency or "KES").upper()
+	ccy = (doc.currency or "USD").upper()
 	qty = float(doc.quantity or 0)
 	if cache and qty > 0:
 		if ccy == "KES":

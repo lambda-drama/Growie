@@ -41,7 +41,7 @@
    "fieldname": "amount_kes",
    "fieldtype": "Currency",
    "in_list_view": 1,
-   "label": "Amount (KES)",
+   "label": "Amount",
    "reqd": 1
   },
   {
@@ -72,11 +72,11 @@
    "options": "M-PESA\nCard\nBank Transfer"
   },
   {
-   "default": "KES",
+   "default": "USD",
    "fieldname": "currency",
    "fieldtype": "Select",
    "label": "Currency",
-   "options": "KES\nUSD\nEUR"
+   "options": "USD\nKES\nEUR\nGBP"
   },
   {
    "fieldname": "transaction_date",

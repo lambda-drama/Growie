@@ -1,6 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "VID-.#####",
  "creation": "2026-04-29 22:16:10.915385",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -9,6 +10,7 @@
   "category",
   "column_break_eejc",
   "related_video",
+  "youtube_url",
   "section_break_dxzd",
   "whats_all_about"
  ],
@@ -41,15 +43,21 @@
    "fieldname": "whats_all_about",
    "fieldtype": "Text Editor",
    "label": "Whats all about?"
+  },
+  {
+   "fieldname": "youtube_url",
+   "fieldtype": "Data",
+   "label": "Youtube Url"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-29 22:19:58.339090",
+ "modified": "2026-05-01 13:54:43.995830",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Videos",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {
