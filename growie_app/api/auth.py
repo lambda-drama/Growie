@@ -25,10 +25,22 @@ def _db_subscription_tier(api_value: str | None) -> str | None:
 	return _TIERS_TO_DB.get(lower)
 
 
+def _normalize_currency_or_default(code: str | None, default: str = "USD") -> str:
+	"""Return an enabled Currency code or fallback."""
+	c = (code or "").strip().upper()
+	if not c:
+		return default
+	has_enabled = frappe.get_meta("Currency").has_field("enabled")
+	filters = {"name": c}
+	if has_enabled:
+		filters["enabled"] = 1
+	return c if frappe.db.exists("Currency", filters) else default
+
+
 # ── Signup ────────────────────────────────────────────────────────────────────
 
 @frappe.whitelist(allow_guest=True)
-def signup(full_name: str, email: str, password: str, id_type: str, id_number: str, preferred_currency: str = "KES"):
+def signup(full_name: str, email: str, password: str, id_type: str, id_number: str, preferred_currency: str = "USD"):
 	"""
 	Create a new Frappe User (Website User) and a linked Growe Member record,
 	then auto-login so the browser session is immediately active.
@@ -51,8 +63,7 @@ def signup(full_name: str, email: str, password: str, id_type: str, id_number: s
 	if not id_number:
 		frappe.throw(_("ID number is required."))
 
-	if preferred_currency not in ("KES", "USD", "EUR", "GBP"):
-		preferred_currency = "KES"
+	preferred_currency = _normalize_currency_or_default(preferred_currency, "USD")
 
 	# ── Duplicate check ───────────────────────────────────────────────────────
 	if frappe.db.exists("User", {"email": email}):
@@ -124,7 +135,7 @@ def get_profile():
 		"user": member.user,
 		"full_name": member.full_name,
 		"subscription_tier": _api_subscription_tier(member.subscription_tier),
-		"preferred_currency": member.preferred_currency or "KES",
+		"preferred_currency": member.preferred_currency or "USD",
 		"id_documents": [
 			{"id_type": doc.id_type, "id_number": doc.id_number}
 			for doc in member.id_documents
@@ -157,8 +168,8 @@ def update_profile(
 	db_tier = _db_subscription_tier(subscription_tier)
 	if db_tier:
 		member.subscription_tier = db_tier
-	if preferred_currency and preferred_currency in ("KES", "USD", "EUR", "GBP"):
-		member.preferred_currency = preferred_currency
+	if preferred_currency:
+		member.preferred_currency = _normalize_currency_or_default(preferred_currency, "USD")
 
 	if full_name is not None and str(full_name).strip():
 		clean = str(full_name).strip()
