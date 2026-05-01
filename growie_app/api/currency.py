@@ -64,10 +64,7 @@ def get_exchange_rate_for_currency(target_currency: str, base_currency: str = "U
         title="Growe Currency Rate Missing",
         message=f"Could not resolve rate. base={base}, target={code}, date={tx_date}, resolved={rate}",
     )
-    # frappe.throw(
-    #     f"No exchange rate found between {base} and {code} for {tx_date}. "
-    #     "Please configure Currency Exchange in ERPNext."
-    # )
+   
 
 
 @frappe.whitelist()
