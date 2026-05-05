@@ -1,6 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "field:site_name",
  "creation": "2026-04-29 21:56:49.444143",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -13,7 +14,8 @@
   {
    "fieldname": "site_name",
    "fieldtype": "Data",
-   "label": "Site Name"
+   "label": "Site Name",
+   "unique": 1
   },
   {
    "fieldname": "site_link",
@@ -28,10 +30,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-29 21:57:17.706266",
+ "modified": "2026-05-06 02:03:00.100500",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "News WebScrapping Sites",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {

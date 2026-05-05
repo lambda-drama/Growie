@@ -11,6 +11,8 @@ Supported providers  (set in Growe AI Provider → Provider field):
 The active provider is set in Growe Settings → Default AI Provider (Link to Growe AI Provider).
 """
 
+from html import escape
+
 import frappe
 from frappe import _
 from frappe.utils import get_first_day, get_last_day, today
@@ -204,6 +206,55 @@ def _get_member() -> str | None:
 	return frappe.db.get_value("Growe Member", {"user": frappe.session.user}, "name")
 
 
+def _truncate_for_question_field(question: str) -> str:
+	"""Growe AI Response.question is Small Text — respect DocType length."""
+	q = (question or "").strip() or "(empty)"
+	cap = 140
+	try:
+		meta = frappe.get_meta("Growe AI Response")
+		field = meta.get_field("question")
+		if field and getattr(field, "length", None):
+			cap = int(field.length)
+	except Exception:
+		pass
+	if len(q) > cap:
+		return q[: max(1, cap - 1)] + "…"
+	return q
+
+
+def _answer_as_text_editor_html(text: str) -> str:
+	"""Plain model output → minimal HTML safe for Text Editor field."""
+	raw = escape((text or "").strip())
+	if not raw:
+		return "<p></p>"
+	paras = raw.split("\n\n")
+	html_parts = []
+	for block in paras:
+		inner = "<br>".join(block.split("\n"))
+		html_parts.append(f"<p>{inner}</p>")
+	return "".join(html_parts)
+
+
+def _save_growe_ai_response(member_name: str, question: str, answer: str) -> None:
+	"""Audit row on Growe AI Response (Question + Response). Omit datetime — DocType default applies."""
+	if not member_name:
+		return
+	try:
+		doc = frappe.get_doc(
+			{
+				"doctype": "Growe AI Response",
+				"member": member_name,
+				"question": _truncate_for_question_field(question),
+				"response": _answer_as_text_editor_html(answer),
+			}
+		)
+		doc.flags.ignore_permissions = True
+		doc.insert()
+		frappe.db.commit()
+	except Exception:
+		pass
+
+
 def _save_conversation(
 	question: str,
 	answer: str,
@@ -211,12 +262,14 @@ def _save_conversation(
 	model: str,
 	conversation_type: str = "Chat",
 	holding: str = "",
+	audit_question: str | None = None,
 ) -> None:
-	"""Persist a Q&A pair to Growe AI Conversation (best-effort, never blocks response)."""
+	"""Persist to Growe AI Conversation when possible and always append Growe AI Response (audit)."""
+	member = _get_member()
+	if not member:
+		return
+	record_q = audit_question if audit_question is not None else question
 	try:
-		member = _get_member()
-		if not member:
-			return
 		doc = frappe.get_doc({
 			"doctype": "Growe AI Conversation",
 			"member": member,
@@ -231,7 +284,8 @@ def _save_conversation(
 		doc.insert(ignore_permissions=True)
 		frappe.db.commit()
 	except Exception:
-		pass  # Never let storage failure break the AI response
+		pass  # Conversation row is secondary to the user's reply
+	_save_growe_ai_response(member, record_q, answer)
 
 
 # ─── Context builders ─────────────────────────────────────────────────────────
@@ -327,13 +381,13 @@ def chat(question: str, context: str = ""):
 	try:
 		_enforce_monthly_ai_limit(member_name)
 	except frappe.ValidationError as e:
-		# Return the limit message as a regular response instead of throwing
+		msg = str(e)
+		_save_growe_ai_response(member_name, (question or "").strip() or "(Monthly limit)", msg)
 		return {
-			"reply": str(e),
+			"reply": msg,
 			"provider": "System",
 			"model": "N/A"
 		}
-        
 
 	if not question or not question.strip():
 		frappe.throw("Question cannot be empty.")
@@ -376,13 +430,14 @@ def analyse_portfolio():
         try:
             _enforce_monthly_ai_limit(member_name)
         except frappe.ValidationError as e:
-            # Return the limit message as a regular response instead of throwing
+            msg = str(e)
+            _save_growe_ai_response(member_name, "Portfolio analysis", msg)
             return {
-                "reply": str(e),
+                "reply": msg,
                 "provider": "System",
                 "model": "N/A"
             }
-        
+
         ctx = _build_portfolio_context(member_name)
         if not ctx:
             frappe.throw("No holdings found to analyse. Add holdings first.")
@@ -406,6 +461,7 @@ def analyse_portfolio():
             provider_name=provider.provider_name,
             model=provider.model,
             conversation_type="Portfolio Analysis",
+            audit_question=question,
         )
 
         return {
@@ -415,8 +471,12 @@ def analyse_portfolio():
         }
     except Exception as e:
         frappe.log_error(f"Portfolio analysis error: {str(e)}", "Growe AI")
+        err_reply = f"⚠️ {str(e)}"
+        mn = frappe.db.get_value("Growe Member", {"user": frappe.session.user}, "name")
+        if mn:
+            _save_growe_ai_response(mn, "Portfolio analysis", err_reply)
         return {
-            "reply": f"⚠️ {str(e)}",
+            "reply": err_reply,
             "provider": "System",
             "model": "N/A"
         }
@@ -436,13 +496,13 @@ def analyse_holding(holding_name: str):
 	try:
 		_enforce_monthly_ai_limit(member_name)
 	except frappe.ValidationError as e:
-		# Return the limit message as a regular response instead of throwing
+		msg = str(e)
+		_save_growe_ai_response(member_name, "Holding analysis", msg)
 		return {
-			"reply": str(e),
+			"reply": msg,
 			"provider": "System",
 			"model": "N/A"
 		}
-        
 
 	ticker = holding.ticker or holding.asset_name
 	cost   = float(holding.cost_basis_kes or 0)

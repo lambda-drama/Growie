@@ -1051,7 +1051,7 @@
  },
  {
   "api_symbol": "NESN",
-  "company_name": "Nestl\u00e9 S.A.",
+  "company_name": "Nestlé S.A.",
   "currency": "CHF",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1059,7 +1059,7 @@
   "isin": null,
   "market": "Global",
   "modified": "2026-04-24 23:54:51.846179",
-  "name": "NESN-Nestl\u00e9 S.A.",
+  "name": "NESN-Nestlé S.A.",
   "sector": "Consumer Goods",
   "ticker": "NESN"
  },
