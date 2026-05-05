@@ -1,0 +1,30 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Video Category",
+  "modified": "2026-04-29 22:18:17.509302",
+  "name": "All Videos",
+  "video_category": "All Videos"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Video Category",
+  "modified": "2026-04-29 22:19:16.802763",
+  "name": "Education",
+  "video_category": "Education"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Video Category",
+  "modified": "2026-04-29 22:19:23.963142",
+  "name": "Analysis",
+  "video_category": "Analysis"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Video Category",
+  "modified": "2026-04-29 22:19:30.610042",
+  "name": "Interviews",
+  "video_category": "Interviews"
+ }
+]

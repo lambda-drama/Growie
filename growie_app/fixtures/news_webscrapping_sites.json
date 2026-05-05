@@ -1,0 +1,50 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "News WebScrapping Sites",
+  "modified": "2026-05-06 02:06:46.335944",
+  "name": "Yahoo finance",
+  "site_link": "https://finance.yahoo.com/",
+  "site_name": "Yahoo finance"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "News WebScrapping Sites",
+  "modified": "2026-05-06 02:03:27.886646",
+  "name": "Alpha Vantage",
+  "site_link": null,
+  "site_name": "Alpha Vantage"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "News WebScrapping Sites",
+  "modified": "2026-05-06 02:03:35.951771",
+  "name": "Bloomberg",
+  "site_link": null,
+  "site_name": "Bloomberg"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "News WebScrapping Sites",
+  "modified": "2026-05-06 02:08:33.991052",
+  "name": "MorningStar",
+  "site_link": "https://www.morningstar.com/news",
+  "site_name": "MorningStar"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "News WebScrapping Sites",
+  "modified": "2026-05-06 02:07:38.155190",
+  "name": "Investing.com",
+  "site_link": "https://www.investing.com/",
+  "site_name": "Investing.com"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "News WebScrapping Sites",
+  "modified": "2026-05-06 02:07:22.650402",
+  "name": "Nairobi Stock Exchange",
+  "site_link": "https://www.nse.co.ke/",
+  "site_name": "Nairobi Stock Exchange"
+ }
+]

@@ -40,6 +40,9 @@ fixtures = [
  },
  {
 	 "doctype":"Video Category"
+ },
+ {
+	 "doctype":"News WebScrapping Sites"
  }
 ]
 

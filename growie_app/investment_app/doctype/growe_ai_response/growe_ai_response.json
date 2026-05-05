@@ -1,6 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "AI-.#####",
  "creation": "2026-05-06 01:28:36.481555",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -64,10 +65,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-06 01:40:34.297167",
+ "modified": "2026-05-06 01:56:16.216415",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe AI Response",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {

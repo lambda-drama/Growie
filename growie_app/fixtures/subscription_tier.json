@@ -1,0 +1,32 @@
+[
+ {
+  "amount": 0.0,
+  "currency": "USD",
+  "docstatus": 0,
+  "doctype": "Subscription Tier",
+  "modified": "2026-04-29 22:10:50.060351",
+  "name": "Free",
+  "subscription_tier": "Free",
+  "what_it_entails": "<div class=\"ql-editor read-mode\"><ul><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">Track up to 10 holdings</span></li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">Basic portfolio overview</span></li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">Daily market indices</span></li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">Limited news feed</span></li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">Community access (read-only)</span></li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">Basic health score</span></li></ul><p><br></p></div>"
+ },
+ {
+  "amount": 15.0,
+  "currency": "USD",
+  "docstatus": 0,
+  "doctype": "Subscription Tier",
+  "modified": "2026-04-29 22:10:37.239820",
+  "name": "Pro",
+  "subscription_tier": "Pro",
+  "what_it_entails": "<div class=\"ql-editor read-mode\"><ul><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">Unlimited holdings</span></li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">Full portfolio analytics</span></li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">AI-powered analysis</span></li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">Weekly stock picks</span></li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">Learning bites</span></li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">Community participation</span></li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">Advanced health score breakdown</span></li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">Multi-currency support</span></li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">Export reports (PDF/CSV)</span></li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">Email alerts &amp; notifications</span></li></ul><p><br></p></div>"
+ },
+ {
+  "amount": 85.0,
+  "currency": "USD",
+  "docstatus": 0,
+  "doctype": "Subscription Tier",
+  "modified": "2026-04-29 22:10:29.098094",
+  "name": "Coached",
+  "subscription_tier": "Coached",
+  "what_it_entails": "<div class=\"ql-editor read-mode\"><ul><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">Everything in Pro</span></li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">1-on-1 monthly coaching session</span></li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">Personalized investment plan</span></li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">Direct WhatsApp support</span></li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">Priority AI analysis queue</span></li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">Custom portfolio recommendations</span></li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">Quarterly portfolio review</span></li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">Exclusive webinar access</span></li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">Tax optimization guidance</span></li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><span style=\"background-color:lab(100 0 0);color:lab(3.04768 -1.31044 -4.08459);font-size:14px\">Estate planning basics</span></li></ul><p><br></p></div>"
+ }
+]
