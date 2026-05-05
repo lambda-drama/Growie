@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 from frappe.utils import validate_email_address
+from werkzeug.utils import secure_filename
 
 # DocType "Growe Member".subscription_tier options are title-cased: Free, Pro, Coached.
 # API and frontend use lowercase free|pro|coached.
@@ -115,6 +116,52 @@ def signup(full_name: str, email: str, password: str, id_type: str, id_number: s
 	}  # API: always lowercase tier label
 
 
+_ALLOWED_IMAGE_EXT = frozenset({"jpg", "jpeg", "png", "gif", "webp"})
+
+
+@frappe.whitelist()
+def upload_member_image():
+	"""
+	Attach an image to the current user's Growe Member `image` field (Attach Image).
+	Expects multipart form field `file`. Used right after signup when the session is active.
+	"""
+	user_email = frappe.session.user
+	if user_email == "Guest":
+		frappe.throw(_("Please log in first."), frappe.AuthenticationError)
+
+	member_name = frappe.db.get_value("Growe Member", {"user": user_email}, "name")
+	if not member_name:
+		frappe.throw(_("Growe Member profile not found."))
+
+	files = frappe.request.files
+	f = files.get("file") if files else None
+	if not f:
+		frappe.throw(_("No file uploaded."))
+
+	content = f.read()
+	if not content:
+		frappe.throw(_("Empty file."))
+
+	fname_raw = getattr(f, "filename", "") or "image.jpg"
+	fname = secure_filename(fname_raw) or "image.jpg"
+	ext = (fname.rsplit(".", 1)[-1] if "." in fname else "").lower()
+	if ext not in _ALLOWED_IMAGE_EXT:
+		frappe.throw(_("Please upload a JPG, PNG, GIF, or WebP image."))
+
+	from frappe.utils.file_manager import save_file
+
+	file_doc = save_file(fname, content, "Growe Member", member_name, decode=False, is_private=0, df="image")
+
+	member = frappe.get_doc("Growe Member", member_name)
+	member.image = file_doc.file_url
+	member.flags.ignore_permissions = True
+	member.save()
+
+	frappe.db.commit()
+
+	return {"success": True, "image": member.image}
+
+
 # ── Profile ───────────────────────────────────────────────────────────────────
 
 @frappe.whitelist()
@@ -134,6 +181,7 @@ def get_profile():
 	return {
 		"user": member.user,
 		"full_name": member.full_name,
+		"image": member.image or "",
 		"subscription_tier": _api_subscription_tier(member.subscription_tier),
 		"preferred_currency": member.preferred_currency or "USD",
 		"id_documents": [
@@ -204,6 +252,7 @@ def update_profile(
 	return {
 		"success": True,
 		"full_name": member.full_name,
+		"image": member.image or "",
 		"subscription_tier": _api_subscription_tier(member.subscription_tier),
 		"preferred_currency": member.preferred_currency,
 		"id_documents": [
