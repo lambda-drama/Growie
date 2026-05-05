@@ -7,6 +7,7 @@
  "field_order": [
   "full_name",
   "user",
+  "image",
   "column_break_1",
   "subscription_tier",
   "preferred_currency",
@@ -69,11 +70,17 @@
    "fieldtype": "Table",
    "label": "ID Documents",
    "options": "Growe Member ID"
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "label": "Image"
   }
  ],
+ "image_field": "image",
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-29 22:11:26.647594",
+ "modified": "2026-05-06 00:39:00.931027",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Member",
