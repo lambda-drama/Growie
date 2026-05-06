@@ -175,9 +175,12 @@ website_route_rules = [
 # ---------------
 
 scheduler_events = {
-	"daily": [
-		"growie_app.investment_app.doctype.news_settings.news_settings.daily_news_scrape"
-	]
+	"cron": {
+		# 08:00 server time daily — gated by News Settings → Activate (see daily_news_scrape)
+		"0 8 * * *": [
+			"growie_app.investment_app.doctype.news_settings.news_settings.daily_news_scrape",
+		],
+	},
 }
 
 # Testing

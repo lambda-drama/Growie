@@ -5,15 +5,31 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "activate",
   "date",
+  "rewrite_with_ai",
   "section_break_qizi",
   "webscrapping_sites"
  ],
  "fields": [
   {
+   "default": "0",
+   "description": "When enabled: scheduled fetch runs daily at 8:00 AM and the Fetch Best News Now button runs. When disabled: no ingest runs.",
+   "fieldname": "activate",
+   "fieldtype": "Check",
+   "label": "Activate"
+  },
+  {
    "fieldname": "date",
    "fieldtype": "Date",
    "label": "Date"
+  },
+  {
+   "default": "0",
+   "description": "When checked, picks one story per site and rewrites headline + commentary + learning bite with your Growe AI provider (RSS/API text + optional fetched page content). Requires Default AI Provider in Growe Settings.",
+   "fieldname": "rewrite_with_ai",
+   "fieldtype": "Check",
+   "label": "Rewrite with AI"
   },
   {
    "fieldname": "section_break_qizi",
@@ -30,7 +46,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-04-29 21:59:40.492272",
+ "modified": "2026-05-07 01:51:50.100342",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "News Settings",

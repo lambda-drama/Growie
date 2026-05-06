@@ -8,7 +8,8 @@
  "field_order": [
   "site_name",
   "column_break_aaqi",
-  "site_link"
+  "site_link",
+  "rss_feed"
  ],
  "fields": [
   {
@@ -21,6 +22,12 @@
    "fieldname": "site_link",
    "fieldtype": "Data",
    "label": "Site Link"
+  },
+  {
+   "description": "If set, this RSS/Atom URL is used (recommended for Yahoo, Morningstar-style sources). Leave empty to use built-in URLs for known providers or generic scraping.",
+   "fieldname": "rss_feed",
+   "fieldtype": "Data",
+   "label": "RSS or Atom feed URL"
   },
   {
    "fieldname": "column_break_aaqi",

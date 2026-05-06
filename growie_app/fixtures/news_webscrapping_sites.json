@@ -4,6 +4,7 @@
   "doctype": "News WebScrapping Sites",
   "modified": "2026-05-06 02:06:46.335944",
   "name": "Yahoo finance",
+  "rss_feed": "https://finance.yahoo.com/rss/topstories",
   "site_link": "https://finance.yahoo.com/",
   "site_name": "Yahoo finance"
  },
@@ -12,7 +13,8 @@
   "doctype": "News WebScrapping Sites",
   "modified": "2026-05-06 02:03:27.886646",
   "name": "Alpha Vantage",
-  "site_link": null,
+  "rss_feed": null,
+  "site_link": "https://www.alphavantage.co/",
   "site_name": "Alpha Vantage"
  },
  {
@@ -28,6 +30,7 @@
   "doctype": "News WebScrapping Sites",
   "modified": "2026-05-06 02:08:33.991052",
   "name": "MorningStar",
+  "rss_feed": "https://www.investing.com/rss/news_25.rss",
   "site_link": "https://www.morningstar.com/news",
   "site_name": "MorningStar"
  },
