@@ -442,6 +442,21 @@ def get_holding_movement(holding_name: str, period: str = "1y"):
 	}
 
 
+# ── Excel import (Growe web app) ───────────────────────────────────────────────
+
+@frappe.whitelist()
+def import_holdings_excel(file_url: str):
+	"""
+	Import the Scope / global stocks Excel template for the logged-in member only.
+
+	Upload the file first via POST ``/api/method/upload_file``, then pass ``file_url`` from the response.
+	"""
+	member = _member_name()
+	from growie_app.utils.holdings_excel_import import import_scope_template_excel
+
+	return import_scope_template_excel(file_url=file_url, investor=member)
+
+
 # ── Delete ────────────────────────────────────────────────────────────────────
 
 @frappe.whitelist()

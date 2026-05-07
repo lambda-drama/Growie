@@ -11,10 +11,22 @@
   "asset_name",
   "ticker",
   "currency",
+  "sold",
+  "sold_date",
   "column_break_xvhk",
+  "initial_investment_value",
   "value_kes",
   "date_added",
   "notes",
+  "broker",
+  "section_break_ywee",
+  "share_breakdown",
+  "buying_price",
+  "current_price",
+  "column_break_nxvh",
+  "delta",
+  "percentage",
+  "goal",
   "optional_section",
   "quantity",
   "cost_basis_kes",
@@ -35,8 +47,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Asset Class",
-   "options": "MMF\nReal Estate\nNSE\nGlobal",
-   "reqd": 1
+   "options": "MMF\nReal Estate\nNSE\nGlobal"
   },
   {
    "fieldname": "asset_name",
@@ -50,7 +61,7 @@
    "fieldname": "value_kes",
    "fieldtype": "Currency",
    "in_list_view": 1,
-   "label": "Value",
+   "label": "Current Price",
    "options": "currency",
    "reqd": 1
   },
@@ -111,12 +122,71 @@
   {
    "fieldname": "column_break_bdig",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "broker",
+   "fieldtype": "Data",
+   "label": "Broker"
+  },
+  {
+   "fieldname": "initial_investment_value",
+   "fieldtype": "Currency",
+   "label": "Initial Investment Value"
+  },
+  {
+   "fieldname": "section_break_ywee",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "share_breakdown",
+   "fieldtype": "Float",
+   "label": "Share Breakdown"
+  },
+  {
+   "fieldname": "buying_price",
+   "fieldtype": "Currency",
+   "label": "Buying Price"
+  },
+  {
+   "fieldname": "current_price",
+   "fieldtype": "Currency",
+   "label": "Current Price"
+  },
+  {
+   "fieldname": "column_break_nxvh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "delta",
+   "fieldtype": "Currency",
+   "label": "Delta"
+  },
+  {
+   "default": "0",
+   "fieldname": "sold",
+   "fieldtype": "Check",
+   "label": "Sold"
+  },
+  {
+   "fieldname": "percentage",
+   "fieldtype": "Percent",
+   "label": "Percentage"
+  },
+  {
+   "fieldname": "goal",
+   "fieldtype": "Data",
+   "label": "Goal"
+  },
+  {
+   "fieldname": "sold_date",
+   "fieldtype": "Date",
+   "label": "Sold Date"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-01 13:05:08.404878",
+ "modified": "2026-05-07 02:12:49.147356",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Holding",

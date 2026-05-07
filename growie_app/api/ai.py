@@ -11,6 +11,8 @@ Supported providers  (set in Growe AI Provider → Provider field):
 The active provider is set in Growe Settings → Default AI Provider (Link to Growe AI Provider).
 """
 
+import json
+import re
 from html import escape
 
 import frappe
@@ -164,13 +166,20 @@ def _call_gemini(api_key: str, model: str, system: str, messages: list,
 	return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
 
 
-def _dispatch(provider, system: str, user_messages: list) -> str:
-	"""Route to the correct provider API."""
+def _dispatch(provider, system: str, user_messages: list, *, max_output_tokens: int | None = None) -> str:
+	"""Route to the correct provider API.
+
+	:param max_output_tokens: Optional override for this call (e.g. long-form news rewrite).
+	"""
 	prov = (provider.provider or "").lower()
 	api_key = provider.get_password("api_key")
 	model = provider.model or ""
 	temp = float(provider.temperature or 0.7)
-	max_tok = int(provider.max_tokens or 1000)
+	cfg = int(provider.max_tokens or 1000)
+	if max_output_tokens is not None:
+		max_tok = int(max_output_tokens)
+	else:
+		max_tok = cfg
 
 	# Full message list including system (for OpenAI-compat providers)
 	full_msgs = ([{"role": "system", "content": system}] if system else []) + user_messages
@@ -197,6 +206,101 @@ def _dispatch(provider, system: str, user_messages: list) -> str:
 	else:
 		frappe.throw(f"Provider type '{provider.provider}' is not yet supported. "
 					 "Supported: Claude, OpenAI, Gemini, Groq, DeepSeek.")
+
+
+# ─── News ingestion rewrite (Desk / scheduler) ───────────────────────────────
+
+NEWS_REWRITE_SYSTEM = """You are Growe AI, rewriting third-party headlines into ORIGINAL educational investment content for Kenyan and diaspora readers.
+
+RULES:
+- Paraphrase completely: twist the headline; do NOT copy wording from the SOURCE MATERIAL verbatim.
+- Use ONLY facts grounded in SOURCE MATERIAL below. Never invent quotes, percentages, lawsuits, dates, or outcomes that are not clearly supported. If facts are sparse, write a shorter piece and be explicit about uncertainty.
+- Output ONLY a raw JSON object (no markdown code fences). Use these keys with string values:
+  "insight_title": punchy card headline (distinct angle from originals).
+  "insight_commentary_html": ONLY <p>...</p> blocks (2–4 short paragraphs): what moved, why it matters, one practical takeaway. The last <p> must mention that investing involves risks and this is not regulated financial advice.
+  "learning_bite_title": pedagogical title (different phrasing from insight_title).
+  "topic_tag": one short label such as Markets, Earnings, Rates, FX, or NSE.
+  "article_html": full standalone article as HTML (<p>, optional <ul><li>, <strong>, <h3>); 6–14 short paragraphs educating the reader.
+
+HTML safety: use only tags p, ul, li, strong, em, br, h3 — no onclick, iframe, img, script, style, svg."""
+
+
+def _scrub_news_html_fragment(html: str) -> str:
+	if not html or not isinstance(html, str):
+		return "<p></p>"
+	s = re.sub(r"(?is)<script[^>]*>.*?</script>", "", html)
+	s = re.sub(r"(?is)<iframe[^>]*>[^<]*(?:<[^>/][\s\S]*?</iframe>|/>)", "", s)
+	s = re.sub(r"(?is)<\s*(object|embed|svg|canvas|video|audio)\b[\s\S]*?</\s*\1\s*>", "", s)
+	s = s.strip()
+	return s or "<p></p>"
+
+
+def _extract_json_object_from_llm(raw: str) -> dict:
+	"""Parse a JSON object from model output; tolerate markdown fences."""
+	s = (raw or "").strip()
+	if not s:
+		frappe.throw("Empty AI reply for news rewrite.")
+	if s.startswith("```"):
+		s = re.sub(r"^```(?:json)?\s*", "", s, flags=re.IGNORECASE | re.MULTILINE)
+		s = re.sub(r"\s*```\s*$", "", s, flags=re.MULTILINE)
+	start = s.find("{")
+	end = s.rfind("}")
+	if start == -1 or end <= start:
+		frappe.throw("AI reply was not JSON (no object found).")
+	s = s[start : end + 1]
+	try:
+		return json.loads(s)
+	except json.JSONDecodeError as e:
+		frappe.throw(f"Could not parse news JSON from AI: {e!s}")
+
+
+def rewrite_news_article_for_ingestion(
+	raw_title: str,
+	raw_summary: str,
+	source_url: str,
+	source_label: str,
+	supplementary_text: str = "",
+):
+	"""Call the active Growe AI provider to produce insight + bite fields.
+
+	Returns dict: insight_title, insight_commentary_html, learning_bite_title,
+	topic_tag, article_html — all sanitized strings suitable for Desk Text Editor fields.
+	This path does NOT enforce monthly user AI limits (server-side ingestion only).
+	"""
+	provider = _get_active_provider()
+	base_mt = int(provider.max_tokens or 1000)
+	tok_budget = min(8192, max(4096, base_mt))
+
+	payload = []
+	payload.append(f"SOURCE_LABEL: {source_label}".strip())
+	if source_url:
+		payload.append(f"SOURCE_URL: {source_url}".strip())
+	payload.append(f"ORIGINAL_TITLE: {(raw_title or '').strip()}".strip())
+	if (raw_summary or "").strip():
+		payload.append(f"ORIGINAL_SUMMARY_OR_SNIPPET:\n{(raw_summary or '').strip()}")
+	if (supplementary_text or "").strip():
+		payload.append(f"SUPPLEMENTARY_PAGE_TEXT (may be truncated):\n{(supplementary_text or '').strip()[:14000]}")
+	body = "\n\n".join(payload)
+
+	raw = _dispatch(
+		provider,
+		system=NEWS_REWRITE_SYSTEM,
+		user_messages=[
+			{"role": "user", "content": (body + "\n\nProduce the JSON object now.")[:18000]},
+		],
+		max_output_tokens=tok_budget,
+	)
+	data = _extract_json_object_from_llm(raw)
+	out = {
+		"insight_title": (data.get("insight_title") or "").strip(),
+		"insight_commentary_html": _scrub_news_html_fragment(data.get("insight_commentary_html") or ""),
+		"learning_bite_title": (data.get("learning_bite_title") or "").strip(),
+		"topic_tag": (data.get("topic_tag") or "Market News").strip(),
+		"article_html": _scrub_news_html_fragment(data.get("article_html") or ""),
+	}
+	if not out["insight_title"] or not out["article_html"] or not out["learning_bite_title"]:
+		frappe.throw("AI returned incomplete news fields (need insight title, bite title, and article).")
+	return out
 
 
 # ─── Conversation persistence ─────────────────────────────────────────────────
