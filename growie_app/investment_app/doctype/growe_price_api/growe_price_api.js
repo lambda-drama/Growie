@@ -69,8 +69,9 @@ frappe.ui.form.on("Growe Price API", {
 				function () {
 					frappe.call({
 						method: "growie_app.api.price.refresh_prices",
+						args: { provider_name: frm.doc.name },
 						freeze: true,
-						freeze_message: __("Fetching prices from all active providers…"),
+						freeze_message: __("Fetching prices using {0}…", [frm.doc.provider_name || frm.doc.name]),
 						callback: function (r) {
 							if (r.message) {
 								frappe.msgprint({

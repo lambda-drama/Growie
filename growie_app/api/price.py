@@ -70,7 +70,36 @@ def _mansa_kes_usd_rate(provider: dict) -> float | None:
 
 # ── Provider loader ───────────────────────────────────────────────────────────
 
-def _get_providers(market_type: str) -> list:
+def _provider_key(provider: dict) -> str:
+	"""Normalized key from Growe Price API.api_provider select."""
+	return str(provider.get("api_provider") or "").strip().lower()
+
+
+def _get_providers(market_type: str, provider_name: str | None = None) -> list:
+	"""
+	Load active providers for a market. If provider_name is passed, return only that row
+	(if active and market-compatible) so refresh can be forced to a specific provider.
+	"""
+	if provider_name:
+		p = frappe.db.get_value(
+			"Growe Price API",
+			provider_name,
+			[
+				"name", "provider_name", "api_provider", "market_type",
+				"api_base_url", "api_key", "endpoint_prices", "calls_per_month", "is_active",
+			],
+			as_dict=True,
+		)
+		if not p:
+			frappe.throw(_(f"Provider '{provider_name}' not found."))
+		if not int(p.get("is_active") or 0):
+			frappe.throw(_(f"Provider '{provider_name}' is not active."))
+		if p.market_type not in (market_type, "Both"):
+			return []
+		if str(market_type).upper() == "NSE" and _provider_key(p) == "alpha vantage":
+			return []
+		return [p]
+
 	providers = frappe.get_all(
 		"Growe Price API",
 		filters={"is_active": 1},
@@ -83,11 +112,7 @@ def _get_providers(market_type: str) -> list:
 	filtered = [p for p in providers if p.market_type in (market_type, "Both")]
 	# Business rule: Alpha Vantage is Global-only.
 	if str(market_type).upper() == "NSE":
-		def _is_alpha(p: dict) -> bool:
-			api_prov = str(p.get("api_provider") or "").lower()
-			prov_name = str(p.get("provider_name") or "").lower().replace(" ", "")
-			return "alpha" in api_prov or "alphavantage" in prov_name
-		filtered = [p for p in filtered if not _is_alpha(p)]
+		filtered = [p for p in filtered if _provider_key(p) != "alpha vantage"]
 	return filtered
 
 
@@ -376,18 +401,15 @@ def _fetch_alpha_vantage(
 # ── Generic dispatcher (uses api_provider field) ───────────────────────────────
 
 def _fetch_from_provider(provider: dict, symbols: list, market: str = "NSE") -> dict:
-	api_prov  = (provider.get("api_provider")  or "").lower()
-	prov_name = (provider.get("provider_name") or "").lower()
-	
-	if "mansa" in api_prov or "mansa" in prov_name:
+	api_prov = _provider_key(provider)
+
+	if api_prov == "mansa markets":
 		return _fetch_mansa(provider, symbols, market)
-	if "fcs" in api_prov or "fcs" in prov_name:
+	if api_prov == "fcs api":
 		return _fetch_fcs(provider, symbols, market)
-	if "alpha" in api_prov or "alphavantage" in prov_name.replace(" ", "") or "alpha vantage" in prov_name:
-		
+	if api_prov == "alpha vantage":
 		if str(market).upper() != "GLOBAL":
 			return {}
-		
 		return _fetch_alpha_vantage(provider, symbols, market)
 
 	# Unknown — skip with a warning
@@ -450,17 +472,9 @@ def _update_holdings_for_ticker(ticker: str, price_kes: float):
 # ── Core orchestrator ─────────────────────────────────────────────────────────
 
 def _provider_uses_alpha_vantage(provider: dict) -> bool:
-	"""True if this Growe Price API row should use Alpha Vantage GLOBAL_QUOTE."""
-	api = (provider.get("api_provider") or "").lower()
-	name = (provider.get("provider_name") or "").lower()
-	return (
-		"alpha" in api
-		or "alphavantage" in api.replace(" ", "")
-		or "alpha vantage" in api
-		or "alpha" in name
-		or "alphavantage" in name.replace(" ", "")
-		or "alpha vantage" in name
-	)
+	"""True only when api_provider select is exactly 'Alpha Vantage'."""
+	
+	return _provider_key(provider) == "alpha vantage"
 
 
 def _api_symbol_maps_for_tickers(nse: list, global_: list) -> tuple[dict, dict]:
@@ -486,32 +500,40 @@ def _api_symbol_maps_for_tickers(nse: list, global_: list) -> tuple[dict, dict]:
 	return nse_map, gmap
 
 
-def _fetch_and_store(market: str, tickers: list, sym_map: dict | None = None) -> dict:
+def _fetch_and_store(
+	market: str,
+	tickers: list,
+	sym_map: dict | None = None,
+	provider_name: str | None = None,
+) -> dict:
 	if not tickers:
 		return {}
 
-	providers = _get_providers(market)
+	providers = _get_providers(market, provider_name=provider_name)
 	remaining = list(
 		dict.fromkeys((t or "").upper() for t in tickers if (t or "").strip())
 	)
+ 
 	prices: dict = {}
 	usd_to_kes = _get_usd_to_kes()
 	sym_map = sym_map or {}
-
+	
 	for provider in providers:
+		
 		if not remaining:
 			break
 		if provider.get("_alpha_rate_limited"):
 			continue
-
+		
 		# Try to get live KES rate from Mansa forex endpoint
 		api_prov = (provider.get("api_provider") or "").lower()
 		if "mansa" in api_prov or "mansa" in (provider.get("provider_name") or "").lower():
 			live_rate = _mansa_kes_usd_rate(provider)
 			if live_rate:
 				usd_to_kes = live_rate
-
+		print("Nikoia")
 		if _provider_uses_alpha_vantage(provider):
+			
 			fetched = _fetch_alpha_vantage(
 				provider, remaining, market, symbol_override_map=sym_map
 			)
@@ -527,7 +549,7 @@ def _fetch_and_store(market: str, tickers: list, sym_map: dict | None = None) ->
 			price_kes = data["price"] if currency == "KES" else data["price"] * usd_to_kes
 			prices[tu] = price_kes
 			remaining.remove(tu)
-
+	
 	# One ticker at a time if batch did not return some symbols
 	if remaining and providers:
 		for provider in providers:
@@ -556,17 +578,18 @@ def _fetch_and_store(market: str, tickers: list, sym_map: dict | None = None) ->
 					price_kes = data["price"] if currency == "KES" else data["price"] * usd_to_kes
 					prices[tu] = price_kes
 					remaining.remove(tu)
-
+    
 	return prices
 
 
 # ── Public API endpoints ──────────────────────────────────────────────────────
 
 @frappe.whitelist()
-def refresh_prices():
+def refresh_prices(provider_name: str = None):
 	"""
 	Fetch fresh prices for all tickers in Growe Holdings.
 	Upserts Growe Price Cache and recomputes holding values.
+	If provider_name is passed, only that active Growe Price API row is used.
 	"""
 	all_holdings = frappe.get_all(
 		"Growe Holding",
@@ -587,10 +610,10 @@ def refresh_prices():
 			global_tickers.add(h.ticker.upper())
 
 	nse_map, global_map = _api_symbol_maps_for_tickers(list(nse_tickers), list(global_tickers))
-	nse_prices = _fetch_and_store("NSE", list(nse_tickers), nse_map)
-	global_prices = _fetch_and_store("Global", list(global_tickers), global_map)
+	nse_prices = _fetch_and_store("NSE", list(nse_tickers), nse_map, provider_name=provider_name)
+	global_prices = _fetch_and_store("Global", list(global_tickers), global_map, provider_name=provider_name)
 	all_prices = {**nse_prices, **global_prices}
-
+  
 	for ticker, price_kes in all_prices.items():
 		_update_holdings_for_ticker(ticker, price_kes)
 
@@ -771,6 +794,7 @@ def _collect_tickers_for_live_prices() -> tuple[list, list, dict, dict]:
 	2) Growe Holding — any ticker in a portfolio that is not already covered by
 	   the stock master, so "Refresh all prices" still works without a row in Growe Stock.
 	"""
+	
 	nse: set = set()
 	global_: set = set()
 	nse_map: dict = {}

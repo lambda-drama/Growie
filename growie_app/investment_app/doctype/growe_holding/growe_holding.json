@@ -53,6 +53,7 @@
    "fieldname": "asset_name",
    "fieldtype": "Link",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Stock",
    "options": "Growe Stock",
    "reqd": 1
@@ -70,6 +71,7 @@
    "fieldname": "date_added",
    "fieldtype": "Date",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Date Added"
   },
   {
@@ -87,7 +89,9 @@
    "fetch_from": "asset_name.ticker",
    "fieldname": "ticker",
    "fieldtype": "Data",
-   "label": "Ticker (for stocks)"
+   "hidden": 1,
+   "label": "Ticker (for stocks)",
+   "show_on_timeline": 1
   },
   {
    "default": "USD",
@@ -186,7 +190,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-07 02:12:49.147356",
+ "modified": "2026-05-08 17:42:51.453054",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Holding",
