@@ -22,6 +22,7 @@
   "doctype": "News WebScrapping Sites",
   "modified": "2026-05-06 02:03:35.951771",
   "name": "Bloomberg",
+  "rss_feed": null,
   "site_link": null,
   "site_name": "Bloomberg"
  },
@@ -39,6 +40,7 @@
   "doctype": "News WebScrapping Sites",
   "modified": "2026-05-06 02:07:38.155190",
   "name": "Investing.com",
+  "rss_feed": null,
   "site_link": "https://www.investing.com/",
   "site_name": "Investing.com"
  },
@@ -47,6 +49,7 @@
   "doctype": "News WebScrapping Sites",
   "modified": "2026-05-06 02:07:22.650402",
   "name": "Nairobi Stock Exchange",
+  "rss_feed": null,
   "site_link": "https://www.nse.co.ke/",
   "site_name": "Nairobi Stock Exchange"
  }
