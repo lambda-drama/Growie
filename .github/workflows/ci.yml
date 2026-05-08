@@ -89,6 +89,7 @@ jobs:
         working-directory: /home/runner/frappe-bench
         run: |
           bench get-app growie_app $GITHUB_WORKSPACE
+          (cd apps/growie_app/frontend && npm ci)
           bench setup requirements --dev
           bench new-site --db-root-password root --admin-password admin test_site
           bench --site test_site install-app growie_app
