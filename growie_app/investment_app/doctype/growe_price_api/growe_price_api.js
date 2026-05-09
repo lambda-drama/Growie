@@ -35,15 +35,24 @@ frappe.ui.form.on("Growe Price API", {
 						callback: function (r) {
 							frm.reload_doc(); // refresh last_test_result / last_test_at
 							if (r.message && r.message.success) {
+								const m = r.message;
+								const cur = (m.currency || "").toUpperCase();
+								const sym = cur === "USD" ? "$" : cur === "KES" ? "Sh " : "";
+								const priceLabel =
+									cur === "USD"
+										? __("Live quote (USD)")
+										: cur === "KES"
+											? __("Live quote (KES)")
+											: __("Live quote");
 								frappe.msgprint({
 									title: __("✅ Connection Successful"),
 									indicator: "green",
 									message: `
 										<table class="table table-bordered" style="margin-top:8px">
-											<tr><td><b>Ticker</b></td><td>${r.message.ticker}</td></tr>
-											<tr><td><b>Price (KES)</b></td><td>${frappe.format(r.message.price_kes, { fieldtype: "Currency" })}</td></tr>
-											<tr><td><b>Change</b></td><td>${r.message.change_percent >= 0 ? "▲" : "▼"} ${Math.abs(r.message.change_percent).toFixed(2)}%</td></tr>
-											<tr><td><b>Currency</b></td><td>${r.message.currency}</td></tr>
+											<tr><td><b>Ticker</b></td><td>${m.ticker}</td></tr>
+											<tr><td><b>${priceLabel}</b></td><td>${sym}${Number(m.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}</td></tr>
+											<tr><td><b>Change</b></td><td>${m.change_percent >= 0 ? "▲" : "▼"} ${Math.abs(m.change_percent).toFixed(2)}%</td></tr>
+											<tr><td><b>Currency</b></td><td>${m.currency}</td></tr>
 										</table>`,
 								});
 							} else {
@@ -125,6 +134,17 @@ frappe.ui.form.on("Growe Price API", {
 			);
 		}
 
+		if (api_prov.includes("finnhub")) {
+			frm.dashboard.add_comment(
+				__("<b>Test Connection</b> shows the raw quote returned by Finnhub. " +
+				   "<b>Refresh prices</b> fills <b>Growe Price Cache</b> with USD and KES fields per ticker. " +
+				   "Symbols (e.g. <code>AAPL</code>); override via <b>Growe Stock → API Symbol</b>. " +
+				   "<a href=\"https://finnhub.io/docs/api\" target=\"_blank\">Docs</a>"),
+				"blue",
+				true
+			);
+		}
+
 		// ── Helpful quick-start note ──────────────────────────────────────────────
 		if (!frm.doc.__islocal && !frm.doc.api_key) {
 			frm.dashboard.add_comment(
@@ -166,6 +186,12 @@ function _set_provider_hints(frm) {
 			api_base_url: "https://www.alphavantage.co",
 			endpoint_prices: "/query",
 			calls_per_month: 500,   // free: 25/day ≈ 750/month
+			market_type: "Both",
+		},
+		finnhub: {
+			api_base_url: "https://finnhub.io/api/v1",
+			endpoint_prices: "/quote",
+			calls_per_month: 60000, // free tier ~60/min; adjust if you upgrade
 			market_type: "Both",
 		},
 	};
