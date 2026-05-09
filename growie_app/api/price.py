@@ -1,5 +1,5 @@
 """
-Price fetching service — Mansa Markets, FCS API, Alpha Vantage.
+Price fetching service — Mansa Markets, FCS API, Finnhub, Alpha Vantage.
 
 Mansa Markets (mansaapi.com):
   Base: https://www.mansaapi.com/api/v1
@@ -24,6 +24,15 @@ Alpha Vantage (alphavantage.co):
              "09. change":"-2.3700","10. change percent":"-0.8668%"}}
   NSE format: symbol=SCOM.NBO  (Nairobi Stock Exchange suffix on Alpha Vantage)
   Free tier: 25 req/day — fetches one symbol per call, use sparingly.
+
+Finnhub (finnhub.io):
+  Base: https://finnhub.io/api/v1
+  Auth: ?token={api_key}
+  Endpoint: GET /quote?symbol=AAPL&token={key}
+  Response: {"c":261.74,"h","l","o","pc":259.48,"t"} — c=current, pc=previous close
+  One HTTP request per symbol; free tier ~60 calls/minute — spaced requests.
+  Symbols: Finnhub-native (e.g. AAPL); optional Growe Stock.api_symbol. Quote `c` is USD;
+  Growe Price Cache still stores price_usd and price_kes using your USD/KES setting when syncing.
 
 Dispatch is determined by the "api_provider" Select field on the Growe Price API record.
 """
@@ -51,12 +60,34 @@ def _get_usd_to_kes() -> float:
 	return _USD_TO_KES_DEFAULT
 
 
+def _price_api_key(provider: dict) -> str:
+	"""
+	Resolve API key for Growe Price API. Password fields are omitted from get_value/get_all;
+	load the document and read the secret via get_password.
+	"""
+	name = provider.get("name")
+	details = frappe.get_doc("Growe Price API", name)
+	key =  details.get_password("api_key")
+	if key:
+		return str(key).strip()
+	doc_name = provider.get("name")
+	if doc_name:
+		try:
+			doc = frappe.get_doc("Growe Price API", doc_name)
+			pw = doc.get_password("api_key")
+			if pw:
+				return str(pw).strip()
+		except Exception:
+			pass
+	return ""
+
+
 def _mansa_kes_usd_rate(provider: dict) -> float | None:
 	"""Fetch live KES-USD rate from Mansa forex endpoint."""
 	try:
 		base = provider["api_base_url"].rstrip("/")
 		url = f"{base}/forex/KES-USD"
-		resp = _requests.get(url, params={"api_key": provider.get("api_key", "")}, timeout=8)
+		resp = _requests.get(url, params={"api_key": _price_api_key(provider)}, timeout=8)
 		if resp.ok:
 			data = resp.json()
 			# Mansa returns the pair rate
@@ -126,7 +157,7 @@ def _fetch_mansa(provider: dict, symbols: list, market: str = "NSE") -> dict:
 	  2. Filter to the tickers we need.
 	"""
 	base = provider["api_base_url"].rstrip("/")
-	api_key = provider.get("api_key", "")
+	api_key = _price_api_key(provider)
 	results: dict = {}
 
 	# Map our internal market → Mansa exchange code
@@ -223,7 +254,7 @@ def _fetch_fcs(provider: dict, symbols: list, market: str = "Global") -> dict:
 	base = provider["api_base_url"].rstrip("/")
 	endpoint = provider.get("endpoint_prices") or "/stock/latest"
 	url = f"{base}{endpoint}"
-	access_key = provider.get("api_key", "")
+	access_key = _price_api_key(provider)
 
 	prefix = _FCS_EXCHANGE_PREFIX.get(market, "")
 
@@ -313,7 +344,7 @@ def _fetch_alpha_vantage(
 	"""
 	base = provider["api_base_url"].rstrip("/")
 	endpoint = provider.get("endpoint_prices") or "/query"
-	api_key = provider.get("api_key", "")
+	api_key = _price_api_key(provider)
 	results: dict = {}
 
 	for idx, symbol in enumerate(symbols):
@@ -398,19 +429,126 @@ def _fetch_alpha_vantage(
 	return results
 
 
+# ── Finnhub ───────────────────────────────────────────────────────────────────
+#
+# Quote: GET /api/v1/quote?symbol=AAPL&token=KEY  →  { "c", "pc", "h", "l", "o", "t" }
+# See https://finnhub.io/docs/api
+
+_FINNHUB_DEFAULT_BASE = "https://finnhub.io/api/v1"
+
+
+def _fetch_finnhub(
+	provider: dict,
+	symbols: list,
+	market: str = "Global",
+	symbol_override_map: dict | None = None,
+) -> dict:
+	"""
+	Fetch prices via Finnhub quote (one symbol per request). Symbols match Finnhub's
+	conventions (same string you pass to curl); optional Growe Stock.api_symbol remaps tickers.
+
+	symbol_override_map: optional {internal ticker → Finnhub symbol} from Growe Stock.api_symbol.
+	"""
+	base = (provider.get("api_base_url") or "").strip().rstrip("/") or _FINNHUB_DEFAULT_BASE
+	endpoint = (provider.get("endpoint_prices") or "/quote").strip()
+	if not endpoint.startswith("/"):
+		endpoint = "/" + endpoint
+	token = _price_api_key(provider)
+	
+	symbol_override_map = symbol_override_map or {}
+	results: dict = {}
+
+	if not token:
+		frappe.log_error(
+			title="Finnhub: missing API token",
+			message="Growe Price API.api_key is empty for Finnhub.",
+		)
+		return {}
+
+	url = f"{base}{endpoint}"
+
+	for idx, symbol in enumerate(symbols):
+		if idx > 0:
+			time.sleep(1.05)
+
+		sym_u = (symbol or "").upper().strip()
+		if not sym_u:
+			continue
+
+		if sym_u in symbol_override_map:
+			fh_symbol = symbol_override_map[sym_u].strip()
+		else:
+			fh_symbol = sym_u
+
+		params = {"symbol": fh_symbol, "token": token}
+		try:
+			resp = _requests.get(url, params=params, timeout=12)
+			resp.raise_for_status()
+			body = resp.json()
+
+			if isinstance(body, dict) and body.get("error"):
+				frappe.log_error(
+					title=f"Finnhub API error ({fh_symbol})",
+					message=str(body.get("error")),
+				)
+				continue
+
+			c = float(body.get("c") or 0)
+			pc = float(body.get("pc") or 0)
+
+			if not c:
+				frappe.log_error(
+					title=f"Finnhub: no price for {fh_symbol}",
+					message=str(body),
+				)
+				continue
+
+			if body.get("dp") is not None:
+				change_pct = round(float(body.get("dp") or 0), 4)
+			elif pc and pc != 0:
+				change_pct = round((c - pc) / pc * 100, 4)
+			else:
+				change_pct = 0.0
+
+			# Finnhub /quote has no currency field; `c` is USD — cache upsert derives KES via settings.
+			results[sym_u] = {
+				"price": c,
+				"change_percent": change_pct,
+				"currency": "USD",
+			}
+
+		except Exception as e:
+			frappe.log_error(
+				title=f"Finnhub fetch error ({fh_symbol})",
+				message=str(e),
+			)
+
+	return results
+
+
 # ── Generic dispatcher (uses api_provider field) ───────────────────────────────
 
-def _fetch_from_provider(provider: dict, symbols: list, market: str = "NSE") -> dict:
+def _fetch_from_provider(
+	provider: dict,
+	symbols: list,
+	market: str = "NSE",
+	symbol_override_map: dict | None = None,
+) -> dict:
 	api_prov = _provider_key(provider)
+	symbol_override_map = symbol_override_map or {}
 
 	if api_prov == "mansa markets":
 		return _fetch_mansa(provider, symbols, market)
 	if api_prov == "fcs api":
 		return _fetch_fcs(provider, symbols, market)
+	if api_prov == "finnhub":
+		return _fetch_finnhub(provider, symbols, market, symbol_override_map=symbol_override_map)
 	if api_prov == "alpha vantage":
 		if str(market).upper() != "GLOBAL":
 			return {}
-		return _fetch_alpha_vantage(provider, symbols, market)
+		return _fetch_alpha_vantage(
+			provider, symbols, market, symbol_override_map=symbol_override_map
+		)
 
 	# Unknown — skip with a warning
 	frappe.log_error(
@@ -418,7 +556,7 @@ def _fetch_from_provider(provider: dict, symbols: list, market: str = "NSE") -> 
 		message=(
 			f"No parser for provider '{provider.get('provider_name')}' "
 			f"(api_provider='{provider.get('api_provider')}'). "
-			"Supported: Mansa Markets, FCS API, Alpha Vantage."
+			"Supported: Mansa Markets, FCS API, Finnhub, Alpha Vantage."
 		),
 	)
 	return {}
@@ -531,14 +669,14 @@ def _fetch_and_store(
 			live_rate = _mansa_kes_usd_rate(provider)
 			if live_rate:
 				usd_to_kes = live_rate
-		print("Nikoia")
 		if _provider_uses_alpha_vantage(provider):
-			
 			fetched = _fetch_alpha_vantage(
 				provider, remaining, market, symbol_override_map=sym_map
 			)
 		else:
-			fetched = _fetch_from_provider(provider, remaining, market)
+			fetched = _fetch_from_provider(
+				provider, remaining, market, symbol_override_map=sym_map
+			)
 
 		for ticker, data in fetched.items():
 			tu = (ticker or "").upper()
@@ -568,7 +706,9 @@ def _fetch_and_store(
 						provider, [alone], market, symbol_override_map=sym_map
 					)
 				else:
-					fetched = _fetch_from_provider(provider, [alone], market)
+					fetched = _fetch_from_provider(
+						provider, [alone], market, symbol_override_map=sym_map
+					)
 				for ticker, data in fetched.items():
 					tu = (ticker or "").upper()
 					if tu not in remaining:
@@ -624,7 +764,7 @@ def refresh_prices(provider_name: str = None):
 			_(
 				"No live prices were saved. Check: (1) Growe Price API records are Active, "
 				"(2) Market Type matches your holdings (NSE vs Global), "
-				"(3) API Provider is Mansa Markets, FCS API, or Alpha Vantage, "
+				"(3) API Provider is Mansa Markets, FCS API, Finnhub, or Alpha Vantage, "
 				"(4) Error Log for provider errors."
 			),
 			alert=True,
@@ -681,11 +821,21 @@ def test_provider(provider_name: str, test_ticker: str = "SCOM", market: str = N
 		market = "NSE" if provider.market_type in ("NSE", "Both") else "Global"
 
 	ticker = test_ticker.strip().upper()
-	usd_to_kes = _get_usd_to_kes()
+
+	sym_for_test: dict = {}
+	row = frappe.db.get_value(
+		"Growe Stock",
+		{"ticker": ticker},
+		"api_symbol",
+	)
+	if row:
+		sym_for_test[ticker] = row
 
 	try:
-		results = _fetch_from_provider(dict(provider), [ticker], market)
-		
+		results = _fetch_from_provider(
+			dict(provider), [ticker], market, symbol_override_map=sym_for_test
+		)
+
 	except Exception as e:
 		_save_test_result(provider_name, f"ERROR: {e}")
 		return {"success": False, "error": str(e)}
@@ -693,20 +843,19 @@ def test_provider(provider_name: str, test_ticker: str = "SCOM", market: str = N
 	if ticker in results:
 		data = results[ticker]
 		currency = (data.get("currency") or "KES").upper()
-		price_kes = data["price"] if currency == "KES" else data["price"] * usd_to_kes
+		price_raw = float(data["price"])
 		change_pct = data.get("change_percent", 0)
 		msg = (
-			f"✅  {ticker}  KES {price_kes:,.2f}  "
-			f"({'▲' if change_pct >= 0 else '▼'} {abs(change_pct):.2f}%)  "
-			f"[{data.get('currency', '?')}]"
+			f"✅  {ticker}  {currency} {price_raw:,.6g}  "
+			f"({'▲' if change_pct >= 0 else '▼'} {abs(change_pct):.2f}%)"
 		)
 		_save_test_result(provider_name, msg)
 		return {
 			"success": True,
 			"ticker": ticker,
-			"price_kes": round(price_kes, 2),
-			"change_percent": change_pct,
+			"price": round(price_raw, 8),
 			"currency": currency,
+			"change_percent": change_pct,
 			"message": msg,
 		}
 	else:
@@ -869,7 +1018,9 @@ def _fetch_market_for_refresh(market: str, tickers: list, sym_map: dict) -> int:
 				provider, remaining, market, symbol_override_map=sym_map
 			)
 		else:
-			fetched = _fetch_from_provider(provider, remaining, market)
+			fetched = _fetch_from_provider(
+				provider, remaining, market, symbol_override_map=sym_map
+			)
 		_usd = _get_usd_to_kes()
 		for ticker, data in list(fetched.items()):
 			tu = (ticker or "").upper()
@@ -891,7 +1042,9 @@ def _fetch_market_for_refresh(market: str, tickers: list, sym_map: dict) -> int:
 						provider, [lone], market, symbol_override_map=sym_map
 					)
 				else:
-					fetched = _fetch_from_provider(provider, [lone], market)
+					fetched = _fetch_from_provider(
+						provider, [lone], market, symbol_override_map=sym_map
+					)
 				_usd = _get_usd_to_kes()
 				for tk, data in list(fetched.items()):
 					tu = (tk or "").upper()
@@ -949,7 +1102,7 @@ def get_nse_index():
 			base = provider.api_base_url.rstrip("/")
 			resp = _requests.get(
 				f"{base}/index/NSE",
-				params={"api_key": provider.api_key or ""},
+				params={"api_key": _price_api_key(dict(provider))},
 				timeout=8,
 			)
 			if resp.ok:

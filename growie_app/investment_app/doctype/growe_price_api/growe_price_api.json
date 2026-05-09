@@ -107,7 +107,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "API Provider",
-   "options": "\nMansa Markets\nFCS API\nNSE Data API (Open Source)\nAfrimarket (Python)\nAlpha Vantage\nYahoo Finance\nTwelve Data\nIntrinio\nICE Data Services\nNone (Manual Entry)"
+   "options": "\nMansa Markets\nFCS API\nFinnhub\nNSE Data API (Open Source)\nAfrimarket (Python)\nAlpha Vantage\nYahoo Finance\nTwelve Data\nIntrinio\nICE Data Services\nNone (Manual Entry)"
   },
   {
    "fieldname": "test_section",
@@ -134,7 +134,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-24 16:05:39.887684",
+ "modified": "2026-05-10 01:16:12.959761",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Price API",
