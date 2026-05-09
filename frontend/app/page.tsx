@@ -1,0 +1,103 @@
+'use client'
+
+import { useEffect } from 'react'
+import { AppShell } from '@/components/layout'
+import {
+  PortfolioView,
+  NewsView,
+  MarketsView,
+  VideosView,
+  CommunityView,
+  AnalysisView,
+  PricingView,
+  LandingView,
+  SettingsView,
+  SupportView,
+  AppointmentsView,
+} from '@/views'
+import { AuthModal } from '@/components/auth'
+import { useAppStore } from '@/lib/store'
+import { useAuth } from '@/hooks/use-auth'
+
+const ALL_TABS = [
+  'portfolio',
+  'news',
+  'markets',
+  'videos',
+  'community',
+  'analysis',
+  'appointments',
+  'pricing',
+  'settings',
+  'support',
+  'landing',
+]
+const publicTabs = ['news', 'markets', 'pricing']
+const authRequiredTabs = ['portfolio', 'community', 'settings', 'support', 'analysis', 'videos', 'appointments']
+
+function hashTab(): string {
+  if (typeof window === 'undefined') return ''
+  const raw = window.location.hash.replace('#', '').trim()
+  /** Support `#news?insight=GI-….` deep links — tab name is always before `?`. */
+  const path = raw.split('?')[0].trim().toLowerCase()
+  return ALL_TABS.includes(path) ? path : ''
+}
+
+export default function HomePage() {
+  const { activeTab, setAuthModal, setActiveTab } = useAppStore()
+  const { isAuthenticated, isLoading } = useAuth()
+
+  // On mount: restore tab from URL hash
+  useEffect(() => {
+    const tab = hashTab()
+    if (tab) setActiveTab(tab)
+
+    const onHash = () => {
+      const t = hashTab()
+      if (t) setActiveTab(t)
+    }
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Redirect unauthenticated users away from protected tabs (wait for auth to load)
+  useEffect(() => {
+    if (isLoading) return
+    if (!isAuthenticated && authRequiredTabs.includes(activeTab)) {
+      setActiveTab('news')
+      setAuthModal('login')
+    }
+  }, [activeTab, isAuthenticated, isLoading, setActiveTab, setAuthModal])
+
+  const renderView = () => {
+    switch (activeTab) {
+      case 'news':      return <NewsView />
+      case 'markets':   return <MarketsView />
+      case 'videos':    return <VideosView />
+      case 'community': return isAuthenticated ? <CommunityView /> : <NewsView />
+      case 'portfolio': return isAuthenticated ? <PortfolioView /> : <NewsView />
+      case 'analysis':  return <AnalysisView />
+      case 'pricing':   return <PricingView />
+      case 'settings':  return isAuthenticated ? <SettingsView /> : <NewsView />
+      case 'support':       return isAuthenticated ? <SupportView /> : <NewsView />
+      case 'appointments': return isAuthenticated ? <AppointmentsView /> : <NewsView />
+      default:              return isAuthenticated ? <PortfolioView /> : <NewsView />
+    }
+  }
+
+  if (!isAuthenticated && !publicTabs.includes(activeTab)) {
+    return (
+      <>
+        <LandingView />
+        <AuthModal />
+      </>
+    )
+  }
+
+  return (
+    <>
+      <AppShell>{renderView()}</AppShell>
+      <AuthModal />
+    </>
+  )
+}
