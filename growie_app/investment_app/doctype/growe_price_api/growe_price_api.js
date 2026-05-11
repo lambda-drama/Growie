@@ -74,7 +74,9 @@ frappe.ui.form.on("Growe Price API", {
 		// ── Fetch All Prices Now button ───────────────────────────────────────────
 		frm.add_custom_button(__("Refresh All Prices Now"), function () {
 			frappe.confirm(
-				__("This will fetch live prices for all tickers in your holdings and update their values. Continue?"),
+				__(
+					"This will fetch live prices for all active listed tickers (portfolio tickers first) and update holding values. Continue?"
+				),
 				function () {
 					frappe.call({
 						method: "growie_app.api.price.refresh_prices",

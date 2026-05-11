@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAppStore } from '@/lib/store'
 import { getHoldings, getPortfolioSummary, type PortfolioSummary } from '@/services/portfolio'
-import { refreshPrices } from '@/services/markets'
+import { refreshStockPrices } from '@/services/markets'
 import { useAuth } from '@/providers/auth-provider'
 
 export function usePortfolio() {
@@ -29,14 +29,14 @@ export function usePortfolio() {
     }
   }, [isAuthenticated, setHoldings])
 
-  /** Fetches live prices (Growe Price API → cache + holding values), then reloads portfolio. */
+  /** Fetches live prices for all listed tickers (holdings first), updates cache + holding values, then reloads portfolio. */
   const refresh = useCallback(async () => {
     if (!isAuthenticated) return
     setIsLoading(true)
     setError(null)
     let priceRefreshError: string | null = null
     try {
-      await refreshPrices()
+      await refreshStockPrices()
     } catch (err) {
       priceRefreshError =
         err instanceof Error ? err.message : 'Live prices could not be refreshed from your APIs'
