@@ -88,6 +88,7 @@ def signup(full_name: str, email: str, password: str, id_type: str, id_number: s
 	user_doc.flags.ignore_password_policy = True
 	user_doc.insert()
 
+	user_doc.add_roles("Analytics")  # Or whatever role you want
 	# ── Create Growe Member ───────────────────────────────────────────────────
 	id_row = {"id_type": id_type, "id_number": id_number}
 
@@ -281,3 +282,5 @@ def change_password(current_password, new_password):
 	update_password(user_email, (new_password or "").strip(), logout_all_sessions=False)
 	frappe.db.commit()
 	return {"success": True}
+
+
