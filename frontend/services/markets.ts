@@ -14,6 +14,8 @@ export interface StockWithPrice {
   source: string
   fetchedAt: string
   hasPrice: boolean
+  /** Present when API returns only rows with both price and change % (Markets page). */
+  hasCompleteQuote?: boolean
 }
 
 export interface PriceCacheRow {
@@ -127,7 +129,7 @@ export async function getStocksWithPrices(
   const params = new URLSearchParams()
   if (market) params.append('market', market)
   if (sector) params.append('sector', sector)
-  params.append('limit', '200')
+  params.append('limit', '500')
 
   const response = await fetch(
     `/api/method/growie_app.api.price.get_stocks_with_prices?${params.toString()}`,

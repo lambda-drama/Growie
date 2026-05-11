@@ -216,7 +216,7 @@ export function MarketsView() {
     return latest.fetchedAt
   }, [stocks])
 
-  const pricedCount = filtered.filter((s) => s.hasPrice).length
+  const pricedCount = filtered.length
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
@@ -226,7 +226,7 @@ export function MarketsView() {
         <div>
           <h1 className="text-2xl font-bold">Markets</h1>
           <p className="text-sm text-muted-foreground">
-            {stocks.length} stocks · {pricedCount} with live prices
+            {stocks.length} stock{stocks.length !== 1 ? 's' : ''} with price and daily change
             {lastUpdated && (
               <span className="ml-2">· Updated {formatDateRelative(lastUpdated)}</span>
             )}
@@ -247,7 +247,7 @@ export function MarketsView() {
               {isRefreshing
                 ? <Loader2 className="h-4 w-4 animate-spin" />
                 : <RefreshCcw className="h-4 w-4" />}
-              {isRefreshing ? 'Fetching…' : 'Refresh Prices'}
+              {isRefreshing ? 'Updating all APIs…' : 'Refresh Prices'}
             </Button>
           ) : (
             <p className="text-xs text-muted-foreground">Sign in to refresh prices</p>
@@ -316,7 +316,11 @@ export function MarketsView() {
         ) : filtered.length === 0 ? (
           <div className="py-16 text-center text-muted-foreground">
             <Search className="mx-auto h-8 w-8 opacity-40" />
-            <p className="mt-2">No stocks found{search ? ` for "${search}"` : ''}.</p>
+            <p className="mt-2">
+              {search
+                ? `No stocks match "${search}" with a live price and change.`
+                : 'No listed stocks have both a live price and change % yet. Sign in and use Refresh Prices, or check your Growe Price API records.'}
+            </p>
           </div>
         ) : groupBySector ? (
           <div className="divide-y">
@@ -335,10 +339,9 @@ export function MarketsView() {
         {/* Footer stats */}
         {!isLoading && filtered.length > 0 && (
           <div className="border-t bg-muted/20 px-4 py-2 text-xs text-muted-foreground">
-            Showing {filtered.length} of {stocks.length} stocks ·{' '}
-            {pricedCount > 0
-              ? `${pricedCount} have live prices via Alpha Vantage / Mansa / FCS`
-              : 'No prices yet — click Refresh Prices to fetch'}
+            Listed instruments have a cached price and daily change %. Refresh runs every
+            configured provider (in order), twice for symbols that still lack data, with
+            portfolio tickers fetched first.
           </div>
         )}
       </Card>
