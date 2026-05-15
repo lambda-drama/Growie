@@ -21,8 +21,9 @@ from frappe.utils import get_first_day, get_last_day, today
 
 # ─── System prompt ────────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """You are Growe AI, a financial assistant for Kenyan and diaspora investors.
+SYSTEM_PROMPT = """You are Barbs AI, a financial assistant for Kenyan and diaspora investors.
 You give clear, concise, and actionable investment insights with an Africa-first lens.
+Never mention underlying model vendors (OpenAI, Claude, GPT, Gemini, etc.) — you are Barbs AI only.
 
 You understand:
 - Nairobi Securities Exchange (NSE) stocks, sectors, and typical KES valuations
@@ -35,8 +36,20 @@ Rules:
 - Use KES values where relevant; mention USD equivalent for global stocks
 - Clearly flag risks and uncertainties
 - End with one concrete recommended next step
-- Add a brief disclaimer: "This is not regulated financial advice"
-- Use plain English — no excessive jargon
+- Use plain English only — no markdown (no **, *, #, or _ formatting)
+- Do not add legal disclaimers (e.g. "not regulated financial advice")
+"""
+
+PORTFOLIO_ANALYSIS_FORMAT = """
+Structure your response with these labelled sections (plain text, one short paragraph each):
+STRENGTHS:
+RISKS:
+OPPORTUNITIES:
+WATCHLIST:
+RECOMMENDATIONS:
+1. [Title]: [one sentence]
+2. [Title]: [one sentence]
+3. [Title]: [one sentence]
 """
 
 # ─── Provider helpers ─────────────────────────────────────────────────────────
@@ -206,6 +219,25 @@ def _dispatch(provider, system: str, user_messages: list, *, max_output_tokens: 
 	else:
 		frappe.throw(f"Provider type '{provider.provider}' is not yet supported. "
 					 "Supported: Claude, OpenAI, Gemini, Groq, DeepSeek.")
+
+
+def _clean_barbs_reply(text: str) -> str:
+	"""Plain text for UI: no markdown asterisks or regulated-advice disclaimer."""
+	if not text:
+		return ""
+	s = text.strip()
+	lines = []
+	for line in s.split("\n"):
+		stripped = line.strip().strip("*").strip().lower()
+		if "not regulated financial advice" in stripped:
+			continue
+		lines.append(line)
+	s = "\n".join(lines).strip()
+	# **bold** then *italic*
+	s = re.sub(r"\*\*([^*]+)\*\*", r"\1", s)
+	s = re.sub(r"(?<!\*)\*([^*\n]+)\*(?!\*)", r"\1", s)
+	s = s.replace("**", "").replace("*", "")
+	return s.strip()
 
 
 # ─── News ingestion rewrite (Desk / scheduler) ───────────────────────────────
@@ -501,10 +533,12 @@ def chat(question: str, context: str = ""):
 		user_content = f"{user_content}\n\nPortfolio context:\n{context.strip()}"
 
 	provider = _get_active_provider()
-	reply = _dispatch(
-		provider,
-		system=SYSTEM_PROMPT,
-		user_messages=[{"role": "user", "content": user_content}],
+	reply = _clean_barbs_reply(
+		_dispatch(
+			provider,
+			system=SYSTEM_PROMPT,
+			user_messages=[{"role": "user", "content": user_content}],
+		)
 	)
 
 	_save_conversation(
@@ -548,15 +582,17 @@ def analyse_portfolio():
 
         question = (
             "Please analyse my overall investment portfolio. "
-            "Cover: (1) diversification quality, (2) top risks, "
-            "(3) what's working well, and (4) one clear recommended next step."
+            "Cover diversification, top risks, what's working well, opportunities, and 3 actionable recommendations."
+            + PORTFOLIO_ANALYSIS_FORMAT
         )
 
         provider = _get_active_provider()
-        reply = _dispatch(
-            provider,
-            system=SYSTEM_PROMPT,
-            user_messages=[{"role": "user", "content": f"{question}\n\n{ctx}"}],
+        reply = _clean_barbs_reply(
+            _dispatch(
+                provider,
+                system=SYSTEM_PROMPT,
+                user_messages=[{"role": "user", "content": f"{question}\n\n{ctx}"}],
+            )
         )
 
         _save_conversation(
@@ -644,10 +680,12 @@ def analyse_holding(holding_name: str):
 	)
 
 	provider = _get_active_provider()
-	reply = _dispatch(
-		provider,
-		system=SYSTEM_PROMPT,
-		user_messages=[{"role": "user", "content": f"{question}\n\n{ctx}"}],
+	reply = _clean_barbs_reply(
+		_dispatch(
+			provider,
+			system=SYSTEM_PROMPT,
+			user_messages=[{"role": "user", "content": f"{question}\n\n{ctx}"}],
+		)
 	)
 
 	_save_conversation(

@@ -4,6 +4,8 @@ import {
   Newspaper,
   TrendingUp,
   Wallet,
+  LayoutDashboard,
+  Layers,
   Brain,
   MoreHorizontal,
   PlayCircle,
@@ -11,6 +13,8 @@ import {
   CreditCard,
   Lock,
   CalendarDays,
+  Goal,
+  FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/lib/store'
@@ -32,13 +36,13 @@ interface NavItem {
 
 // Public nav items for bottom bar
 const publicNavItems: NavItem[] = [
-  { id: 'news', label: 'News', icon: Newspaper },
+  { id: 'news', label: 'Insights', icon: Newspaper },
   { id: 'markets', label: 'Markets', icon: TrendingUp },
 ]
 
 // Auth nav items for bottom bar
 const authNavItems: NavItem[] = [
-  { id: 'portfolio', label: 'Portfolio', icon: Wallet, requiresAuth: true },
+  { id: 'dashboard', label: 'Home', icon: LayoutDashboard, requiresAuth: true },
   { id: 'analysis', label: 'Analysis', icon: Brain, requiresAuth: true },
 ]
 
@@ -48,6 +52,10 @@ const publicMoreItems: NavItem[] = [
 ]
 
 const authMoreItems: NavItem[] = [
+  { id: 'stack', label: 'My Stack', icon: Layers, requiresAuth: true },
+  { id: 'portfolio', label: 'Portfolio', icon: Wallet, requiresAuth: true },
+  { id: 'goals', label: 'Goals', icon: Goal, requiresAuth: true },
+  { id: 'reports', label: 'Reports', icon: FileText, requiresAuth: true },
   { id: 'community', label: 'Community', icon: Users, requiresAuth: true },
   { id: 'videos', label: 'Videos', icon: PlayCircle, requiresAuth: true },
   { id: 'appointments', label: 'Coach', icon: CalendarDays, requiresAuth: true },

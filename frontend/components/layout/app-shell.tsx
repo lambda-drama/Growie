@@ -14,7 +14,7 @@ export function AppShell({ children }: AppShellProps) {
       <Header />
       <Sidebar />
       <main className="pb-20 md:pl-64 md:pb-0">
-        <div className="p-4 md:p-6">{children}</div>
+        <div className="p-3 sm:p-4 md:p-6">{children}</div>
       </main>
       <BottomNav />
     </div>

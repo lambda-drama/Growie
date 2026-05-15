@@ -88,7 +88,7 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
       <div className="flex h-14 items-center justify-between px-4 md:px-6">
         <button
-          onClick={() => setActiveTab(isAuthenticated ? 'portfolio' : 'landing')}
+          onClick={() => setActiveTab(isAuthenticated ? 'dashboard' : 'landing')}
           className="flex items-center gap-2 transition-opacity hover:opacity-80"
         >
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
@@ -183,6 +183,9 @@ export function Header() {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setActiveTab('dashboard')}>
+                    Dashboard
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setActiveTab('portfolio')}>
                     <User className="mr-2 h-4 w-4" />
                     My Portfolio

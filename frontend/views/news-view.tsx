@@ -14,7 +14,7 @@ import { getLearningBites, markBiteRead } from '@/services/insights'
 type NewsCategory = 'all' | 'kenya' | 'global'
 
 const categories: { id: NewsCategory; label: string }[] = [
-  { id: 'all', label: 'All Insights' },
+  { id: 'all', label: 'All insights' },
   { id: 'kenya', label: 'Kenya (NSE)' },
   { id: 'global', label: 'Global' },
 ]
@@ -224,8 +224,8 @@ export function NewsView() {
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-3 sm:px-0 pb-24">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Weekly Insights</h1>
-        <p className="text-muted-foreground">Curated market analysis and investment stories</p>
+        <h1 className="text-2xl font-bold text-foreground">Market Intelligence</h1>
+        <p className="text-muted-foreground">Curated analysis and investment stories</p>
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-2">
