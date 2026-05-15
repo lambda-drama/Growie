@@ -39,3 +39,16 @@ export function firstNameFrom(fullName?: string | null): string {
   if (!fullName?.trim()) return 'there'
   return fullName.trim().split(/\s+/)[0] ?? 'there'
 }
+
+/** Outline buttons — buy = blue border, sell = red border */
+export const STACK_BUY_BUTTON_CLASS =
+  'border-2 border-primary bg-transparent text-primary shadow-none hover:bg-primary/10 hover:text-primary'
+
+export const STACK_SELL_BUTTON_CLASS =
+  'border-2 border-red-500 bg-transparent text-red-600 shadow-none hover:bg-red-500/10 hover:text-red-600 dark:border-red-500 dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-400'
+
+export function stackTradeBadgeClass(isBuy: boolean): string {
+  return isBuy
+    ? 'border-2 border-primary bg-primary/5 text-primary'
+    : 'border-2 border-red-500 bg-red-500/5 text-red-600 dark:text-red-400'
+}

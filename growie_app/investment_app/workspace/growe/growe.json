@@ -39,6 +39,14 @@
   },
   {
    "hidden": 0,
+   "label": "Growe Holding Transaction",
+   "link_to": "Growe Holding Transaction",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "label": "Growe Insight",
    "link_to": "Growe Insight",
    "link_type": "DocType",
@@ -140,6 +148,13 @@
    "doc_view": "List",
    "label": "Growe Transaction",
    "link_to": "Growe Transaction",
+   "type": "DocType"
+  },
+  {
+   "color": "Cyan",
+   "doc_view": "List",
+   "label": "Holding Transactions",
+   "link_to": "Growe Holding Transaction",
    "type": "DocType"
   },
   {

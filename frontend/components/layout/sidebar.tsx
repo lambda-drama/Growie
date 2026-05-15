@@ -138,17 +138,17 @@ export function Sidebar() {
 
         {/* Barbs AI promo */}
         {isAuthenticated && (
-          <div className="rounded-lg border border-violet-500/30 bg-gradient-to-br from-violet-600/90 to-primary p-4 text-white shadow-sm">
+          <div className="rounded-lg border border-primary/20 bg-primary p-4 text-primary-foreground shadow-sm">
             <div className="flex items-center gap-2">
               <Sparkles className="h-5 w-5" />
               <span className="font-semibold">Powered by Barbs AI</span>
             </div>
-            <p className="mt-2 text-xs text-white/85">Intelligent insights. Smarter decisions.</p>
+            <p className="mt-2 text-xs text-primary-foreground/85">Intelligent insights. Smarter decisions.</p>
             <Button
               variant="secondary"
               size="sm"
               className="mt-3 w-full gap-1 bg-white text-primary hover:bg-white/90"
-              onClick={() => setActiveTab('analysis')}
+              onClick={() => setActiveTab('barbs-ai')}
             >
               Learn more
               <ArrowRight className="h-3.5 w-3.5" />

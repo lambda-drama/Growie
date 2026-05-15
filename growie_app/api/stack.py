@@ -16,6 +16,7 @@ from growie_app.api.portfolio import (
 	add_holding,
 	search_stocks,
 )
+from growie_app.investment_app.holding_ledger import create_holding_transaction
 
 
 def _asset_class_from_market(market: str) -> str:
@@ -476,31 +477,18 @@ def record_buy(
 	if unit <= 0:
 		unit = _native_unit_price_from_kes(flt(doc.cost_basis_kes), flt(doc.quantity), ccy, date_str)
 
-	amount_ccy = qty * unit
-	amount_kes = _to_kes(amount_ccy, ccy, date_str)
-
-	txn = frappe.get_doc(
-		{
-			"doctype": "Growe Holding Transaction",
-			"member": member,
-			"holding": holding_name,
-			"transaction_type": "Buy",
-			"asset_class": doc.asset_class,
-			"market_tag": _market_tag_for_holding(doc),
-			"currency": ccy,
-			"quantity": qty,
-			"unit_price": unit,
-			"amount": amount_ccy,
-			"amount_kes": amount_kes,
-			"transaction_date": use_date,
-			"ticker": doc.ticker,
-			"asset_name": doc.asset_name,
-			"reference": reference or "",
-			"notes": notes or "",
-		}
+	txn = create_holding_transaction(
+		member=member,
+		holding_name=holding_name,
+		transaction_type="Buy",
+		quantity=qty,
+		unit_price=unit,
+		currency=ccy,
+		transaction_date=use_date,
+		holding_doc=doc,
+		reference=reference or "",
+		notes=notes or "",
 	)
-	txn.flags.ignore_permissions = True
-	txn.insert()
 	frappe.db.commit()
 
 	return {
@@ -562,31 +550,18 @@ def record_sell(
 	doc.flags.ignore_permissions = True
 	doc.save()
 
-	amount_ccy = qty * unit
-	amount_kes = _to_kes(amount_ccy, ccy, str(use_date))
-
-	txn = frappe.get_doc(
-		{
-			"doctype": "Growe Holding Transaction",
-			"member": member,
-			"holding": holding_name,
-			"transaction_type": "Sell",
-			"asset_class": doc.asset_class,
-			"market_tag": _market_tag_for_holding(doc),
-			"currency": ccy,
-			"quantity": qty,
-			"unit_price": unit,
-			"amount": amount_ccy,
-			"amount_kes": amount_kes,
-			"transaction_date": use_date,
-			"ticker": doc.ticker,
-			"asset_name": doc.asset_name,
-			"reference": reference or "",
-			"notes": notes or "",
-		}
+	txn = create_holding_transaction(
+		member=member,
+		holding_name=holding_name,
+		transaction_type="Sell",
+		quantity=qty,
+		unit_price=unit,
+		currency=ccy,
+		transaction_date=use_date,
+		holding_doc=doc,
+		reference=reference or "",
+		notes=notes or "",
 	)
-	txn.flags.ignore_permissions = True
-	txn.insert()
 	frappe.db.commit()
 
 	return {

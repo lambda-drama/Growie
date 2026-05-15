@@ -23,6 +23,8 @@ import {
 import { DisplayCurrencyPicker } from '@/components/currency/display-currency-picker'
 import { StackStockPicker } from '@/components/stack/stack-stock-picker'
 import { recordBuy, recordSell, createStock } from '@/services/stack'
+import { STACK_BUY_BUTTON_CLASS, STACK_SELL_BUTTON_CLASS } from '@/lib/stack-ui'
+import { cn } from '@/lib/utils'
 import type { StackHolding } from '@/services/stack'
 import type { AssetClass } from '@/types'
 import type { GroweStock } from '@/services/portfolio'
@@ -288,7 +290,12 @@ export function TradeDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={saving} variant={isSell ? 'destructive' : 'default'}>
+          <Button
+            onClick={handleSubmit}
+            disabled={saving}
+            variant="outline"
+            className={cn(isSell ? STACK_SELL_BUTTON_CLASS : STACK_BUY_BUTTON_CLASS)}
+          >
             {saving ? 'Saving…' : isSell ? 'Record sell' : 'Record buy'}
           </Button>
         </DialogFooter>

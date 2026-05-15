@@ -10,6 +10,7 @@ import {
   VideosView,
   CommunityView,
   AnalysisView,
+  BarbsAIView,
   PricingView,
   LandingView,
   SettingsView,
@@ -32,6 +33,7 @@ const ALL_TABS = [
   'videos',
   'community',
   'analysis',
+  'barbs-ai',
   'appointments',
   'goals',
   'reports',
@@ -40,7 +42,7 @@ const ALL_TABS = [
   'support',
   'landing',
 ]
-const publicTabs = ['news', 'markets', 'pricing']
+const publicTabs = ['news', 'markets', 'pricing', 'barbs-ai']
 const authRequiredTabs = ['dashboard', 'stack', 'portfolio', 'goals', 'reports', 'community', 'settings', 'support', 'analysis', 'videos', 'appointments']
 
 function hashTab(): string {
@@ -89,6 +91,7 @@ export default function HomePage() {
       case 'goals':     return isAuthenticated ? <GoalsView /> : <NewsView />
       case 'reports':   return isAuthenticated ? <ReportsView /> : <NewsView />
       case 'analysis':  return <AnalysisView />
+      case 'barbs-ai':  return <BarbsAIView />
       case 'pricing':   return <PricingView />
       case 'settings':  return isAuthenticated ? <SettingsView /> : <NewsView />
       case 'support':       return isAuthenticated ? <SupportView /> : <NewsView />
