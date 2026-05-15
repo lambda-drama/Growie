@@ -361,7 +361,7 @@ export function LandingView() {
             <div>
               <h4 className="font-semibold text-white">Product</h4>
               <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
-                <li><button onClick={() => setActiveTab('news')} className="hover:text-foreground">News</button></li>
+                <li><button onClick={() => setActiveTab('news')} className="hover:text-foreground">Insights</button></li>
                 <li><button onClick={() => setActiveTab('markets')} className="hover:text-foreground">Markets</button></li>
                 <li><button onClick={() => setActiveTab('videos')} className="hover:text-foreground">Videos</button></li>
                 <li><button onClick={() => setActiveTab('pricing')} className="hover:text-foreground">Pricing</button></li>

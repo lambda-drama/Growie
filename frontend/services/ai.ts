@@ -31,6 +31,12 @@ export interface ConversationRecord {
   holding: string
 }
 
+export interface SavedPortfolioAnalysis {
+  id: string
+  answer: string
+  askedAt: string
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 async function getCSRF(): Promise<string> {
@@ -72,7 +78,7 @@ async function post<T>(method: string, body: Record<string, unknown>): Promise<T
 
 // ─── Endpoints ────────────────────────────────────────────────────────────────
 
-/** Returns active AI provider info — no API key exposed. */
+/** Returns whether Barbs AI is configured (no vendor/model exposed to UI). */
 export async function getProviderStatus(): Promise<AIProviderStatus> {
   try {
     const resp = await fetch(
@@ -86,25 +92,18 @@ export async function getProviderStatus(): Promise<AIProviderStatus> {
   }
 }
 
-/**
- * General chat — ask any investment question.
- * Optionally pass a portfolio context string for richer answers.
- */
 export async function chat(question: string, context = ''): Promise<AIReply> {
   return post<AIReply>('growie_app.api.ai.chat', { question, context })
 }
 
-/** Full portfolio-level AI analysis for the logged-in user. */
 export async function analysePortfolio(): Promise<AIReply> {
   return post<AIReply>('growie_app.api.ai.analyse_portfolio', {})
 }
 
-/** Analysis of a single holding (by Frappe document name). */
 export async function analyseHolding(holdingName: string): Promise<AIReply> {
   return post<AIReply>('growie_app.api.ai.analyse_holding', { holding_name: holdingName })
 }
 
-/** Return the user's past AI conversations, newest first. */
 export async function getConversationHistory(
   limit = 20,
   conversationType = ''
@@ -121,4 +120,12 @@ export async function getConversationHistory(
   } catch {
     return []
   }
+}
+
+/** Latest saved portfolio analysis for the logged-in user (if any). */
+export async function getLatestPortfolioAnalysis(): Promise<SavedPortfolioAnalysis | null> {
+  const rows = await getConversationHistory(1, 'Portfolio Analysis')
+  const latest = rows[0]
+  if (!latest?.answer?.trim()) return null
+  return { id: latest.id, answer: latest.answer, askedAt: latest.askedAt }
 }

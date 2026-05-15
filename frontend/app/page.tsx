@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { AppShell } from '@/components/layout'
 import {
+  DashboardView,
   PortfolioView,
   NewsView,
   MarketsView,
@@ -14,12 +15,17 @@ import {
   SettingsView,
   SupportView,
   AppointmentsView,
+  GoalsView,
+  MyStackView,
+  ReportsView,
 } from '@/views'
 import { AuthModal } from '@/components/auth'
 import { useAppStore } from '@/lib/store'
 import { useAuth } from '@/hooks/use-auth'
 
 const ALL_TABS = [
+  'dashboard',
+  'stack',
   'portfolio',
   'news',
   'markets',
@@ -27,13 +33,15 @@ const ALL_TABS = [
   'community',
   'analysis',
   'appointments',
+  'goals',
+  'reports',
   'pricing',
   'settings',
   'support',
   'landing',
 ]
 const publicTabs = ['news', 'markets', 'pricing']
-const authRequiredTabs = ['portfolio', 'community', 'settings', 'support', 'analysis', 'videos', 'appointments']
+const authRequiredTabs = ['dashboard', 'stack', 'portfolio', 'goals', 'reports', 'community', 'settings', 'support', 'analysis', 'videos', 'appointments']
 
 function hashTab(): string {
   if (typeof window === 'undefined') return ''
@@ -75,13 +83,17 @@ export default function HomePage() {
       case 'markets':   return <MarketsView />
       case 'videos':    return <VideosView />
       case 'community': return isAuthenticated ? <CommunityView /> : <NewsView />
+      case 'dashboard': return isAuthenticated ? <DashboardView /> : <NewsView />
+      case 'stack':     return isAuthenticated ? <MyStackView /> : <NewsView />
       case 'portfolio': return isAuthenticated ? <PortfolioView /> : <NewsView />
+      case 'goals':     return isAuthenticated ? <GoalsView /> : <NewsView />
+      case 'reports':   return isAuthenticated ? <ReportsView /> : <NewsView />
       case 'analysis':  return <AnalysisView />
       case 'pricing':   return <PricingView />
       case 'settings':  return isAuthenticated ? <SettingsView /> : <NewsView />
       case 'support':       return isAuthenticated ? <SupportView /> : <NewsView />
       case 'appointments': return isAuthenticated ? <AppointmentsView /> : <NewsView />
-      default:              return isAuthenticated ? <PortfolioView /> : <NewsView />
+      default:              return isAuthenticated ? <DashboardView /> : <NewsView />
     }
   }
 

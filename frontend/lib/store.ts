@@ -2,7 +2,7 @@
 
 import { create } from 'zustand'
 import { useShallow } from 'zustand/react/shallow'
-import type { Holding, HealthScore, Currency, SubscriptionTier } from '@/types'
+import type { AssetClass, Holding, HealthScore, Currency, SubscriptionTier } from '@/types'
 
 /**
  * Global UI and portfolio state.
@@ -36,6 +36,18 @@ interface AppState {
   setMobileMenuOpen: (open: boolean) => void
   authModal: 'login' | 'signup' | null
   setAuthModal: (modal: 'login' | 'signup' | null) => void
+
+  // My Stack drill-down
+  stackNav:
+    | { screen: 'overview' }
+    | { screen: 'class'; assetClass: AssetClass }
+    | { screen: 'position'; holdingId: string; assetClass: AssetClass }
+  setStackNav: (
+    nav:
+      | { screen: 'overview' }
+      | { screen: 'class'; assetClass: AssetClass }
+      | { screen: 'position'; holdingId: string; assetClass: AssetClass }
+  ) => void
 }
 
 // Exchange rates (simplified — fetch from a live API in production)
@@ -105,6 +117,9 @@ export const useAppStore = create<AppState>((set) => ({
   setMobileMenuOpen: (open) => set({ isMobileMenuOpen: open }),
   authModal: null,
   setAuthModal: (modal) => set({ authModal: modal }),
+
+  stackNav: { screen: 'overview' },
+  setStackNav: (nav) => set({ stackNav: nav }),
 }))
 
 /** Subscribe to both code + ERPNext-derived multiplier so amounts update when rates load. */

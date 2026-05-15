@@ -1,0 +1,150 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-05-15 18:23:52.278141",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "member",
+  "goal",
+  "transaction_type",
+  "currency",
+  "amount",
+  "transaction_date",
+  "column_break_egxe",
+  "source",
+  "reference",
+  "notes",
+  "holding",
+  "section_break_nbbk",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "member",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Member",
+   "options": "Growe Member",
+   "reqd": 1
+  },
+  {
+   "fieldname": "goal",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Goal",
+   "options": "Growe Goal",
+   "reqd": 1
+  },
+  {
+   "default": "Deposit",
+   "fieldname": "transaction_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Transaction Type",
+   "options": "\nDeposit\nWithdrawal\nInterest\nDividend\nAdjustment",
+   "reqd": 1
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount",
+   "reqd": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "transaction_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Transaction Date",
+   "reqd": 1
+  },
+  {
+   "default": "Bank Transfer",
+   "fieldname": "source",
+   "fieldtype": "Select",
+   "label": "Source",
+   "options": "\nBank Transfer\nM-Pesa\nSalary\nInvestment Return\nCash\nOther"
+  },
+  {
+   "description": "Transaction ID, M-Pesa code, or bank reference",
+   "fieldname": "reference",
+   "fieldtype": "Data",
+   "label": "Reference Number"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  },
+  {
+   "description": "If this came from selling an investment",
+   "fieldname": "holding",
+   "fieldtype": "Link",
+   "label": "Linked Holding (Optional)",
+   "options": "Growe Holding"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Growe Goal Transaction",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "column_break_egxe",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_nbbk",
+   "fieldtype": "Section Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-05-15 18:27:06.514782",
+ "modified_by": "Administrator",
+ "module": "Investment App",
+ "name": "Growe Goal Transaction",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "if_owner": 1,
+   "read": 1,
+   "role": "Website User",
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

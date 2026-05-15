@@ -5,7 +5,9 @@ All endpoints require an authenticated session unless noted.
 
 import frappe
 from frappe import _
-from frappe.utils import now_datetime, today, getdate
+from frappe.utils import add_days, flt, get_datetime_str, getdate, now_datetime, today
+
+_USD_TO_KES_FALLBACK = 130.0
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -83,8 +85,95 @@ def _holding_to_dict(h) -> dict:
 	}
 
 
+def _growe_usd_to_kes_fallback() -> float:
+	"""Last-resort USD→KES when ERPNext has no row for the requested date."""
+	try:
+		settings = frappe.get_single("Growe Settings")
+		rate = flt(getattr(settings, "usd_to_kes_rate", None))
+		if rate > 0:
+			return rate
+	except Exception:
+		pass
+	return _USD_TO_KES_FALLBACK
+
+
+def _currency_exchange_db_rate(
+	from_currency: str, to_currency: str, transaction_date, args: str = None
+) -> float:
+	"""
+	Look up Currency Exchange in the database only (no Frankfurt API — avoids msgprint noise).
+
+	Mirrors erpnext.setup.utils.get_exchange_rate filters without calling the external API.
+	"""
+	if not (from_currency and to_currency):
+		return 0.0
+	if from_currency == to_currency:
+		return 1.0
+
+	tx_date = getdate(transaction_date or today())
+	currency_settings = frappe.get_cached_doc("Accounts Settings")
+	allow_stale = currency_settings.get("allow_stale")
+
+	filters = [
+		["date", "<=", get_datetime_str(tx_date)],
+		["from_currency", "=", from_currency],
+		["to_currency", "=", to_currency],
+	]
+	if args == "for_buying":
+		filters.append(["for_buying", "=", 1])
+	elif args == "for_selling":
+		filters.append(["for_selling", "=", 1])
+
+	if not allow_stale:
+		stale_days = flt(currency_settings.get("stale_days")) or 1
+		checkpoint = add_days(tx_date, -int(stale_days))
+		filters.append(["date", ">", get_datetime_str(checkpoint)])
+
+	entries = frappe.get_all(
+		"Currency Exchange",
+		fields=["exchange_rate"],
+		filters=filters,
+		order_by="date desc",
+		limit=1,
+	)
+	if entries:
+		return flt(entries[0].exchange_rate)
+	return 0.0
+
+
+def _resolve_rate_to_kes(from_currency: str, on_date: str = None) -> float:
+	"""
+	Return how many KES equal 1 unit of from_currency.
+
+	Tries direct and inverse Currency Exchange rows, multiple date fallbacks, then Growe Settings for USD.
+	Does not call ERPNext's get_exchange_rate API path (which msgprints when Frankfurt fails).
+	"""
+	src = (from_currency or "KES").upper().strip()
+	if src == "KES":
+		return 1.0
+
+	requested = str(getdate(on_date or today()))
+	dates_to_try = [requested]
+	if requested != str(today()):
+		dates_to_try.append(str(today()))
+
+	for date_str in dates_to_try:
+		for args in (None, "for_buying", "for_selling"):
+			direct = _currency_exchange_db_rate(src, "KES", date_str, args)
+			if direct > 0:
+				return direct
+			inverse = _currency_exchange_db_rate("KES", src, date_str, args)
+			if inverse > 0:
+				return 1.0 / inverse
+
+	if src == "USD":
+		return _growe_usd_to_kes_fallback()
+
+	return 0.0
+
+
 def _to_kes(amount: float, from_currency: str, on_date: str = None) -> float:
-	"""Convert amount from from_currency to KES via ERPNext exchange rates."""
+	"""Convert amount from from_currency to KES via Currency Exchange (with sensible fallbacks)."""
 	src = (from_currency or "KES").upper().strip()
 	val = float(amount or 0)
 	if not val:
@@ -92,17 +181,13 @@ def _to_kes(amount: float, from_currency: str, on_date: str = None) -> float:
 	if src == "KES":
 		return val
 
-	try:
-		from erpnext.setup.utils import get_exchange_rate
-		rate = float(get_exchange_rate(src, "KES", on_date or today()) or 0)
-		if rate <= 0:
-			frappe.throw(
-				_("No exchange rate configured from {0} to KES on {1}. Please configure Currency Exchange in ERPNext.")
-				.format(src, on_date or today())
-			)
-		return val * rate
-	except ImportError:
-		frappe.throw(_("ERPNext exchange rate utilities are not available on this site."))
+	rate = _resolve_rate_to_kes(src, on_date)
+	if rate <= 0:
+		frappe.throw(
+			_("No exchange rate configured from {0} to KES on {1}. Please configure Currency Exchange in ERPNext.")
+			.format(src, on_date or today())
+		)
+	return val * rate
 
 
 # ── Stock search ──────────────────────────────────────────────────────────────
@@ -179,29 +264,17 @@ def get_currencies(query: str = "", limit: int = 100):
 
 def _kes_per_unit_of_foreign(foreign_currency: str, transaction_date=None) -> float:
 	"""
-	Return how many KES equal 1 unit of foreign_currency (using ERPNext exchange rates).
+	Return multiplier for: amount_in_foreign = amount_kes * multiplier (display conversion).
 
-	If only KES→foreign exists, use it directly (multiply amount_kes by it for foreign amount).
-	If only foreign→KES exists with rate R meaning 1 foreign = R KES, then 1 KES = 1/R foreign.
+	Uses the same DB + fallback resolver as _to_kes, inverted: 1 / (KES per 1 foreign).
 	"""
-	d = transaction_date or today()
 	f = (foreign_currency or "").upper().strip()
 	if not f or f == "KES":
 		return 1.0
 
-	try:
-		from erpnext.setup.utils import get_exchange_rate
-	except ImportError:
-		return 0.0
-
-	direct = float(get_exchange_rate("KES", f, d) or 0)
-	if direct > 0:
-		return direct
-
-	inverse = float(get_exchange_rate(f, "KES", d) or 0)
-	if inverse > 0:
-		return 1.0 / inverse
-
+	kes_per_foreign = _resolve_rate_to_kes(f, transaction_date)
+	if kes_per_foreign > 0:
+		return 1.0 / kes_per_foreign
 	return 0.0
 
 
