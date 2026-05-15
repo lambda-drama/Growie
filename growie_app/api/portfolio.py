@@ -424,8 +424,29 @@ def add_holding(
 		"date_added": use_date,
 		"last_updated": now_datetime(),
 	})
+	if price_in_currency > 0:
+		doc.buying_price = price_in_currency
 	doc.flags.ignore_permissions = True
 	doc.insert()
+
+	if qty > 0:
+		from growie_app.investment_app.holding_ledger import create_holding_transaction
+
+		unit = price_in_currency if price_in_currency > 0 else (
+			(value_kes / qty) / _to_kes(1, ccy, use_date) if ccy != "KES" and qty > 0 else (value_kes / qty if qty > 0 else 0)
+		)
+		create_holding_transaction(
+			member=member,
+			holding_name=doc.name,
+			transaction_type="Buy",
+			quantity=qty,
+			unit_price=unit,
+			currency=ccy,
+			transaction_date=use_date,
+			holding_doc=doc,
+			notes=notes or "",
+		)
+
 	frappe.db.commit()
 	return _holding_to_dict(doc)
 

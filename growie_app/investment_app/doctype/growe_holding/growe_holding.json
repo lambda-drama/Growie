@@ -189,7 +189,13 @@
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
- "links": [],
+ "links": [
+  {
+   "group": "Ledger",
+   "link_doctype": "Growe Holding Transaction",
+   "link_fieldname": "holding"
+  }
+ ],
  "modified": "2026-05-08 17:42:51.453054",
  "modified_by": "Administrator",
  "module": "Investment App",

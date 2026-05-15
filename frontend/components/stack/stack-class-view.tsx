@@ -22,6 +22,7 @@ import { useDisplayMoney } from '@/lib/store'
 import { formatCurrency, formatCurrencyNative, formatPercentage } from '@/lib/format'
 import type { StackHolding } from '@/services/stack'
 import type { AssetClass } from '@/types'
+import { STACK_BUY_BUTTON_CLASS, STACK_SELL_BUTTON_CLASS } from '@/lib/stack-ui'
 import { cn } from '@/lib/utils'
 
 interface StackClassViewProps {
@@ -172,6 +173,7 @@ export function StackClassView({ assetClass, onBack, onOpenPosition }: StackClas
                             <Button
                               variant="outline"
                               size="sm"
+                              className={STACK_BUY_BUTTON_CLASS}
                               onClick={() => openTrade('buy-more', h)}
                             >
                               Buy
@@ -179,7 +181,7 @@ export function StackClassView({ assetClass, onBack, onOpenPosition }: StackClas
                             <Button
                               variant="outline"
                               size="sm"
-                              className="text-destructive hover:text-destructive"
+                              className={STACK_SELL_BUTTON_CLASS}
                               onClick={() => openTrade('sell', h)}
                             >
                               Sell

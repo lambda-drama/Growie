@@ -21,6 +21,7 @@ import { useStackPosition } from '@/hooks/use-stack'
 import { useDisplayMoney } from '@/lib/store'
 import { formatCurrency, formatCurrencyNative, formatPercentage } from '@/lib/format'
 import type { AssetClass } from '@/types'
+import { STACK_BUY_BUTTON_CLASS, STACK_SELL_BUTTON_CLASS, stackTradeBadgeClass } from '@/lib/stack-ui'
 import { cn } from '@/lib/utils'
 
 interface StackPositionViewProps {
@@ -88,13 +89,19 @@ export function StackPositionView({
             <RefreshCcw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
             Refresh
           </Button>
-          <Button size="sm" className="flex-1 sm:flex-none" onClick={() => openTrade('buy-more')} disabled={!holding}>
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn('flex-1 sm:flex-none', STACK_BUY_BUTTON_CLASS)}
+            onClick={() => openTrade('buy-more')}
+            disabled={!holding}
+          >
             Buy more
           </Button>
           <Button
+            variant="outline"
             size="sm"
-            variant="destructive"
-            className="flex-1 sm:flex-none"
+            className={cn('flex-1 sm:flex-none', STACK_SELL_BUTTON_CLASS)}
             onClick={() => openTrade('sell')}
             disabled={!holding}
           >
@@ -182,7 +189,12 @@ export function StackPositionView({
                       <TableRow key={tx.id}>
                         <TableCell>{formatTxDate(tx.transactionDate)}</TableCell>
                         <TableCell>
-                          <Badge variant={tx.type === 'Buy' ? 'secondary' : 'outline'}>{tx.type}</Badge>
+                          <Badge
+                            variant="outline"
+                            className={stackTradeBadgeClass(tx.type === 'Buy')}
+                          >
+                            {tx.type}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-right tabular-nums">{tx.quantity.toLocaleString()}</TableCell>
                         <TableCell className="text-right tabular-nums hidden sm:table-cell">

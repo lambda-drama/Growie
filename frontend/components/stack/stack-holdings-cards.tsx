@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatCurrency, formatCurrencyNative, formatPercentage } from '@/lib/format'
 import type { StackHolding } from '@/services/stack'
+import { STACK_BUY_BUTTON_CLASS, STACK_SELL_BUTTON_CLASS } from '@/lib/stack-ui'
 import { cn } from '@/lib/utils'
 
 interface StackHoldingsCardsProps {
@@ -89,13 +90,18 @@ export function StackHoldingsCards({
                 </dl>
               </button>
               <div className="mt-3 flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1" onClick={() => onBuy(h)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={cn('flex-1', STACK_BUY_BUTTON_CLASS)}
+                  onClick={() => onBuy(h)}
+                >
                   Buy
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="flex-1 text-destructive hover:text-destructive"
+                  className={cn('flex-1', STACK_SELL_BUTTON_CLASS)}
                   onClick={() => onSell(h)}
                 >
                   Sell
