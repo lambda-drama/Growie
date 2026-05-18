@@ -97,22 +97,41 @@ def _growe_usd_to_kes_fallback() -> float:
 	return _USD_TO_KES_FALLBACK
 
 
+def _erpnext_currency_exchange_available() -> bool:
+	"""True when ERPNext Currency Exchange doctype exists on this site."""
+	return bool(frappe.db.table_exists("Currency Exchange"))
+
+
+def _accounts_settings_exchange_prefs() -> tuple[bool, int]:
+	"""(allow_stale, stale_days) from ERPNext Accounts Settings, with safe defaults."""
+	if not frappe.db.table_exists("Accounts Settings"):
+		return True, 365
+	try:
+		currency_settings = frappe.get_cached_doc("Accounts Settings")
+		allow_stale = bool(currency_settings.get("allow_stale"))
+		stale_days = int(flt(currency_settings.get("stale_days")) or 365)
+		return allow_stale, max(stale_days, 1)
+	except Exception:
+		return True, 365
+
+
 def _currency_exchange_db_rate(
 	from_currency: str, to_currency: str, transaction_date, args: str = None
 ) -> float:
 	"""
 	Look up Currency Exchange in the database only (no Frankfurt API — avoids msgprint noise).
 
-	Mirrors erpnext.setup.utils.get_exchange_rate filters without calling the external API.
+	Works without importing erpnext.setup.utils (avoids ImportError on sites missing ERPNext).
 	"""
 	if not (from_currency and to_currency):
 		return 0.0
 	if from_currency == to_currency:
 		return 1.0
+	if not _erpnext_currency_exchange_available():
+		return 0.0
 
 	tx_date = getdate(transaction_date or today())
-	currency_settings = frappe.get_cached_doc("Accounts Settings")
-	allow_stale = currency_settings.get("allow_stale")
+	allow_stale, stale_days = _accounts_settings_exchange_prefs()
 
 	filters = [
 		["date", "<=", get_datetime_str(tx_date)],
@@ -125,19 +144,21 @@ def _currency_exchange_db_rate(
 		filters.append(["for_selling", "=", 1])
 
 	if not allow_stale:
-		stale_days = flt(currency_settings.get("stale_days")) or 1
-		checkpoint = add_days(tx_date, -int(stale_days))
+		checkpoint = add_days(tx_date, -stale_days)
 		filters.append(["date", ">", get_datetime_str(checkpoint)])
 
-	entries = frappe.get_all(
-		"Currency Exchange",
-		fields=["exchange_rate"],
-		filters=filters,
-		order_by="date desc",
-		limit=1,
-	)
-	if entries:
-		return flt(entries[0].exchange_rate)
+	try:
+		entries = frappe.get_all(
+			"Currency Exchange",
+			fields=["exchange_rate"],
+			filters=filters,
+			order_by="date desc",
+			limit=1,
+		)
+		if entries:
+			return flt(entries[0].exchange_rate)
+	except Exception:
+		pass
 	return 0.0
 
 
@@ -169,10 +190,51 @@ def _resolve_rate_to_kes(from_currency: str, on_date: str = None) -> float:
 	if src == "USD":
 		return _growe_usd_to_kes_fallback()
 
+	# Bridge via USD using DB rows when available (e.g. EUR→USD × USD→KES).
+	usd_kes = _growe_usd_to_kes_fallback()
+	for date_str in dates_to_try:
+		for args in (None, "for_buying", "for_selling"):
+			to_usd = _currency_exchange_db_rate(src, "USD", date_str, args)
+			if to_usd > 0:
+				return to_usd * usd_kes
+			from_usd = _currency_exchange_db_rate("USD", src, date_str, args)
+			if from_usd > 0:
+				return usd_kes / from_usd
+
 	return 0.0
 
 
-def _to_kes(amount: float, from_currency: str, on_date: str = None) -> float:
+def kes_per_unit_foreign(from_currency: str, on_date: str = None, *, strict: bool = False) -> float:
+	"""
+	How many KES equal 1 unit of from_currency.
+
+	strict=False: never throw; use Growe Settings USD rate as last resort (for UI display).
+	strict=True: throw if no rate (for trades / accounting).
+	"""
+	src = (from_currency or "KES").upper().strip()
+	if src == "KES":
+		return 1.0
+
+	rate = _resolve_rate_to_kes(src, on_date)
+	if rate > 0:
+		return rate
+
+	if strict:
+		frappe.throw(
+			_("No exchange rate configured from {0} to KES on {1}. Please configure Currency Exchange in ERPNext or set USD to KES in Growe Settings.")
+			.format(src, on_date or today())
+		)
+
+	# Display / read paths: show holdings even when Currency Exchange is empty on this server.
+	frappe.logger("growie.portfolio").warning(
+		"Using USD→KES fallback for %s on %s (no Currency Exchange row)",
+		src,
+		on_date or today(),
+	)
+	return _growe_usd_to_kes_fallback()
+
+
+def _to_kes(amount: float, from_currency: str, on_date: str = None, strict: bool = True) -> float:
 	"""Convert amount from from_currency to KES via Currency Exchange (with sensible fallbacks)."""
 	src = (from_currency or "KES").upper().strip()
 	val = float(amount or 0)
@@ -181,12 +243,7 @@ def _to_kes(amount: float, from_currency: str, on_date: str = None) -> float:
 	if src == "KES":
 		return val
 
-	rate = _resolve_rate_to_kes(src, on_date)
-	if rate <= 0:
-		frappe.throw(
-			_("No exchange rate configured from {0} to KES on {1}. Please configure Currency Exchange in ERPNext.")
-			.format(src, on_date or today())
-		)
+	rate = kes_per_unit_foreign(src, on_date, strict=strict)
 	return val * rate
 
 
@@ -405,7 +462,8 @@ def add_holding(
 		else:
 			kes_px = float(cache.price_kes or 0)
 			if kes_px > 0:
-				price_in_currency = kes_px / _to_kes(1, ccy, use_date)
+				kpu = kes_per_unit_foreign(ccy, use_date, strict=False)
+				price_in_currency = kes_px / kpu if kpu > 0 else 0.0
 
 	value_in_currency = qty * price_in_currency
 	value_kes = _to_kes(value_in_currency, ccy, use_date) if value_in_currency else 0
@@ -433,7 +491,9 @@ def add_holding(
 		from growie_app.investment_app.holding_ledger import create_holding_transaction
 
 		unit = price_in_currency if price_in_currency > 0 else (
-			(value_kes / qty) / _to_kes(1, ccy, use_date) if ccy != "KES" and qty > 0 else (value_kes / qty if qty > 0 else 0)
+			(value_kes / qty) / kes_per_unit_foreign(ccy, use_date, strict=False)
+			if ccy != "KES" and qty > 0
+			else (value_kes / qty if qty > 0 else 0)
 		)
 		create_holding_transaction(
 			member=member,
@@ -500,7 +560,8 @@ def update_holding(
 			price_in_currency = float(cache.price_usd or 0)
 		else:
 			kes_px = float(cache.price_kes or 0)
-			price_in_currency = kes_px / _to_kes(1, ccy, str(doc.date_added))
+			kpu = kes_per_unit_foreign(ccy, str(doc.date_added), strict=False)
+			price_in_currency = kes_px / kpu if kpu > 0 else 0.0
 		value_in_currency = qty * price_in_currency
 		doc.value_kes = _to_kes(value_in_currency, ccy, str(doc.date_added))
 		doc.cost_basis_kes = doc.value_kes

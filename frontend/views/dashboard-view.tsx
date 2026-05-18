@@ -11,6 +11,7 @@ import {
   MetricCards,
   MyStackPanel,
   GoalsSnapshot,
+  DashboardBarbsAI,
 } from '@/components/dashboard'
 import { usePortfolio } from '@/hooks/use-portfolio'
 import { useGoals } from '@/hooks/use-goals'
@@ -101,6 +102,8 @@ export function DashboardView() {
               <GoalsSnapshot goals={goals} />
             )}
           </div>
+
+          <DashboardBarbsAI />
         </>
       )}
     </div>

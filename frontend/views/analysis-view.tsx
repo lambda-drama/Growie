@@ -229,6 +229,14 @@ export function AnalysisView() {
     }
   }
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const seed = sessionStorage.getItem('growe_barbs_chat_seed')
+    if (!seed) return
+    sessionStorage.removeItem('growe_barbs_chat_seed')
+    void sendQuestion(seed)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const notConfigured = providerStatus !== null && !providerStatus.configured
   const showEmpty = !loadingSaved && !hasAnalysis && !isAnalysing
   const showResults = hasAnalysis && !showEmpty

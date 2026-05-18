@@ -12,6 +12,7 @@ from growie_app.api.portfolio import (
 	_ASSET_CLASS_REVERSE,
 	_holding_to_dict,
 	_member_name,
+	kes_per_unit_foreign,
 	_to_kes,
 	add_holding,
 	search_stocks,
@@ -57,7 +58,8 @@ def _price_in_currency(ticker: str, currency: str, on_date: str) -> float:
 		return float(cache.price_usd or 0)
 	kes_px = float(cache.price_kes or 0)
 	if kes_px > 0:
-		return kes_px / _to_kes(1, ccy, on_date)
+		kpu = kes_per_unit_foreign(ccy, on_date, strict=False)
+		return kes_px / kpu if kpu > 0 else 0.0
 	return 0.0
 
 
@@ -82,18 +84,18 @@ def _stack_holding_row(h) -> dict:
 	if bp > 0:
 		avg_buy_native = bp
 	else:
-		kes_per_unit_foreign = _to_kes(1, currency, purchase_date) if currency != "KES" else 1.0
+		kpu = kes_per_unit_foreign(currency, purchase_date, strict=False) if currency != "KES" else 1.0
 		if currency == "KES":
 			avg_buy_native = avg_buy_kes
-		elif kes_per_unit_foreign > 0:
-			avg_buy_native = avg_buy_kes / kes_per_unit_foreign
+		elif kpu > 0:
+			avg_buy_native = avg_buy_kes / kpu
 		else:
 			avg_buy_native = 0
 
 	current_native = _price_in_currency(row.get("ticker") or "", currency, rate_date)
 	if current_native <= 0 and qty > 0:
-		kes_per_unit_foreign = _to_kes(1, currency, rate_date) if currency != "KES" else 1.0
-		current_native = current_kes / kes_per_unit_foreign if kes_per_unit_foreign > 0 else current_kes
+		kpu = kes_per_unit_foreign(currency, rate_date, strict=False) if currency != "KES" else 1.0
+		current_native = current_kes / kpu if kpu > 0 else current_kes
 
 	gain_pct = ((value - cost) / cost * 100) if cost > 0 else 0
 	market = ""
@@ -544,7 +546,7 @@ def record_sell(
 		if doc.quantity > 0 and doc.buying_price:
 			pass
 		elif doc.quantity > 0:
-			kpu = _to_kes(1, ccy, str(use_date)) if ccy != "KES" else 1
+			kpu = kes_per_unit_foreign(ccy, str(use_date), strict=False) if ccy != "KES" else 1
 			doc.buying_price = (flt(doc.cost_basis_kes) / flt(doc.quantity)) / kpu if ccy != "KES" else flt(doc.cost_basis_kes) / flt(doc.quantity)
 
 	doc.flags.ignore_permissions = True
