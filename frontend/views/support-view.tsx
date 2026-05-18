@@ -84,7 +84,7 @@ function IssueCard({ issue }: { issue: SupportIssue }) {
   )
 }
 
-export function SupportView() {
+export function SupportView({ embedded = false }: { embedded?: boolean }) {
   const { isAuthenticated, isLoading: authLoading, user } = useAuth()
   const [issues, setIssues] = useState<SupportIssue[]>([])
   const [types, setTypes] = useState<string[]>([])
@@ -158,16 +158,18 @@ export function SupportView() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8 pb-12">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <HelpCircle className="h-6 w-6" />
+    <div className={cn(embedded ? 'space-y-6' : 'mx-auto max-w-3xl space-y-8 pb-12')}>
+      {!embedded && (
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <HelpCircle className="h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Help &amp; Support</h1>
+            <p className="text-muted-foreground">Raise a ticket and we will get back to you here.</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Help &amp; Support</h1>
-          <p className="text-muted-foreground">Raise a ticket and we will get back to you here.</p>
-        </div>
-      </div>
+      )}
 
       <Card>
         <CardHeader>

@@ -92,7 +92,7 @@ export function AnalysisInsightCards({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">AI insights</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Barbs AI</p>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           {generatedAt ? <span>Generated {formatDateRelative(generatedAt)}</span> : null}
           <Button

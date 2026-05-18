@@ -186,10 +186,6 @@ export function Header() {
                   <DropdownMenuItem onClick={() => setActiveTab('dashboard')}>
                     Dashboard
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setActiveTab('portfolio')}>
-                    <User className="mr-2 h-4 w-4" />
-                    My Portfolio
-                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setActiveTab('settings')}>
                     <Settings className="mr-2 h-4 w-4" />
                     Settings

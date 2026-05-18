@@ -91,7 +91,7 @@ const pricingTiers: PricingTier[] = [
   },
 ]
 
-export function PricingView() {
+export function PricingView({ embedded = false }: { embedded?: boolean }) {
   const { setAuthModal } = useAppStore()
   const { isAuthenticated, user, refreshProfile } = useAuth()
   const [subscribing, setSubscribing] = useState(false)
@@ -154,8 +154,8 @@ export function PricingView() {
   }
 
   return (
-    <div className="space-y-8 pb-20 md:pb-8">
-      {/* Header */}
+    <div className={cn(embedded ? 'space-y-6' : 'space-y-8 pb-20 md:pb-8')}>
+      {!embedded && (
       <div className="text-center">
         <h1 className="text-3xl font-bold tracking-tight text-balance">
           Choose Your Investment Journey
@@ -163,15 +163,28 @@ export function PricingView() {
         <p className="mt-3 text-lg text-muted-foreground text-pretty max-w-2xl mx-auto">
           From free tracking to personalized coaching, Sumstack has a plan that fits your investment goals.
         </p>
-        {subscribeError && (
-          <p className="mt-3 text-sm text-destructive max-w-lg mx-auto" role="alert">
-            {subscribeError}
-          </p>
-        )}
       </div>
+      )}
+
+      {embedded && isAuthenticated && (
+        <p className="text-sm text-muted-foreground">
+          You are on the{' '}
+          <span className="font-semibold text-foreground capitalize">{currentTier}</span> plan. Pick a
+          different tier below to change your subscription.
+        </p>
+      )}
+
+      {subscribeError && (
+        <p
+          className={cn('text-sm text-destructive', !embedded && 'text-center max-w-lg mx-auto')}
+          role="alert"
+        >
+          {subscribeError}
+        </p>
+      )}
 
       {/* Pricing Cards */}
-      <div className="grid gap-6 md:grid-cols-3 max-w-5xl mx-auto">
+      <div className={cn('grid gap-6 md:grid-cols-3', embedded ? '' : 'max-w-5xl mx-auto')}>
         {pricingTiers.map((tier) => {
           const Icon = tier.icon
           const isCurrentPlan = currentTier === tier.tier
@@ -277,6 +290,8 @@ export function PricingView() {
         })}
       </div>
 
+      {!embedded && (
+      <>
       {/* FAQ / Info Section */}
       <div className="max-w-3xl mx-auto mt-12">
         <h2 className="text-xl font-semibold text-center mb-6">
@@ -334,6 +349,8 @@ export function PricingView() {
           </div>
         </div>
       </div>
+      </>
+      )}
 
       <Dialog open={successOpen} onOpenChange={setSuccessOpen}>
         <DialogContent showCloseButton>

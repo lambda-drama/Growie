@@ -14,6 +14,7 @@ from growie_app.utils.news_ingest import (
 	duplicate_insight_title,
 	fetch_article_plain_text,
 	fetch_articles_for_configured_site,
+	infer_insight_market,
 	normalize_title_key,
 )
 
@@ -153,12 +154,20 @@ def fetch_best_news_now():
 
 		read_mins = _estimated_read_minutes(final_bite if rewrite else (summary + final_bite))
 
+		market = infer_insight_market(
+			site_label=site_label,
+			source_url=link,
+			title=insight_title,
+			summary=summary,
+			commentary_html=final_commentary,
+		)
+
 		try:
 			insight = frappe.get_doc(
 				{
 					"doctype": "Growe Insight",
 					"title": insight_title,
-					"market": "Global",
+					"market": market,
 					"sentiment": "Watch",
 					"commentary": final_commentary,
 					"week_starting": today(),
@@ -193,6 +202,19 @@ def fetch_best_news_now():
 		"errors": errors,
 		"rewrite_with_ai": rewrite,
 	}
+
+
+@frappe.whitelist()
+def reclassify_insight_markets():
+	"""Fix market tags on existing insights (e.g. legacy rows saved as Global)."""
+	updated = 0
+	for row in frappe.get_all("Growe Insight", fields=["name", "title", "commentary", "market"]):
+		inferred = infer_insight_market(title=row.title or "", commentary_html=row.commentary or "")
+		if inferred != (row.market or ""):
+			frappe.db.set_value("Growe Insight", row.name, "market", inferred, update_modified=False)
+			updated += 1
+	frappe.db.commit()
+	return {"updated": updated}
 
 
 def daily_news_scrape():

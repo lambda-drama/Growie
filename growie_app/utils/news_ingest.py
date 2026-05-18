@@ -299,6 +299,66 @@ def _filter_relevant(
 	return articles[:max_items]
 
 
+NSE_SOURCE_HINTS = re.compile(
+	r"nairobi\s+securit|nse\.co\.ke|business\s+daily|nation\s+africa|the\s+standard|"
+	r"citizen\s+digital|capital\s+fm|kenya\s+wall\s+street|east\s+african|\.co\.ke",
+	re.I,
+)
+
+NSE_CONTENT_HINTS = re.compile(
+	r"\bnairobi\s+securities\s+exchange\b|\bnse\s+(20|25|all-share|asi)\b|\bnasi\b|"
+	r"\bnse\s+closed\b|\bnse\s+mixed\b|kenyan\s+(equity|market|shares)|"
+	r"equity\s+turnover\s+came\s+in\s+around\s+kes",
+	re.I,
+)
+
+
+def _plain_text_from_html(html: str) -> str:
+	text = re.sub(r"(?is)<script[^>]*>.*?</script>", " ", html or "")
+	text = re.sub(r"<[^>]+>", " ", text)
+	text = html_module.unescape(text)
+	return re.sub(r"\s+", " ", text).strip()
+
+
+def infer_insight_market(
+	*,
+	site_label: str = "",
+	source_url: str = "",
+	title: str = "",
+	summary: str = "",
+	commentary_html: str = "",
+) -> str:
+	"""
+	Return Growe Insight market: NSE or Global.
+
+	Legacy ingest always saved Global; infer from source site, URL, and article text.
+	"""
+	blob = " ".join(
+		[
+			site_label or "",
+			source_url or "",
+			title or "",
+			summary or "",
+			_plain_text_from_html(commentary_html),
+		]
+	)
+	if not blob.strip():
+		return "Global"
+
+	if NSE_SOURCE_HINTS.search(blob) or NSE_CONTENT_HINTS.search(blob):
+		return "NSE"
+
+	if re.search(r"\bnse\b", blob, re.I) and re.search(
+		r"nairobi|kenya|kenyan|\.co\.ke|kes\s+\d", blob, re.I
+	):
+		return "NSE"
+
+	if source_url and re.search(r"\.co\.ke\b", source_url, re.I):
+		return "NSE"
+
+	return "Global"
+
+
 def normalize_title_key(title: str) -> str:
 	return re.sub(r"\s+", " ", (title or "").strip().lower())[:120]
 
