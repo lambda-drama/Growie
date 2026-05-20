@@ -82,6 +82,34 @@ export interface StackPositionDetail {
   transactions: HoldingTransaction[]
 }
 
+export interface RefreshStackPricesResult {
+  nse_updated: number
+  global_updated: number
+  tickers_requested: number
+  nse_tickers: string[]
+  global_tickers: string[]
+}
+
+/** Fetch live prices for the member's stack holdings and update Growe Price Cache. */
+export async function refreshStackPrices(options?: {
+  assetClass?: AssetClass
+  holdingId?: string
+}): Promise<RefreshStackPricesResult> {
+  const body: Record<string, string> = {}
+  if (options?.assetClass) body.asset_class = options.assetClass
+  if (options?.holdingId) body.holding_name = options.holdingId
+
+  const res = await fetch('/api/method/growie_app.api.stack.refresh_stack_prices', {
+    method: 'POST',
+    credentials: 'include',
+    headers: postHeaders(),
+    body: JSON.stringify(body),
+  })
+  const data = await res.json()
+  if (data?.message) return data.message as RefreshStackPricesResult
+  throw new Error(extractError(data))
+}
+
 export async function getStackOverview(): Promise<StackClassSummary[]> {
   const res = await fetch('/api/method/growie_app.api.stack.get_stack_overview', {
     credentials: 'include',

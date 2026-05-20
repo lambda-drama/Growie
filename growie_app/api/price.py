@@ -37,6 +37,8 @@ Finnhub (finnhub.io):
 Dispatch is determined by the "api_provider" Select field on the Growe Price API record.
 """
 
+import re
+
 import frappe
 from frappe import _
 from frappe.utils import now_datetime
@@ -47,6 +49,47 @@ import time
 # ── KES/USD fallback rate ─────────────────────────────────────────────────────
 
 _USD_TO_KES_DEFAULT = 130.0
+
+
+def _redact_secrets_in_message(text: str) -> str:
+	"""Strip API keys/tokens from vendor error text before logging (never show to users)."""
+	if not text:
+		return ""
+	s = str(text)
+	s = re.sub(r"(?i)(api\s*key\s*as\s*)[A-Za-z0-9]{6,}", r"\1***", s)
+	s = re.sub(r"(?i)(apikey[=:\s]+)[A-Za-z0-9]{6,}", r"\1***", s)
+	s = re.sub(r"(?i)(access[_\s]?key[=:\s]+)[A-Za-z0-9]{6,}", r"\1***", s)
+	s = re.sub(r"(?i)(token[=:\s]+)[A-Za-z0-9]{6,}", r"\1***", s)
+	return s
+
+
+def _mark_provider_rate_limited(provider: dict, vendor: str, raw_message: str = ""):
+	"""Skip this provider for the rest of the refresh run; log server-side only."""
+	provider["_rate_limited"] = 1
+	if vendor == "alpha vantage":
+		provider["_alpha_rate_limited"] = 1
+	safe = _redact_secrets_in_message(raw_message)
+	frappe.logger("growie.price").warning(
+		"%s rate limit or quota reached; trying next provider. %s",
+		vendor,
+		safe[:200] if safe else "",
+	)
+
+
+def _provider_is_rate_limited(provider: dict) -> bool:
+	return bool(provider.get("_rate_limited") or provider.get("_alpha_rate_limited"))
+
+
+def _http_response_rate_limited(resp, provider: dict, vendor: str) -> bool:
+	"""True when HTTP status indicates quota exhaustion; provider is skipped for this run."""
+	if getattr(resp, "status_code", None) != 429:
+		return False
+	try:
+		body = (resp.text or "")[:500]
+	except Exception:
+		body = ""
+	_mark_provider_rate_limited(provider, vendor, body)
+	return True
 
 
 def _get_usd_to_kes() -> float:
@@ -106,6 +149,22 @@ def _provider_key(provider: dict) -> str:
 	return str(provider.get("api_provider") or "").strip().lower()
 
 
+# Prefer bulk/fast providers first; Alpha Vantage last (25 req/day free tier).
+_PROVIDER_FETCH_ORDER = {
+	"mansa markets": 0,
+	"fcs api": 1,
+	"finnhub": 2,
+	"alpha vantage": 9,
+}
+
+
+def _sort_providers_for_fetch(providers: list) -> list:
+	return sorted(
+		providers,
+		key=lambda p: (_PROVIDER_FETCH_ORDER.get(_provider_key(p), 5), p.get("name") or ""),
+	)
+
+
 def _get_providers(market_type: str, provider_name: str | None = None) -> list:
 	"""
 	Load active providers for a market. If provider_name is passed, return only that row
@@ -144,7 +203,7 @@ def _get_providers(market_type: str, provider_name: str | None = None) -> list:
 	# Business rule: Alpha Vantage is Global-only.
 	if str(market_type).upper() == "NSE":
 		filtered = [p for p in filtered if _provider_key(p) != "alpha vantage"]
-	return filtered
+	return _sort_providers_for_fetch(filtered)
 
 
 # ── Mansa Markets ─────────────────────────────────────────────────────────────
@@ -170,6 +229,8 @@ def _fetch_mansa(provider: dict, symbols: list, market: str = "NSE") -> dict:
 			url = f"{base}/stocks"
 			params = {"exchange": exchange, "api_key": api_key}
 			resp = _requests.get(url, params=params, timeout=15)
+			if _http_response_rate_limited(resp, provider, "mansa markets"):
+				return results
 			resp.raise_for_status()
 			body = resp.json()
 
@@ -275,13 +336,19 @@ def _fetch_fcs(provider: dict, symbols: list, market: str = "Global") -> dict:
 		}
 		try:
 			resp = _requests.get(url, params=params, timeout=15)
+			if _http_response_rate_limited(resp, provider, "fcs api"):
+				return results
 			resp.raise_for_status()
 			body = resp.json()
 
 			if not body.get("status"):
+				msg = str(body.get("msg") or body)
+				if re.search(r"(?i)limit|quota|rate", msg):
+					_mark_provider_rate_limited(provider, "fcs api", msg)
+					return results
 				frappe.log_error(
 					title="FCS API error",
-					message=f"status=false: {body.get('msg', body)}",
+					message=_redact_secrets_in_message(f"status=false: {msg}"),
 				)
 				continue
 
@@ -368,30 +435,24 @@ def _fetch_alpha_vantage(
 
 		try:
 			resp = _requests.get(f"{base}{endpoint}", params=params, timeout=10)
+			if _http_response_rate_limited(resp, provider, "alpha vantage"):
+				break
 			resp.raise_for_status()
 			body = resp.json()
 
-			# Alpha Vantage returns a plaintext "Information" or "Note" key when rate-limited
+			# Alpha Vantage returns "Information" or "Note" when rate-limited — skip quietly.
 			if "Information" in body or "Note" in body:
 				limit_msg = body.get("Information") or body.get("Note", "")
-				provider["_alpha_rate_limited"] = 1
-				frappe.log_error(
-					title="Alpha Vantage rate limit hit",
-					message=limit_msg,
-				)
-				frappe.msgprint(
-					f"Alpha Vantage rate limit: {limit_msg}",
-					alert=True,
-					indicator="orange",
-				)
-				break  # stop burning quota once we hit the limit
+				_mark_provider_rate_limited(provider, "alpha vantage", limit_msg)
+				break
 
 			quote = body.get("Global Quote") or {}
 
 			if not quote:
-				frappe.log_error(
-					title=f"Alpha Vantage: no data for {av_symbol}",
-					message=str(body),
+				frappe.logger("growie.price").debug(
+					"Alpha Vantage: no quote for %s (%s)",
+					av_symbol,
+					_redact_secrets_in_message(str(body))[:300],
 				)
 				continue
 
@@ -483,10 +544,16 @@ def _fetch_finnhub(
 		params = {"symbol": fh_symbol, "token": token}
 		try:
 			resp = _requests.get(url, params=params, timeout=12)
+			if _http_response_rate_limited(resp, provider, "finnhub"):
+				return results
 			resp.raise_for_status()
 			body = resp.json()
 
 			if isinstance(body, dict) and body.get("error"):
+				err = str(body.get("error") or "")
+				if re.search(r"(?i)limit|quota|rate", err):
+					_mark_provider_rate_limited(provider, "finnhub", err)
+					return results
 				frappe.log_error(
 					title=f"Finnhub API error ({fh_symbol})",
 					message=str(body.get("error")),
@@ -718,9 +785,9 @@ def _fetch_and_store(
 		
 		if not remaining:
 			break
-		if provider.get("_alpha_rate_limited"):
+		if _provider_is_rate_limited(provider):
 			continue
-		
+
 		# Try to get live KES rate from Mansa forex endpoint
 		api_prov = (provider.get("api_provider") or "").lower()
 		if "mansa" in api_prov or "mansa" in (provider.get("provider_name") or "").lower():
@@ -751,7 +818,7 @@ def _fetch_and_store(
 		for provider in providers:
 			if not remaining:
 				break
-			if provider.get("_alpha_rate_limited"):
+			if _provider_is_rate_limited(provider):
 				continue
 			api_prov = (provider.get("api_provider") or "").lower()
 			if "mansa" in api_prov or "mansa" in (provider.get("provider_name") or "").lower():
@@ -1068,7 +1135,7 @@ def _run_fetch_providers_round(
 	for provider in providers:
 		if not remaining:
 			break
-		if provider.get("_alpha_rate_limited"):
+		if _provider_is_rate_limited(provider):
 			continue
 		if _provider_uses_alpha_vantage(provider):
 			fetched = _fetch_alpha_vantage(
@@ -1090,7 +1157,7 @@ def _run_fetch_providers_round(
 		for provider in providers:
 			if not remaining:
 				break
-			if provider.get("_alpha_rate_limited"):
+			if _provider_is_rate_limited(provider):
 				continue
 			for lone in list(remaining):
 				if _provider_uses_alpha_vantage(provider):
