@@ -5,6 +5,7 @@ import {
   getStackOverview,
   getStackClass,
   getStackPosition,
+  refreshStackPrices,
   type StackClassSummary,
   type StackClassDetail,
   type StackPositionDetail,
@@ -18,22 +19,42 @@ export function useStackOverview() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const load = useCallback(async () => {
+    if (!isAuthenticated) return
+    setClasses(await getStackOverview())
+  }, [isAuthenticated])
+
   const refresh = useCallback(async () => {
     if (!isAuthenticated) return
     setIsLoading(true)
     setError(null)
+    let priceRefreshError: string | null = null
     try {
-      setClasses(await getStackOverview())
+      await refreshStackPrices()
+    } catch (err) {
+      priceRefreshError =
+        err instanceof Error ? err.message : 'Live prices could not be refreshed from your APIs'
+    }
+    try {
+      await load()
+      if (priceRefreshError) setError(priceRefreshError)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load stack')
     } finally {
       setIsLoading(false)
     }
-  }, [isAuthenticated])
+  }, [isAuthenticated, load])
 
   useEffect(() => {
-    refresh()
-  }, [refresh])
+    if (!isAuthenticated) return
+    setIsLoading(true)
+    setError(null)
+    load()
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : 'Failed to load stack')
+      )
+      .finally(() => setIsLoading(false))
+  }, [isAuthenticated, load])
 
   return { classes, isLoading, error, refresh }
 }
@@ -44,22 +65,42 @@ export function useStackClass(assetClass: AssetClass | null) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const load = useCallback(async () => {
+    if (!isAuthenticated || !assetClass) return
+    setDetail(await getStackClass(assetClass))
+  }, [isAuthenticated, assetClass])
+
   const refresh = useCallback(async () => {
     if (!isAuthenticated || !assetClass) return
     setIsLoading(true)
     setError(null)
+    let priceRefreshError: string | null = null
     try {
-      setDetail(await getStackClass(assetClass))
+      await refreshStackPrices({ assetClass })
+    } catch (err) {
+      priceRefreshError =
+        err instanceof Error ? err.message : 'Live prices could not be refreshed from your APIs'
+    }
+    try {
+      await load()
+      if (priceRefreshError) setError(priceRefreshError)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load asset class')
     } finally {
       setIsLoading(false)
     }
-  }, [isAuthenticated, assetClass])
+  }, [isAuthenticated, assetClass, load])
 
   useEffect(() => {
-    refresh()
-  }, [refresh])
+    if (!isAuthenticated || !assetClass) return
+    setIsLoading(true)
+    setError(null)
+    load()
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : 'Failed to load asset class')
+      )
+      .finally(() => setIsLoading(false))
+  }, [isAuthenticated, assetClass, load])
 
   return { detail, isLoading, error, refresh }
 }
@@ -70,22 +111,42 @@ export function useStackPosition(holdingId: string | null) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const load = useCallback(async () => {
+    if (!isAuthenticated || !holdingId) return
+    setDetail(await getStackPosition(holdingId))
+  }, [isAuthenticated, holdingId])
+
   const refresh = useCallback(async () => {
     if (!isAuthenticated || !holdingId) return
     setIsLoading(true)
     setError(null)
+    let priceRefreshError: string | null = null
     try {
-      setDetail(await getStackPosition(holdingId))
+      await refreshStackPrices({ holdingId })
+    } catch (err) {
+      priceRefreshError =
+        err instanceof Error ? err.message : 'Live prices could not be refreshed from your APIs'
+    }
+    try {
+      await load()
+      if (priceRefreshError) setError(priceRefreshError)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load position')
     } finally {
       setIsLoading(false)
     }
-  }, [isAuthenticated, holdingId])
+  }, [isAuthenticated, holdingId, load])
 
   useEffect(() => {
-    refresh()
-  }, [refresh])
+    if (!isAuthenticated || !holdingId) return
+    setIsLoading(true)
+    setError(null)
+    load()
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : 'Failed to load position')
+      )
+      .finally(() => setIsLoading(false))
+  }, [isAuthenticated, holdingId, load])
 
   return { detail, isLoading, error, refresh }
 }

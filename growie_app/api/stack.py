@@ -18,6 +18,58 @@ from growie_app.api.portfolio import (
 	search_stocks,
 )
 from growie_app.investment_app.holding_ledger import create_holding_transaction
+from growie_app.api.price import (
+	_api_symbol_maps_for_tickers,
+	_fetch_market_for_refresh,
+	_update_holdings_for_ticker,
+)
+
+
+def _member_holding_tickers_by_market(
+	member: str,
+	asset_class: str = None,
+	holding_name: str = None,
+) -> tuple[list, list]:
+	"""
+	Split the member's open holdings into NSE vs Global ticker lists for live price fetch.
+	Optional asset_class (frontend slug) or holding_name scopes the set.
+	"""
+	filters = {"investor": member, "sold": 0}
+	if holding_name:
+		filters["name"] = holding_name
+	elif asset_class:
+		ac_label = _ASSET_CLASS_REVERSE.get(asset_class, asset_class)
+		if ac_label in _ASSET_CLASS_MAP:
+			filters["asset_class"] = ac_label
+
+	rows = frappe.get_all(
+		"Growe Holding",
+		filters=filters,
+		fields=["ticker", "asset_class", "asset_name"],
+	)
+	nse: list = []
+	global_: list = []
+	seen_nse: set = set()
+	seen_global: set = set()
+
+	for r in rows:
+		t = (r.ticker or "").upper().strip()
+		if not t:
+			continue
+		ac = (r.asset_class or "").strip()
+		market = ac
+		if ac not in ("NSE", "Global") and r.asset_name:
+			market = frappe.db.get_value("Growe Stock", r.asset_name, "market") or ac
+		if market == "NSE":
+			if t not in seen_nse:
+				seen_nse.add(t)
+				nse.append(t)
+		elif market == "Global":
+			if t not in seen_global:
+				seen_global.add(t)
+				global_.append(t)
+
+	return nse, global_
 
 
 def _asset_class_from_market(market: str) -> str:
@@ -155,6 +207,48 @@ def _revalue_holding(doc, on_date: str = None):
 		doc.value_kes = _to_kes(qty * px, ccy, on_date)
 		doc.current_price = px
 	doc.last_updated = now_datetime()
+
+
+@frappe.whitelist()
+def refresh_stack_prices(asset_class: str = None, holding_name: str = None):
+	"""
+	Fetch live prices for the current member's stack holdings (not the full stock master).
+
+	Uses active Growe Price API providers in order (Finnhub, Mansa, FCS, Alpha Vantage, etc.):
+	each provider fills what it can; a second pass retries tickers still missing from cache.
+	Upserts Growe Price Cache and recomputes Growe Holding.value_kes for those tickers.
+
+	asset_class: optional frontend slug (nse-stocks, global-stocks, …).
+	holding_name: optional single holding — refresh only that position's ticker.
+	"""
+	member = _member_name()
+	if holding_name:
+		_assert_holding_owner(holding_name, member)
+
+	nse_tickers, global_tickers = _member_holding_tickers_by_market(
+		member, asset_class=asset_class, holding_name=holding_name
+	)
+	nse_map, global_map = _api_symbol_maps_for_tickers(nse_tickers, global_tickers)
+
+	nse_updated = _fetch_market_for_refresh("NSE", nse_tickers, nse_map) if nse_tickers else 0
+	global_updated = (
+		_fetch_market_for_refresh("Global", global_tickers, global_map) if global_tickers else 0
+	)
+
+	for t in set(nse_tickers) | set(global_tickers):
+		cache = frappe.db.get_value("Growe Price Cache", t, "price_kes")
+		if cache:
+			_update_holdings_for_ticker(t, float(cache))
+
+	frappe.db.commit()
+
+	return {
+		"nse_updated": nse_updated,
+		"global_updated": global_updated,
+		"tickers_requested": len(nse_tickers) + len(global_tickers),
+		"nse_tickers": nse_tickers,
+		"global_tickers": global_tickers,
+	}
 
 
 @frappe.whitelist()

@@ -160,9 +160,13 @@ def fetch_alpha_vantage_news(api_key: str, limit: int = 6) -> list[dict[str, Any
 	data = resp.json()
 
 	if data.get("Note") or data.get("Information"):
-		frappe.log_error(
-			title="Alpha Vantage news (rate limit or notice)",
-			message=str(data)[:1200],
+		from growie_app.api.price import _redact_secrets_in_message
+
+		frappe.logger("growie.news").warning(
+			"Alpha Vantage news quota: %s",
+			_redact_secrets_in_message(
+				str(data.get("Note") or data.get("Information") or "")
+			)[:300],
 		)
 		return []
 
