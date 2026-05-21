@@ -47,7 +47,7 @@ export function PrivacySettingsPanel({ onBack }: PrivacySettingsPanelProps) {
             <Shield className="h-5 w-5" />
             Data &amp; visibility
           </CardTitle>
-          <CardDescription>Control what Growie can use and show about you.</CardDescription>
+          <CardDescription>Control what Sumstack can use and show about you.</CardDescription>
         </CardHeader>
         <CardContent className="divide-y divide-border">
           <div className="flex items-center justify-between gap-4 py-4 first:pt-0">
@@ -84,7 +84,7 @@ export function PrivacySettingsPanel({ onBack }: PrivacySettingsPanelProps) {
             <div>
               <Label className="text-base font-medium">Allow marketing emails</Label>
               <p className="text-sm text-muted-foreground">
-                Product updates, offers, and tips from the Growie team.
+                Product updates, offers, and tips from the Sumstack team.
               </p>
             </div>
             <Switch

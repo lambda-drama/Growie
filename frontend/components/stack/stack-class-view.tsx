@@ -16,6 +16,7 @@ import {
 import { StackBreadcrumb } from '@/components/stack/stack-breadcrumb'
 import { StackSummaryCards } from '@/components/stack/stack-summary-cards'
 import { StackHoldingsCards } from '@/components/stack/stack-holdings-cards'
+import { StackExcelBulkImport } from '@/components/stack/stack-excel-bulk-import'
 import { TradeDialog, type TradeMode } from '@/components/stack/trade-dialog'
 import { useStackClass } from '@/hooks/use-stack'
 import { useDisplayMoney } from '@/lib/store'
@@ -32,7 +33,7 @@ interface StackClassViewProps {
 }
 
 export function StackClassView({ assetClass, onBack, onOpenPosition }: StackClassViewProps) {
-  const { detail, isLoading, error, refresh } = useStackClass(assetClass)
+  const { detail, isLoading, error, refresh, reload } = useStackClass(assetClass)
   const { currency, kesToDisplayMultiplier } = useDisplayMoney()
   const [tradeOpen, setTradeOpen] = useState(false)
   const [tradeMode, setTradeMode] = useState<TradeMode>('buy-new')
@@ -45,6 +46,7 @@ export function StackClassView({ assetClass, onBack, onOpenPosition }: StackClas
   }
 
   const summary = detail?.summary
+  const showBulkImport = assetClass === 'global-stocks'
 
   return (
     <div className="space-y-6">
@@ -66,6 +68,14 @@ export function StackClassView({ assetClass, onBack, onOpenPosition }: StackClas
             <RefreshCcw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
             Refresh
           </Button>
+          {showBulkImport && (
+            <StackExcelBulkImport
+              variant="compact"
+              className="flex-1 sm:flex-none"
+              onSuccess={reload}
+              disabled={isLoading}
+            />
+          )}
           <Button className="flex-1 gap-2 sm:flex-none" size="sm" onClick={() => openTrade('buy-new')}>
             <Plus className="h-4 w-4" />
             Add position
@@ -101,6 +111,22 @@ export function StackClassView({ assetClass, onBack, onOpenPosition }: StackClas
             onOpenPosition={onOpenPosition}
             onBuy={(h) => openTrade('buy-more', h)}
             onSell={(h) => openTrade('sell', h)}
+            emptyActions={
+              showBulkImport ? (
+                <>
+                  <StackExcelBulkImport onSuccess={reload} disabled={isLoading} />
+                  <Button size="sm" className="gap-2" onClick={() => openTrade('buy-new')}>
+                    <Plus className="h-4 w-4" />
+                    Add position
+                  </Button>
+                </>
+              ) : (
+                <Button size="sm" className="gap-2" onClick={() => openTrade('buy-new')}>
+                  <Plus className="h-4 w-4" />
+                  Add position
+                </Button>
+              )
+            }
           />
 
           <div className="hidden overflow-hidden rounded-xl border md:block">
@@ -118,8 +144,17 @@ export function StackClassView({ assetClass, onBack, onOpenPosition }: StackClas
               <TableBody>
                 {(detail?.holdings ?? []).length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
-                      No positions in this class yet.
+                    <TableCell colSpan={6} className="py-12 text-center">
+                      <p className="text-muted-foreground">No positions in this class yet.</p>
+                      <div className="mt-4 flex flex-wrap justify-center gap-2">
+                        {showBulkImport && (
+                          <StackExcelBulkImport onSuccess={reload} disabled={isLoading} />
+                        )}
+                        <Button size="sm" className="gap-2" onClick={() => openTrade('buy-new')}>
+                          <Plus className="h-4 w-4" />
+                          Add position
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (

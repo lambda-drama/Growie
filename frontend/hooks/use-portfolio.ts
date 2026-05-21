@@ -60,5 +60,15 @@ export function usePortfolio() {
     loadPortfolio()
   }, [loadPortfolio])
 
-  return { holdings, summary, isLoading, error, refresh, addHolding, updateHolding, removeHolding }
+  return {
+    holdings,
+    summary,
+    isLoading,
+    error,
+    refresh,
+    reload: loadPortfolio,
+    addHolding,
+    updateHolding,
+    removeHolding,
+  }
 }

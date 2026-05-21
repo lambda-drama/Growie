@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatCurrency, formatCurrencyNative, formatPercentage } from '@/lib/format'
@@ -14,6 +15,8 @@ interface StackHoldingsCardsProps {
   onOpenPosition: (id: string) => void
   onBuy: (h: StackHolding) => void
   onSell: (h: StackHolding) => void
+  /** Shown under the empty message on mobile (e.g. Bulk + Add position). */
+  emptyActions?: ReactNode
 }
 
 /** Mobile-friendly holding rows (table used from md+). */
@@ -24,12 +27,16 @@ export function StackHoldingsCards({
   onOpenPosition,
   onBuy,
   onSell,
+  emptyActions,
 }: StackHoldingsCardsProps) {
   if (holdings.length === 0) {
     return (
-      <p className="rounded-xl border border-dashed py-12 text-center text-sm text-muted-foreground md:hidden">
-        No positions in this class yet.
-      </p>
+      <div className="rounded-xl border border-dashed py-12 text-center text-sm text-muted-foreground md:hidden">
+        <p>No positions in this class yet.</p>
+        {emptyActions ? (
+          <div className="mt-4 flex flex-wrap justify-center gap-2">{emptyActions}</div>
+        ) : null}
+      </div>
     )
   }
 
