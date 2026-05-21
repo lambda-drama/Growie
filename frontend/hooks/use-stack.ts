@@ -56,7 +56,7 @@ export function useStackOverview() {
       .finally(() => setIsLoading(false))
   }, [isAuthenticated, load])
 
-  return { classes, isLoading, error, refresh }
+  return { classes, isLoading, error, refresh, reload: load }
 }
 
 export function useStackClass(assetClass: AssetClass | null) {
@@ -102,7 +102,7 @@ export function useStackClass(assetClass: AssetClass | null) {
       .finally(() => setIsLoading(false))
   }, [isAuthenticated, assetClass, load])
 
-  return { detail, isLoading, error, refresh }
+  return { detail, isLoading, error, refresh, reload: load }
 }
 
 export function useStackPosition(holdingId: string | null) {

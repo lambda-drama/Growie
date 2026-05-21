@@ -551,7 +551,7 @@ function HoldingDialog({ open, onClose, editing, onSaved }: HoldingDialogProps) 
 
 export function HoldingsTable() {
   const { currency, kesToDisplayMultiplier } = useDisplayMoney()
-  const { holdings, refresh } = usePortfolio()
+  const { holdings, reload } = usePortfolio()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingHolding, setEditingHolding] = useState<Holding | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -586,29 +586,23 @@ export function HoldingsTable() {
     setExcelConfirmOpen(false)
     setPendingExcelFile(null)
     setExcelImportRunning(true)
+    const toastId = toast.loading('Uploading file and importing holdings…')
     try {
-      await toast.promise(
-        (async () => {
-          const result = await importHoldingsFromExcel(file)
-          await refresh()
-          return result
-        })(),
-        {
-          loading: 'Uploading file and importing holdings…',
-          success: (result) => {
-            const errs = (result.errors || []).filter(Boolean)
-            const lines = [
-              `Created ${result.created} holding(s).`,
-              `Sheet: ${result.active_rows ?? '—'} active row(s), ${result.sold_rows ?? '—'} sold row(s).`,
-            ]
-            if (errs.length) {
-              lines.push(`Some rows were skipped: ${errs.slice(0, 5).join(' · ')}`)
-            }
-            return lines.join('\n')
-          },
-          error: (err) =>
-            err instanceof Error ? err.message : 'Import failed. Check your connection and try again.',
-        },
+      const result = await importHoldingsFromExcel(file)
+      const errs = (result.errors || []).filter(Boolean)
+      const msg = [
+        `Created ${result.created} holding(s).`,
+        `Sheet: ${result.active_rows ?? '—'} active row(s), ${result.sold_rows ?? '—'} sold row(s).`,
+        ...(errs.length ? [`Some rows were skipped: ${errs.slice(0, 5).join(' · ')}`] : []),
+      ].join(' ')
+      toast.success(msg, { id: toastId })
+      void reload().catch(() => {
+        toast.error('Import succeeded but holdings could not be refreshed.')
+      })
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Import failed. Check your connection and try again.',
+        { id: toastId },
       )
     } finally {
       setExcelImportRunning(false)
@@ -635,7 +629,7 @@ export function HoldingsTable() {
     setDeleting(id)
     try {
       await apiDeleteHolding(id)
-      await refresh()
+      await reload()
     } catch (err) {
       console.error('Delete failed:', err)
     } finally {
@@ -739,7 +733,7 @@ export function HoldingsTable() {
         open={dialogOpen}
         onClose={() => { setDialogOpen(false); setEditingHolding(null) }}
         editing={editingHolding}
-        onSaved={refresh}
+        onSaved={reload}
       />
     </>
   )

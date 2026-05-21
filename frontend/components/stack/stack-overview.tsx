@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { StackHeroCard } from '@/components/stack/stack-hero-card'
 import { StackMetricsGrid } from '@/components/stack/stack-metrics-grid'
 import { StackClassList } from '@/components/stack/stack-class-list'
+import { StackExcelBulkImport } from '@/components/stack/stack-excel-bulk-import'
 import { TradeDialog } from '@/components/stack/trade-dialog'
 import { useStackOverview } from '@/hooks/use-stack'
 import { usePortfolio } from '@/hooks/use-portfolio'
@@ -23,8 +24,8 @@ interface StackOverviewProps {
 
 export function StackOverview({ onOpenClass }: StackOverviewProps) {
   const { user } = useAuth()
-  const { classes, isLoading: stackLoading, refresh } = useStackOverview()
-  const { holdings, summary, isLoading: portfolioLoading } = usePortfolio()
+  const { classes, isLoading: stackLoading, refresh, reload: reloadStack } = useStackOverview()
+  const { holdings, summary, isLoading: portfolioLoading, reload: reloadPortfolio } = usePortfolio()
   const { currency, kesToDisplayMultiplier } = useDisplayMoney()
   const [tradeOpen, setTradeOpen] = useState(false)
 
@@ -49,6 +50,8 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
   const isLoading = stackLoading && classes.length === 0
   const metricsReady = !portfolioLoading || holdings.length > 0
 
+  const afterBulkImport = () => Promise.all([reloadStack(), reloadPortfolio()])
+
   const greeting = timeGreeting()
   const firstName = user?.fullName
     ? firstNameFrom(user.fullName)
@@ -60,20 +63,27 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
         <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
           {greeting}, {firstName}
         </h1>
-        <Button
-          size="sm"
-          className="hidden shrink-0 gap-1.5 sm:inline-flex"
-          onClick={() => setTradeOpen(true)}
-        >
+        <div className="hidden shrink-0 gap-2 sm:flex">
+          <StackExcelBulkImport variant="compact" onSuccess={afterBulkImport} disabled={stackLoading} />
+          <Button size="sm" className="gap-1.5" onClick={() => setTradeOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Add position
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex w-full gap-2 sm:hidden">
+        <StackExcelBulkImport
+          variant="compact"
+          className="flex-1"
+          onSuccess={afterBulkImport}
+          disabled={stackLoading}
+        />
+        <Button className="flex-1 gap-2" onClick={() => setTradeOpen(true)}>
           <Plus className="h-4 w-4" />
           Add position
         </Button>
       </div>
-
-      <Button className="w-full gap-2 sm:hidden" onClick={() => setTradeOpen(true)}>
-        <Plus className="h-4 w-4" />
-        Add position
-      </Button>
 
       {isLoading ? (
         <div className="space-y-4">
@@ -90,11 +100,16 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
       ) : classes.length === 0 ? (
         <Card>
           <CardContent className="py-16 text-center">
-            <p className="text-muted-foreground">No holdings yet. Add your first position to get started.</p>
-            <Button className="mt-4 gap-2" onClick={() => setTradeOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Add position
-            </Button>
+            <p className="text-muted-foreground">
+              No holdings yet. Add a position manually or bulk-import your Scope / global stocks Excel.
+            </p>
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              <StackExcelBulkImport onSuccess={afterBulkImport} />
+              <Button className="gap-2" onClick={() => setTradeOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Add position
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ) : (

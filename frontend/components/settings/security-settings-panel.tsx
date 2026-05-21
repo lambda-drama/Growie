@@ -58,7 +58,7 @@ export function SecuritySettingsPanel({ onBack }: SecuritySettingsPanelProps) {
             <KeyRound className="h-5 w-5" />
             Password
           </CardTitle>
-          <CardDescription>Change the password for your Growie account.</CardDescription>
+          <CardDescription>Change the password for your Sumstack account.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">

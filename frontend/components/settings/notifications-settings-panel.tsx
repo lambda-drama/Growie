@@ -64,7 +64,7 @@ export function NotificationsSettingsPanel({ onBack }: NotificationsSettingsPane
                 Enable chats (community)
               </Label>
               <p className="text-sm text-muted-foreground">
-                Replies, mentions, and activity from the Growie community.
+                Replies, mentions, and activity from the Sumstack community.
               </p>
             </div>
             <Switch id="notif-community" checked={community} onCheckedChange={toggleCommunity} />
