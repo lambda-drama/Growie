@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, type ChangeEvent } from 'react'
-import { Loader2, Sheet } from 'lucide-react'
+import { FileSpreadsheet, Link2, Loader2, Sheet, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -11,12 +11,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { importHoldingsFromExcel } from '@/services/portfolio'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  importHoldingsFromCsv,
+  importHoldingsFromExcel,
+  importHoldingsFromSpreadsheet,
+  type HoldingsBulkImportResult,
+} from '@/services/portfolio'
 import { cn } from '@/lib/utils'
+
+type ImportMethod = 'excel' | 'csv' | 'spreadsheet'
+type DialogStep = 'choose' | 'spreadsheet-url' | 'confirm'
 
 interface StackExcelBulkImportProps {
   onSuccess: () => void | Promise<void>
-  /** Outline button next to Add position; `compact` for icon-first toolbar. */
   variant?: 'default' | 'compact'
   className?: string
   disabled?: boolean
@@ -28,32 +37,75 @@ export function StackExcelBulkImport({
   className,
   disabled = false,
 }: StackExcelBulkImportProps) {
-  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [step, setStep] = useState<DialogStep>('choose')
+  const [method, setMethod] = useState<ImportMethod | null>(null)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [sheetUrl, setSheetUrl] = useState('')
   const [running, setRunning] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const excelInputRef = useRef<HTMLInputElement>(null)
+  const csvInputRef = useRef<HTMLInputElement>(null)
 
-  const handlePick = (e: ChangeEvent<HTMLInputElement>) => {
+  const reset = () => {
+    setStep('choose')
+    setMethod(null)
+    setPendingFile(null)
+    setSheetUrl('')
+  }
+
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next)
+    if (!next) reset()
+  }
+
+  const openChooser = () => {
+    if (running || disabled) return
+    reset()
+    setOpen(true)
+  }
+
+  const pickExcel = () => {
+    excelInputRef.current?.click()
+  }
+
+  const pickCsv = () => {
+    csvInputRef.current?.click()
+  }
+
+  const pickSpreadsheet = () => {
+    setMethod('spreadsheet')
+    setStep('spreadsheet-url')
+  }
+
+  const handleExcelPick = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
     const lower = file.name.toLowerCase()
     if (!lower.endsWith('.xlsx') && !lower.endsWith('.xls')) {
-      toast.error('Invalid file', {
-        description: 'Please choose an Excel file (.xlsx or .xls).',
-      })
+      toast.error('Invalid file', { description: 'Choose an Excel file (.xlsx or .xls).' })
       return
     }
+    setMethod('excel')
     setPendingFile(file)
-    setConfirmOpen(true)
+    setStep('confirm')
   }
 
-  const handleCancel = () => {
-    setConfirmOpen(false)
-    setPendingFile(null)
+  const handleCsvPick = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const lower = file.name.toLowerCase()
+    if (!lower.endsWith('.csv')) {
+      toast.error('Invalid file', { description: 'Choose a CSV file (.csv).' })
+      return
+    }
+    setMethod('csv')
+    setPendingFile(file)
+    setStep('confirm')
   }
 
-  const formatSuccessMessage = (result: Awaited<ReturnType<typeof importHoldingsFromExcel>>) => {
+  const formatSuccessMessage = (result: HoldingsBulkImportResult) => {
     const errs = (result.errors || []).filter(Boolean)
     const lines = [
       `Created ${result.created} position(s).`,
@@ -65,17 +117,23 @@ export function StackExcelBulkImport({
     return lines.join(' ')
   }
 
-  const handleStart = async () => {
-    const file = pendingFile
-    if (!file) return
-    setConfirmOpen(false)
-    setPendingFile(null)
+  const runImport = async () => {
     setRunning(true)
-    const toastId = toast.loading('Uploading file and importing positions…')
+    const toastId = toast.loading('Importing positions…')
     try {
-      const result = await importHoldingsFromExcel(file)
+      let result: HoldingsBulkImportResult
+      if (method === 'excel' && pendingFile) {
+        result = await importHoldingsFromExcel(pendingFile)
+      } else if (method === 'csv' && pendingFile) {
+        result = await importHoldingsFromCsv(pendingFile)
+      } else if (method === 'spreadsheet' && sheetUrl.trim()) {
+        result = await importHoldingsFromSpreadsheet(sheetUrl.trim())
+      } else {
+        throw new Error('Nothing to import. Choose a file or paste a spreadsheet link.')
+      }
       toast.success(formatSuccessMessage(result), { id: toastId })
-      // Reload lists only — do not await live price refresh (keeps toast from hanging).
+      setOpen(false)
+      reset()
       void Promise.resolve(onSuccess()).catch(() => {
         toast.error('Import succeeded but the list could not be refreshed. Try Refresh.')
       })
@@ -89,47 +147,182 @@ export function StackExcelBulkImport({
     }
   }
 
+  const methodLabel =
+    method === 'excel' ? 'Excel' : method === 'csv' ? 'CSV' : method === 'spreadsheet' ? 'Google Sheets' : ''
+
   return (
     <>
       <input
-        ref={inputRef}
+        ref={excelInputRef}
         type="file"
         accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
         className="hidden"
-        onChange={handlePick}
+        onChange={handleExcelPick}
+      />
+      <input
+        ref={csvInputRef}
+        type="file"
+        accept=".csv,text/csv"
+        className="hidden"
+        onChange={handleCsvPick}
       />
 
-      <Dialog open={confirmOpen} onOpenChange={(open) => { if (!open) handleCancel() }}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Bulk import from Excel</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 text-sm text-muted-foreground">
-            <p>
-              Ready to import{' '}
-              <span className="font-medium text-foreground">{pendingFile?.name ?? 'your file'}</span>.
-              Uses the Scope / global stocks layout (active positions and sold rows).
-            </p>
-            <p>
-              New tickers create <strong className="font-medium text-foreground">Growe Stock</strong>{' '}
-              records. Values are stored in USD.
-            </p>
-          </div>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button type="button" variant="outline" onClick={handleCancel} disabled={running}>
-              Cancel
-            </Button>
-            <Button type="button" onClick={handleStart} disabled={running || !pendingFile}>
-              {running ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Working…
-                </>
-              ) : (
-                'Start import'
-              )}
-            </Button>
-          </DialogFooter>
+          {step === 'choose' && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Bulk upload</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">
+                Import Scope / global stocks template (active and sold sections). Same column layout for
+                all options.
+              </p>
+              <div className="grid gap-2 py-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-auto justify-start gap-3 px-4 py-3"
+                  onClick={pickExcel}
+                >
+                  <Sheet className="h-5 w-5 shrink-0 text-green-600" />
+                  <span className="text-left">
+                    <span className="block font-medium">Excel file</span>
+                    <span className="block text-xs text-muted-foreground">.xlsx or .xls</span>
+                  </span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-auto justify-start gap-3 px-4 py-3"
+                  onClick={pickCsv}
+                >
+                  <FileSpreadsheet className="h-5 w-5 shrink-0 text-blue-600" />
+                  <span className="text-left">
+                    <span className="block font-medium">CSV file</span>
+                    <span className="block text-xs text-muted-foreground">.csv (UTF-8)</span>
+                  </span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-auto justify-start gap-3 px-4 py-3"
+                  onClick={pickSpreadsheet}
+                >
+                  <Link2 className="h-5 w-5 shrink-0 text-orange-600" />
+                  <span className="text-left">
+                    <span className="block font-medium">Spreadsheet link</span>
+                    <span className="block text-xs text-muted-foreground">Public Google Sheets URL</span>
+                  </span>
+                </Button>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                  Cancel
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {step === 'spreadsheet-url' && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Spreadsheet link</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Paste a Google Sheets link. The sheet must be shared so{' '}
+                  <strong className="font-medium text-foreground">anyone with the link can view</strong>{' '}
+                  it.
+                </p>
+                <div className="space-y-2">
+                  <Label htmlFor="bulk-sheet-url">Google Sheets URL</Label>
+                  <Input
+                    id="bulk-sheet-url"
+                    type="url"
+                    placeholder="https://docs.google.com/spreadsheets/d/…"
+                    value={sheetUrl}
+                    onChange={(e) => setSheetUrl(e.target.value)}
+                    disabled={running}
+                  />
+                </div>
+              </div>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setStep('choose')
+                    setSheetUrl('')
+                  }}
+                  disabled={running}
+                >
+                  Back
+                </Button>
+                <Button
+                  type="button"
+                  disabled={running || !sheetUrl.trim()}
+                  onClick={() => setStep('confirm')}
+                >
+                  Continue
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {step === 'confirm' && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Confirm import</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  Import via <span className="font-medium text-foreground">{methodLabel}</span>
+                  {pendingFile ? (
+                    <>
+                      : <span className="font-medium text-foreground">{pendingFile.name}</span>
+                    </>
+                  ) : sheetUrl.trim() ? (
+                    <>
+                      {' '}
+                      from your linked spreadsheet.
+                    </>
+                  ) : null}
+                </p>
+                <p>Uses the Scope / global stocks layout. New tickers create Growe Stock records (USD).</p>
+              </div>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    if (method === 'spreadsheet') {
+                      setStep('spreadsheet-url')
+                    } else {
+                      setStep('choose')
+                      setPendingFile(null)
+                    }
+                  }}
+                  disabled={running}
+                >
+                  Back
+                </Button>
+                <Button type="button" onClick={runImport} disabled={running}>
+                  {running ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Working…
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Start import
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -137,13 +330,10 @@ export function StackExcelBulkImport({
         type="button"
         variant="outline"
         size="sm"
-        className={cn(
-          variant === 'compact' ? 'gap-1.5' : 'gap-2',
-          className,
-        )}
+        className={cn(variant === 'compact' ? 'gap-1.5' : 'gap-2', className)}
         disabled={disabled || running}
-        onClick={() => inputRef.current?.click()}
-        title="Scope-style global stocks template (.xlsx)"
+        onClick={openChooser}
+        title="Bulk upload — Excel, CSV, or Google Sheets"
       >
         <Sheet className="h-4 w-4" />
         <span className={variant === 'compact' ? 'hidden sm:inline' : undefined}>Bulk upload</span>
