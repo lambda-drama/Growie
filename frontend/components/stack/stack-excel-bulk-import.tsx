@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, type ChangeEvent } from 'react'
-import { FileSpreadsheet, Link2, Loader2, Sheet, Upload } from 'lucide-react'
+import { Download, FileSpreadsheet, Link2, Loader2, Sheet, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -19,10 +19,14 @@ import {
   importHoldingsFromSpreadsheet,
   type HoldingsBulkImportResult,
 } from '@/services/portfolio'
+import {
+  downloadHoldingsBulkTemplate,
+  HOLDINGS_BULK_TEMPLATE_EXAMPLE_ROW_NOTE,
+} from '@/lib/holdings-bulk-template'
 import { cn } from '@/lib/utils'
 
 type ImportMethod = 'excel' | 'csv' | 'spreadsheet'
-type DialogStep = 'choose' | 'spreadsheet-url' | 'confirm'
+type DialogStep = 'template-offer' | 'choose' | 'spreadsheet-url' | 'confirm'
 
 interface StackExcelBulkImportProps {
   onSuccess: () => void | Promise<void>
@@ -47,10 +51,18 @@ export function StackExcelBulkImport({
   const csvInputRef = useRef<HTMLInputElement>(null)
 
   const reset = () => {
-    setStep('choose')
+    setStep('template-offer')
     setMethod(null)
     setPendingFile(null)
     setSheetUrl('')
+  }
+
+  const handleDownloadTemplate = () => {
+    downloadHoldingsBulkTemplate()
+    toast.success('Template download started', {
+      description: HOLDINGS_BULK_TEMPLATE_EXAMPLE_ROW_NOTE,
+      duration: 8000,
+    })
   }
 
   const handleOpenChange = (next: boolean) => {
@@ -169,15 +181,51 @@ export function StackExcelBulkImport({
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="sm:max-w-md">
-          {step === 'choose' && (
+          {step === 'template-offer' && (
             <>
               <DialogHeader>
                 <DialogTitle>Bulk upload</DialogTitle>
               </DialogHeader>
               <p className="text-sm text-muted-foreground">
+                Do you need a sample template for global stocks? It matches the Scope layout (active
+                positions and sold rows).
+              </p>
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
+                {HOLDINGS_BULK_TEMPLATE_EXAMPLE_ROW_NOTE}
+              </div>
+              <div className="flex flex-col gap-2 pt-1">
+                <Button type="button" className="gap-2" onClick={handleDownloadTemplate}>
+                  <Download className="h-4 w-4" />
+                  Download sample template (.xlsx)
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setStep('choose')}>
+                  I have my file — continue to upload
+                </Button>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+                  Cancel
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {step === 'choose' && (
+            <>
+              <DialogHeader>
+                <DialogTitle>How do you want to upload?</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">
                 Import Scope / global stocks template (active and sold sections). Same column layout for
                 all options.
               </p>
+              <button
+                type="button"
+                className="text-left text-sm text-primary underline-offset-4 hover:underline"
+                onClick={handleDownloadTemplate}
+              >
+                Download sample template (.xlsx)
+              </button>
               <div className="grid gap-2 py-1">
                 <Button
                   type="button"
@@ -216,7 +264,10 @@ export function StackExcelBulkImport({
                   </span>
                 </Button>
               </div>
-              <DialogFooter>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button type="button" variant="outline" onClick={() => setStep('template-offer')}>
+                  Back
+                </Button>
                 <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                   Cancel
                 </Button>
