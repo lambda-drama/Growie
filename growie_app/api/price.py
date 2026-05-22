@@ -1,5 +1,5 @@
 """
-Price fetching service — Mansa Markets, FCS API, Finnhub, Alpha Vantage.
+Price fetching service — Mansa Markets, FCS API, Finnhub, Alpha Vantage, RapidAPI (NSE).
 
 Mansa Markets (mansaapi.com):
   Base: https://www.mansaapi.com/api/v1
@@ -34,10 +34,17 @@ Finnhub (finnhub.io):
   Symbols: Finnhub-native (e.g. AAPL); optional Growe Stock.api_symbol. Quote `c` is USD;
   Growe Price Cache still stores price_usd and price_kes using your USD/KES setting when syncing.
 
+RapidAPI — Nairobi Stock Exchange (NSE only):
+  Host: nairobi-stock-exchange-nse.p.rapidapi.com
+  Auth: x-rapidapi-key, x-rapidapi-host headers (API key = RapidAPI key)
+  Endpoint: GET /stocks?limit=1000
+  Response: {"success":true,"data":[{"ticker":"SCOM","price":"28.75","change":"-0.50 (-1.71%)",...}]}
+
 Dispatch is determined by the "api_provider" Select field on the Growe Price API record.
 """
 
 import re
+from urllib.parse import urlparse
 
 import frappe
 from frappe import _
@@ -152,10 +159,13 @@ def _provider_key(provider: dict) -> str:
 # Prefer bulk/fast providers first; Alpha Vantage last (25 req/day free tier).
 _PROVIDER_FETCH_ORDER = {
 	"mansa markets": 0,
+	"rapidapi": 0,
 	"fcs api": 1,
 	"finnhub": 2,
 	"alpha vantage": 9,
 }
+
+_RAPIDAPI_NSE_DEFAULT_HOST = "nairobi-stock-exchange-nse.p.rapidapi.com"
 
 
 def _sort_providers_for_fetch(providers: list) -> list:
@@ -200,9 +210,11 @@ def _get_providers(market_type: str, provider_name: str | None = None) -> list:
 		order_by="creation asc",
 	)
 	filtered = [p for p in providers if p.market_type in (market_type, "Both")]
-	# Business rule: Alpha Vantage is Global-only.
+	# Business rule: Alpha Vantage is Global-only; RapidAPI is NSE-only.
 	if str(market_type).upper() == "NSE":
 		filtered = [p for p in filtered if _provider_key(p) != "alpha vantage"]
+	elif str(market_type).upper() == "GLOBAL":
+		filtered = [p for p in filtered if _provider_key(p) != "rapidapi"]
 	return _sort_providers_for_fetch(filtered)
 
 
@@ -268,6 +280,112 @@ def _fetch_mansa(provider: dict, symbols: list, market: str = "NSE") -> dict:
 
 	except Exception as e:
 		frappe.log_error(title="Mansa price fetch error", message=str(e))
+
+	return results
+
+
+# ── RapidAPI — Nairobi Stock Exchange (NSE only) ─────────────────────────────
+
+def _rapidapi_nse_host(provider: dict) -> str:
+	"""RapidAPI host from api_base_url or default Nairobi NSE host."""
+	base = (provider.get("api_base_url") or "").strip().rstrip("/")
+	if base:
+		if base.startswith("http"):
+			netloc = urlparse(base).netloc
+			if netloc:
+				return netloc
+		return base.split("/")[0]
+	return _RAPIDAPI_NSE_DEFAULT_HOST
+
+
+def _parse_rapidapi_price(val) -> float:
+	if val is None or val == "":
+		return 0.0
+	try:
+		return float(str(val).replace(",", "").strip())
+	except (TypeError, ValueError):
+		return 0.0
+
+
+def _parse_rapidapi_nse_change(change_str: str) -> float:
+	"""Parse '+2.50 (+5.82%)' or '-0.50 (-1.71%)' → change percent."""
+	if not change_str:
+		return 0.0
+	m = re.search(r"\(([+-]?\d+(?:\.\d+)?)%\)", str(change_str))
+	if m:
+		try:
+			return float(m.group(1))
+		except ValueError:
+			return 0.0
+	return 0.0
+
+
+def _fetch_rapidapi_nse(provider: dict, symbols: list, market: str = "NSE") -> dict:
+	"""
+	Fetch NSE prices from RapidAPI Nairobi Stock Exchange (bulk GET /stocks).
+
+	Growe Price API.api_key = x-rapidapi-key. api_base_url optional (defaults to Rapid host).
+	"""
+	if str(market).upper() != "NSE":
+		return {}
+
+	api_key = _price_api_key(provider)
+	if not api_key:
+		frappe.log_error(
+			title="RapidAPI NSE: missing API key",
+			message="Growe Price API.api_key is empty for RapidAPI.",
+		)
+		return {}
+
+	host = _rapidapi_nse_host(provider)
+	endpoint = (provider.get("endpoint_prices") or "/stocks").strip()
+	if not endpoint.startswith("/"):
+		endpoint = "/" + endpoint
+	url = f"https://{host}{endpoint}"
+	headers = {
+		"x-rapidapi-key": api_key,
+		"x-rapidapi-host": host,
+		"Content-Type": "application/json",
+		"Accept": "application/json",
+	}
+
+	wanted = {(s or "").upper().strip() for s in symbols if (s or "").strip()}
+	results: dict = {}
+	if not wanted:
+		return results
+
+	try:
+		resp = _requests.get(url, headers=headers, params={"limit": 1000}, timeout=20)
+		if _http_response_rate_limited(resp, provider, "rapidapi"):
+			return results
+		resp.raise_for_status()
+		body = resp.json()
+
+		if not body.get("success"):
+			msg = str(body.get("message") or body.get("error") or "")
+			if re.search(r"(?i)limit|quota|rate|too many", msg):
+				_mark_provider_rate_limited(provider, "rapidapi", msg)
+			else:
+				frappe.logger("growie.price").warning(
+					"RapidAPI NSE: %s", _redact_secrets_in_message(msg)[:300]
+				)
+			return results
+
+		for item in body.get("data") or []:
+			ticker = (item.get("ticker") or "").upper().strip()
+			if not ticker or ticker not in wanted:
+				continue
+			price = _parse_rapidapi_price(item.get("price"))
+			if price <= 0:
+				continue
+			results[ticker] = {
+				"price": price,
+				"change_percent": _parse_rapidapi_nse_change(item.get("change")),
+				"currency": "KES",
+			}
+
+	except Exception as e:
+		frappe.log_error(title="RapidAPI NSE price fetch error", message=str(e))
 
 	return results
 
@@ -606,6 +724,8 @@ def _fetch_from_provider(
 
 	if api_prov == "mansa markets":
 		return _fetch_mansa(provider, symbols, market)
+	if api_prov == "rapidapi":
+		return _fetch_rapidapi_nse(provider, symbols, market)
 	if api_prov == "fcs api":
 		return _fetch_fcs(provider, symbols, market)
 	if api_prov == "finnhub":
@@ -623,7 +743,7 @@ def _fetch_from_provider(
 		message=(
 			f"No parser for provider '{provider.get('provider_name')}' "
 			f"(api_provider='{provider.get('api_provider')}'). "
-			"Supported: Mansa Markets, FCS API, Finnhub, Alpha Vantage."
+			"Supported: Mansa Markets, RapidAPI, FCS API, Finnhub, Alpha Vantage."
 		),
 	)
 	return {}
@@ -890,7 +1010,7 @@ def refresh_prices(provider_name: str = None):
 			_(
 				"No live prices were saved. Check: (1) Growe Price API records are Active, "
 				"(2) Market Type matches your holdings (NSE vs Global), "
-				"(3) API Provider is Mansa Markets, FCS API, Finnhub, or Alpha Vantage, "
+				"(3) API Provider is Mansa Markets, RapidAPI (NSE), FCS API, Finnhub, or Alpha Vantage, "
 				"(4) Error Log for provider errors."
 			),
 			alert=True,

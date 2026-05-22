@@ -147,6 +147,17 @@ frappe.ui.form.on("Growe Price API", {
 			);
 		}
 
+		if (api_prov.includes("rapidapi")) {
+			frm.dashboard.add_comment(
+				__("<b>RapidAPI — Nairobi NSE only.</b> API Key = your <code>x-rapidapi-key</code>. " +
+				   "Bulk <code>GET /stocks</code> (all listings, then filtered to your tickers). " +
+				   "Market Type must be <b>NSE</b>. " +
+				   "<a href=\"https://rapidapi.com/iancenry/api/nairobi-stock-exchange-nse\" target=\"_blank\">Docs</a>"),
+				"blue",
+				true
+			);
+		}
+
 		// ── Helpful quick-start note ──────────────────────────────────────────────
 		if (!frm.doc.__islocal && !frm.doc.api_key) {
 			frm.dashboard.add_comment(
@@ -195,6 +206,12 @@ function _set_provider_hints(frm) {
 			endpoint_prices: "/quote",
 			calls_per_month: 60000, // free tier ~60/min; adjust if you upgrade
 			market_type: "Both",
+		},
+		rapidapi: {
+			api_base_url: "https://nairobi-stock-exchange-nse.p.rapidapi.com",
+			endpoint_prices: "/stocks",
+			calls_per_month: 3000,
+			market_type: "NSE",
 		},
 	};
 
