@@ -214,7 +214,7 @@ def refresh_stack_prices(asset_class: str = None, holding_name: str = None):
 	"""
 	Fetch live prices for the current member's stack holdings (not the full stock master).
 
-	Uses active Growe Price API providers in order (Finnhub, Mansa, FCS, Alpha Vantage, etc.):
+	Uses active Growe Price API providers in order (NSE: RapidAPI first, then Mansa, etc.):
 	each provider fills what it can; a second pass retries tickers still missing from cache.
 	Upserts Growe Price Cache and recomputes Growe Holding.value_kes for those tickers.
 

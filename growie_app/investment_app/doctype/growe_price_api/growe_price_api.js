@@ -73,9 +73,16 @@ frappe.ui.form.on("Growe Price API", {
 
 		// ── Fetch All Prices Now button ───────────────────────────────────────────
 		frm.add_custom_button(__("Refresh All Prices Now"), function () {
+			const prov = (frm.doc.api_provider || "").toLowerCase();
+			const scopeHint = prov.includes("rapidapi") || prov.includes("mansa")
+				? __("This provider only updates <b>NSE</b> tickers; Global symbols are skipped.")
+				: prov.includes("finnhub") || prov.includes("alpha")
+					? __("This provider only updates <b>Global</b> tickers; NSE symbols are skipped.")
+					: __("Updates tickers this provider supports (by market).");
 			frappe.confirm(
 				__(
-					"This will fetch live prices for all active listed tickers (portfolio tickers first) and update holding values. Continue?"
+					"This will fetch live prices for active tickers (portfolio first) using <b>{0}</b> only. {1} Continue?",
+					[frm.doc.provider_name || frm.doc.name, scopeHint]
 				),
 				function () {
 					frappe.call({
@@ -138,9 +145,8 @@ frappe.ui.form.on("Growe Price API", {
 
 		if (api_prov.includes("finnhub")) {
 			frm.dashboard.add_comment(
-				__("<b>Test Connection</b> shows the raw quote returned by Finnhub. " +
-				   "<b>Refresh prices</b> fills <b>Growe Price Cache</b> with USD and KES fields per ticker. " +
-				   "Symbols (e.g. <code>AAPL</code>); override via <b>Growe Stock → API Symbol</b>. " +
+				__("<b>Global stocks only.</b> Set <b>Market Type</b> to <b>Global</b> (not Both) — " +
+				   "NSE tickers use RapidAPI / Mansa. Test with <code>AAPL</code>. " +
 				   "<a href=\"https://finnhub.io/docs/api\" target=\"_blank\">Docs</a>"),
 				"blue",
 				true

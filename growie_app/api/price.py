@@ -156,23 +156,109 @@ def _provider_key(provider: dict) -> str:
 	return str(provider.get("api_provider") or "").strip().lower()
 
 
-# Prefer bulk/fast providers first; Alpha Vantage last (25 req/day free tier).
+def _is_rapidapi_nse_provider(provider: dict) -> bool:
+	"""True for RapidAPI Nairobi NSE rows (by select, name, or host URL)."""
+	if _provider_key(provider) == "rapidapi":
+		return True
+	pn = (provider.get("provider_name") or "").lower().replace(" ", "")
+	if "rapidapi" in pn:
+		return True
+	base = (provider.get("api_base_url") or "").lower()
+	return "nairobi-stock-exchange-nse" in base or "rapidapi.com" in base
+
+
+# Which markets each provider may call (Growe Stock.market / holding asset class).
+_PROVIDER_MARKETS: dict[str, frozenset] = {
+	"rapidapi": frozenset({"NSE"}),
+	"mansa markets": frozenset({"NSE"}),
+	"fcs api": frozenset({"NSE", "GLOBAL"}),
+	"finnhub": frozenset({"GLOBAL"}),
+	"alpha vantage": frozenset({"GLOBAL"}),
+}
+
+# NSE: RapidAPI first on every UI/desk refresh; then Mansa bulk; AV last (Global only).
 _PROVIDER_FETCH_ORDER = {
-	"mansa markets": 0,
-	"rapidapi": 0,
-	"fcs api": 1,
-	"finnhub": 2,
+	"rapidapi": -1,
+	"mansa markets": 1,
+	"fcs api": 2,
+	"finnhub": 3,
 	"alpha vantage": 9,
 }
+
+
+def _normalize_market_label(market: str) -> str:
+	m = str(market or "NSE").strip().upper()
+	return "GLOBAL" if m == "GLOBAL" else "NSE"
+
+
+def _provider_supports_market(provider: dict, market: str) -> bool:
+	"""
+	Whether this Growe Price API row may fetch quotes for the given market.
+	NSE tickers never use Finnhub/Alpha Vantage even when market_type is Both.
+	"""
+	m = _normalize_market_label(market)
+	if _is_rapidapi_nse_provider(provider):
+		return m == "NSE"
+	key = _provider_key(provider)
+	allowed = _PROVIDER_MARKETS.get(key)
+	if allowed is not None:
+		return m in allowed
+	mt = (provider.get("market_type") or "").strip().upper()
+	if mt == "BOTH":
+		return True
+	return mt == m
 
 _RAPIDAPI_NSE_DEFAULT_HOST = "nairobi-stock-exchange-nse.p.rapidapi.com"
 
 
-def _sort_providers_for_fetch(providers: list) -> list:
-	return sorted(
-		providers,
-		key=lambda p: (_PROVIDER_FETCH_ORDER.get(_provider_key(p), 5), p.get("name") or ""),
+def _sort_providers_for_fetch(providers: list, market: str = "NSE") -> list:
+	"""Order providers for a market; RapidAPI is always first for NSE refreshes."""
+
+	def _rank(p: dict) -> tuple:
+		if str(market).upper() == "NSE" and _is_rapidapi_nse_provider(p):
+			return (-1, p.get("name") or "")
+		return (_PROVIDER_FETCH_ORDER.get(_provider_key(p), 5), p.get("name") or "")
+
+	return sorted(providers, key=_rank)
+
+
+def _get_provider_by_name(provider_name: str) -> dict | None:
+	"""Load one active Growe Price API row by document name."""
+	if not provider_name or not frappe.db.exists("Growe Price API", provider_name):
+		return None
+	return frappe.db.get_value(
+		"Growe Price API",
+		provider_name,
+		[
+			"name", "provider_name", "api_provider", "market_type",
+			"api_base_url", "api_key", "endpoint_prices", "calls_per_month", "is_active",
+		],
+		as_dict=True,
 	)
+
+
+def _eligible_tickers_for_provider(
+	provider: dict, nse_tickers: list, global_tickers: list
+) -> list:
+	"""Tickers this provider is allowed to refresh (by Growe Stock / holding market)."""
+	out: list = []
+	if _provider_supports_market(provider, "NSE"):
+		out.extend(nse_tickers or [])
+	if _provider_supports_market(provider, "GLOBAL"):
+		out.extend(global_tickers or [])
+	return list(dict.fromkeys((t or "").upper() for t in out if (t or "").strip()))
+
+
+def _prices_from_cache_for_tickers(tickers: list) -> dict:
+	prices: dict = {}
+	for t in tickers:
+		tu = (t or "").upper().strip()
+		if not tu:
+			continue
+		cache = frappe.db.get_value("Growe Price Cache", tu, "price_kes")
+		if cache:
+			prices[tu] = float(cache)
+	return prices
 
 
 def _get_providers(market_type: str, provider_name: str | None = None) -> list:
@@ -181,22 +267,12 @@ def _get_providers(market_type: str, provider_name: str | None = None) -> list:
 	(if active and market-compatible) so refresh can be forced to a specific provider.
 	"""
 	if provider_name:
-		p = frappe.db.get_value(
-			"Growe Price API",
-			provider_name,
-			[
-				"name", "provider_name", "api_provider", "market_type",
-				"api_base_url", "api_key", "endpoint_prices", "calls_per_month", "is_active",
-			],
-			as_dict=True,
-		)
+		p = _get_provider_by_name(provider_name)
 		if not p:
 			frappe.throw(_(f"Provider '{provider_name}' not found."))
 		if not int(p.get("is_active") or 0):
 			frappe.throw(_(f"Provider '{provider_name}' is not active."))
-		if p.market_type not in (market_type, "Both"):
-			return []
-		if str(market_type).upper() == "NSE" and _provider_key(p) == "alpha vantage":
+		if not _provider_supports_market(p, market_type):
 			return []
 		return [p]
 
@@ -209,13 +285,8 @@ def _get_providers(market_type: str, provider_name: str | None = None) -> list:
 		],
 		order_by="creation asc",
 	)
-	filtered = [p for p in providers if p.market_type in (market_type, "Both")]
-	# Business rule: Alpha Vantage is Global-only; RapidAPI is NSE-only.
-	if str(market_type).upper() == "NSE":
-		filtered = [p for p in filtered if _provider_key(p) != "alpha vantage"]
-	elif str(market_type).upper() == "GLOBAL":
-		filtered = [p for p in filtered if _provider_key(p) != "rapidapi"]
-	return _sort_providers_for_fetch(filtered)
+	filtered = [p for p in providers if _provider_supports_market(p, market_type)]
+	return _sort_providers_for_fetch(filtered, market_type)
 
 
 # ── Mansa Markets ─────────────────────────────────────────────────────────────
@@ -227,6 +298,9 @@ def _fetch_mansa(provider: dict, symbols: list, market: str = "NSE") -> dict:
 	  1. Bulk fetch all stocks for the exchange (one call, very efficient).
 	  2. Filter to the tickers we need.
 	"""
+	if _normalize_market_label(market) != "NSE":
+		return {}
+
 	base = provider["api_base_url"].rstrip("/")
 	api_key = _price_api_key(provider)
 	results: dict = {}
@@ -628,6 +702,9 @@ def _fetch_finnhub(
 
 	symbol_override_map: optional {internal ticker → Finnhub symbol} from Growe Stock.api_symbol.
 	"""
+	if _normalize_market_label(market) != "GLOBAL":
+		return {}
+
 	base = (provider.get("api_base_url") or "").strip().rstrip("/") or _FINNHUB_DEFAULT_BASE
 	endpoint = (provider.get("endpoint_prices") or "/quote").strip()
 	if not endpoint.startswith("/"):
@@ -654,7 +731,8 @@ def _fetch_finnhub(
 		if not sym_u:
 			continue
 
-		if sym_u in symbol_override_map:
+		# NSE api_symbol values (e.g. SCOM.NR for Alpha Vantage) are not Finnhub symbols.
+		if sym_u in symbol_override_map and _normalize_market_label(market) == "GLOBAL":
 			fh_symbol = symbol_override_map[sym_u].strip()
 		else:
 			fh_symbol = sym_u
@@ -682,9 +760,8 @@ def _fetch_finnhub(
 			pc = float(body.get("pc") or 0)
 
 			if not c:
-				frappe.log_error(
-					title=f"Finnhub: no price for {fh_symbol}",
-					message=str(body),
+				frappe.logger("growie.price").debug(
+					"Finnhub: no price for %s (%s)", fh_symbol, body
 				)
 				continue
 
@@ -722,13 +799,15 @@ def _fetch_from_provider(
 	api_prov = _provider_key(provider)
 	symbol_override_map = symbol_override_map or {}
 
+	if _is_rapidapi_nse_provider(provider):
+		return _fetch_rapidapi_nse(provider, symbols, market)
 	if api_prov == "mansa markets":
 		return _fetch_mansa(provider, symbols, market)
-	if api_prov == "rapidapi":
-		return _fetch_rapidapi_nse(provider, symbols, market)
 	if api_prov == "fcs api":
 		return _fetch_fcs(provider, symbols, market)
 	if api_prov == "finnhub":
+		if _normalize_market_label(market) != "GLOBAL":
+			return {}
 		return _fetch_finnhub(provider, symbols, market, symbol_override_map=symbol_override_map)
 	if api_prov == "alpha vantage":
 		if str(market).upper() != "GLOBAL":
@@ -861,7 +940,10 @@ def _provider_uses_alpha_vantage(provider: dict) -> bool:
 
 
 def _api_symbol_maps_for_tickers(nse: list, global_: list) -> tuple[dict, dict]:
-	"""Load Growe Stock api_symbol for held tickers (required for correct Alpha Vantage symbols)."""
+	"""
+	Load Growe Stock api_symbol overrides per market.
+	Global map → Finnhub / Alpha Vantage. NSE map → Alpha Vantage only (not passed to Finnhub).
+	"""
 	nse_map: dict = {}
 	gmap: dict = {}
 	uniq = {(t or "").upper() for t in (nse or []) + (global_ or []) if (t or "").strip()}
@@ -875,10 +957,11 @@ def _api_symbol_maps_for_tickers(nse: list, global_: list) -> tuple[dict, dict]:
 		t = (s.ticker or "").upper()
 		if not s.api_symbol:
 			continue
-		m = (s.market or "NSE").strip().upper()
+		m = _normalize_market_label(s.market or "NSE")
 		if m == "GLOBAL":
 			gmap[t] = s.api_symbol
 		else:
+			# AV NSE suffixes (SCOM.NR) — only used when Alpha Vantage runs on NSE path
 			nse_map[t] = s.api_symbol
 	return nse_map, gmap
 
@@ -896,11 +979,14 @@ def _fetch_and_store(
 	remaining = list(
 		dict.fromkeys((t or "").upper() for t in tickers if (t or "").strip())
 	)
- 
+
 	prices: dict = {}
+	if not providers:
+		return prices
+
 	usd_to_kes = _get_usd_to_kes()
 	sym_map = sym_map or {}
-	
+
 	for provider in providers:
 		
 		if not remaining:
@@ -983,12 +1069,50 @@ def refresh_prices(provider_name: str = None):
 	nse_tickers = _sort_tickers_holdings_first(nse_tickers)
 	global_tickers = _sort_tickers_holdings_first(global_tickers)
 
+	eligible: list = []
 	if provider_name:
-		nse_prices = _fetch_and_store("NSE", list(nse_tickers), nse_map, provider_name=provider_name)
-		global_prices = _fetch_and_store("Global", list(global_tickers), global_map, provider_name=provider_name)
-		all_prices = {**nse_prices, **global_prices}
-		nse_updated_count = len(nse_prices)
-		global_updated_count = len(global_prices)
+		p = _get_provider_by_name(provider_name)
+		if not p:
+			frappe.throw(_(f"Provider '{provider_name}' not found."))
+		if not int(p.get("is_active") or 0):
+			frappe.throw(_(f"Provider '{provider_name}' is not active."))
+
+		eligible = _eligible_tickers_for_provider(p, nse_tickers, global_tickers)
+		prov = [p]
+		all_prices = {}
+		nse_updated_count = 0
+		global_updated_count = 0
+
+		if _provider_supports_market(p, "NSE") and nse_tickers:
+			nse_updated_count = _fetch_market_for_refresh(
+				"NSE", nse_tickers, nse_map, providers=prov
+			)
+			all_prices.update(_prices_from_cache_for_tickers(nse_tickers))
+		if _provider_supports_market(p, "GLOBAL") and global_tickers:
+			global_updated_count = _fetch_market_for_refresh(
+				"Global", global_tickers, global_map, providers=prov
+			)
+			all_prices.update(_prices_from_cache_for_tickers(global_tickers))
+
+		if not eligible and (nse_tickers or global_tickers):
+			frappe.msgprint(
+				_(
+					"{0} cannot refresh your tickers: you have {1} NSE and {2} Global symbol(s), "
+					"but this provider only supports {3}. Use RapidAPI or Mansa for NSE, "
+					"Finnhub or Alpha Vantage for Global, or run Refresh without picking one provider."
+				).format(
+					provider.get("provider_name") or provider_name,
+					len(nse_tickers),
+					len(global_tickers),
+					"NSE"
+					if _is_rapidapi_nse_provider(p) or _provider_key(p) == "mansa markets"
+					else "Global"
+					if _provider_key(p) in ("finnhub", "alpha vantage")
+					else "NSE and Global (FCS)",
+				),
+				alert=True,
+				indicator="orange",
+			)
 	else:
 		nse_updated_count = _fetch_market_for_refresh("NSE", nse_tickers, nse_map)
 		global_updated_count = _fetch_market_for_refresh("Global", global_tickers, global_map)
@@ -997,6 +1121,7 @@ def refresh_prices(provider_name: str = None):
 			cache = frappe.db.get_value("Growe Price Cache", t, "price_kes")
 			if cache:
 				all_prices[t] = float(cache)
+		eligible = list(dict.fromkeys((nse_tickers or []) + (global_tickers or [])))
 
 	for t in set(nse_tickers) | set(global_tickers):
 		cache = frappe.db.get_value("Growe Price Cache", t, "price_kes")
@@ -1005,17 +1130,21 @@ def refresh_prices(provider_name: str = None):
 
 	frappe.db.commit()
 
-	if not all_prices and (nse_tickers or global_tickers):
-		frappe.msgprint(
-			_(
-				"No live prices were saved. Check: (1) Growe Price API records are Active, "
-				"(2) Market Type matches your holdings (NSE vs Global), "
-				"(3) API Provider is Mansa Markets, RapidAPI (NSE), FCS API, Finnhub, or Alpha Vantage, "
-				"(4) Error Log for provider errors."
-			),
-			alert=True,
-			indicator="orange",
-		)
+	if not all_prices and eligible:
+		hint = _(
+			"No live prices were saved for the tickers this run can fetch. "
+			"Check API key, RapidAPI quota, and Error Log. "
+			"NSE tickers: {0}, Global tickers: {1}."
+		).format(len(nse_tickers), len(global_tickers))
+		if provider_name:
+			p = _get_provider_by_name(provider_name) or {}
+			if _is_rapidapi_nse_provider(p):
+				hint = _(
+					"RapidAPI returned no NSE prices (quota, key, or ticker mismatch). "
+					"Global tickers ({0}) are skipped for this provider — use Finnhub/Mansa for those. "
+					"NSE tickers requested: {1}."
+				).format(len(global_tickers), len(nse_tickers))
+		frappe.msgprint(hint, alert=True, indicator="orange")
 
 	return {
 		"nse_updated": nse_updated_count,
@@ -1296,17 +1425,22 @@ def _run_fetch_providers_round(
 						remaining.remove(tu)
 
 
-def _fetch_market_for_refresh(market: str, tickers: list, sym_map: dict) -> int:
+def _fetch_market_for_refresh(
+	market: str, tickers: list, sym_map: dict, providers: list | None = None
+) -> int:
 	"""
 	Fetch and upsert for one market. Each active provider runs in order (batch, then
 	stragglers). A second pass repeats the same for tickers still missing a complete
 	quote so later APIs can fill gaps the first pass missed.
 
+	providers: optional fixed list (Desk refresh using one Growe Price API row).
+
 	Returns how many tickers gained a complete quote (price + change %) vs before this run.
 	"""
 	if not tickers:
 		return 0
-	providers = _get_providers(market)
+	if providers is None:
+		providers = _get_providers(market)
 	original = list(dict.fromkeys((t or "").upper() for t in tickers if (t or "").strip()))
 	if not original:
 		return 0

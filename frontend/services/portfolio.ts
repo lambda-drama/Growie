@@ -162,16 +162,20 @@ export async function updateHolding(holdingId: string, data: UpdateHoldingData):
   throw new Error(extractError(resData))
 }
 
-export interface HoldingsExcelImportResult {
+export interface HoldingsBulkImportResult {
   created: number
   skipped: number
   active_rows: number
   sold_rows: number
   errors: string[]
+  source?: string
 }
 
-/** Upload a file as a private Frappe File (portal-safe MIME types include .xlsx). */
-export async function uploadPortfolioExcelFile(file: File): Promise<string> {
+/** @deprecated Use HoldingsBulkImportResult */
+export type HoldingsExcelImportResult = HoldingsBulkImportResult
+
+/** Upload a file as a private Frappe File (portal upload_file). */
+export async function uploadPortfolioImportFile(file: File): Promise<string> {
   const csrf = getCSRF()
   const fd = new FormData()
   fd.append('file', file)
@@ -191,20 +195,49 @@ export async function uploadPortfolioExcelFile(file: File): Promise<string> {
   throw new Error(extractError(resData))
 }
 
-/** Upload .xlsx then create Growe Holding rows from the Scope template (active + sold sections). */
-export async function importHoldingsFromExcel(file: File): Promise<HoldingsExcelImportResult> {
-  const fileUrl = await uploadPortfolioExcelFile(file)
-  const response = await fetch('/api/method/growie_app.api.portfolio.import_holdings_excel', {
+/** @deprecated Use uploadPortfolioImportFile */
+export const uploadPortfolioExcelFile = uploadPortfolioImportFile
+
+async function importHoldingsFromEndpoint(
+  method: string,
+  body: Record<string, string>
+): Promise<HoldingsBulkImportResult> {
+  const response = await fetch(`/api/method/${method}`, {
     method: 'POST',
     credentials: 'include',
     headers: postHeaders(),
-    body: JSON.stringify({ file_url: fileUrl }),
+    body: JSON.stringify(body),
   })
   const resData = (await response.json()) as Record<string, unknown>
   if (resData?.message && typeof resData.message === 'object') {
-    return resData.message as HoldingsExcelImportResult
+    return resData.message as HoldingsBulkImportResult
   }
   throw new Error(extractError(resData))
+}
+
+/** Scope template from .xlsx / .xls */
+export async function importHoldingsFromExcel(file: File): Promise<HoldingsBulkImportResult> {
+  const fileUrl = await uploadPortfolioImportFile(file)
+  return importHoldingsFromEndpoint('growie_app.api.portfolio.import_holdings_excel', {
+    file_url: fileUrl,
+  })
+}
+
+/** Scope template from .csv */
+export async function importHoldingsFromCsv(file: File): Promise<HoldingsBulkImportResult> {
+  const fileUrl = await uploadPortfolioImportFile(file)
+  return importHoldingsFromEndpoint('growie_app.api.portfolio.import_holdings_csv', {
+    file_url: fileUrl,
+  })
+}
+
+/** Scope template from a public Google Sheets link */
+export async function importHoldingsFromSpreadsheet(
+  spreadsheetUrl: string
+): Promise<HoldingsBulkImportResult> {
+  return importHoldingsFromEndpoint('growie_app.api.portfolio.import_holdings_spreadsheet', {
+    spreadsheet_url: spreadsheetUrl.trim(),
+  })
 }
 
 export async function deleteHolding(holdingId: string): Promise<void> {

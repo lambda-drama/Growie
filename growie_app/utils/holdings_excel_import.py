@@ -11,11 +11,15 @@ Sheet layout:
 
 from __future__ import annotations
 
+import csv
+import io
 import re
 from datetime import date, datetime
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 import frappe
+import requests
 from frappe import _
 from frappe.utils import getdate, now_datetime, today
 
@@ -56,9 +60,9 @@ def _normalize_ticker(raw: str) -> tuple[str, str]:
 	return s[:40], api_symbol[:140]
 
 
-def _get_excel_path(file_url: str) -> str:
+def _get_uploaded_file_path(file_url: str) -> str:
 	if not file_url:
-		frappe.throw(_("Attach an Excel file first."))
+		frappe.throw(_("Attach a file first."))
 	name = frappe.db.get_value("File", {"file_url": file_url}, "name")
 	if not name and "/" in (file_url or ""):
 		tail = file_url.strip().split("/")[-1]
@@ -67,6 +71,125 @@ def _get_excel_path(file_url: str) -> str:
 	if not name:
 		frappe.throw(_("Uploaded file not found. Try uploading again."))
 	return frappe.get_doc("File", name).get_full_path()
+
+
+def _parse_date_cell(val: Any) -> str:
+	if isinstance(val, datetime):
+		return val.date().isoformat()
+	if isinstance(val, date):
+		return val.isoformat()
+	s = _norm_cell(val)
+	if not s:
+		return str(today())
+	try:
+		return str(getdate(s))
+	except Exception:
+		return str(today())
+
+
+def _rows_from_excel_path(path: str) -> list[tuple]:
+	try:
+		import openpyxl
+	except ImportError as e:
+		frappe.throw(_("openpyxl is required for Excel import: {0}").format(e))
+	wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+	try:
+		ws = wb.active
+		return [tuple(r) for r in ws.iter_rows(values_only=True)]
+	finally:
+		wb.close()
+
+
+def _rows_from_csv_path(path: str) -> list[tuple]:
+	rows: list[tuple] = []
+	for encoding in ("utf-8-sig", "utf-8", "latin-1"):
+		try:
+			with open(path, newline="", encoding=encoding) as f:
+				for row in csv.reader(f):
+					rows.append(tuple(row))
+			return rows
+		except UnicodeDecodeError:
+			continue
+	if not rows:
+		frappe.throw(_("Could not read the CSV file. Save it as UTF-8 and try again."))
+	return rows
+
+
+def _rows_from_csv_bytes(data: bytes) -> list[tuple]:
+	text = None
+	for encoding in ("utf-8-sig", "utf-8", "latin-1"):
+		try:
+			text = data.decode(encoding)
+			break
+		except UnicodeDecodeError:
+			continue
+	if not text:
+		frappe.throw(_("Could not decode spreadsheet data as text."))
+	reader = csv.reader(io.StringIO(text))
+	return [tuple(row) for row in reader]
+
+
+def _google_sheets_export_url(spreadsheet_url: str) -> str:
+	"""
+	Build a public CSV export URL from a Google Sheets view/edit link.
+	Sheet must be shared (anyone with the link can view).
+	"""
+	raw = (spreadsheet_url or "").strip()
+	if not raw:
+		frappe.throw(_("Paste a Google Sheets link."))
+
+	# Already an export URL
+	if "export?format=csv" in raw or "output=csv" in raw:
+		return raw
+
+	parsed = urlparse(raw)
+	if "docs.google.com" not in (parsed.netloc or ""):
+		frappe.throw(_("Only Google Sheets links are supported. Paste a docs.google.com/spreadsheets/… URL."))
+
+	m = re.search(r"/spreadsheets/d/([a-zA-Z0-9-_]+)", raw)
+	if not m:
+		frappe.throw(_("Could not find a spreadsheet ID in that link."))
+
+	sheet_id = m.group(1)
+	qs = parse_qs(parsed.query)
+	gid = (qs.get("gid") or [None])[0]
+	if not gid:
+		gid_m = re.search(r"[#&]gid=(\d+)", raw)
+		gid = gid_m.group(1) if gid_m else None
+
+	url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
+	if gid:
+		url += f"&gid={gid}"
+	return url
+
+
+def _fetch_spreadsheet_rows(spreadsheet_url: str) -> list[tuple]:
+	export_url = _google_sheets_export_url(spreadsheet_url)
+	try:
+		resp = requests.get(export_url, timeout=45, headers={"User-Agent": "Growe/1.0"})
+	except requests.RequestException as e:
+		frappe.throw(_("Could not download the spreadsheet: {0}").format(e))
+
+	if resp.status_code == 403:
+		frappe.throw(
+			_(
+				"The spreadsheet is not accessible. Share it so anyone with the link can view, then try again."
+			)
+		)
+	if not resp.ok:
+		frappe.throw(
+			_("Spreadsheet download failed (HTTP {0}). Check the link and sharing settings.").format(
+				resp.status_code
+			)
+		)
+	content = resp.content or b""
+	if not content or content[:15].lower().startswith(b"<!doctype") or content[:6].lower().startswith(b"<html"):
+		frappe.throw(
+			_(
+				"The link did not return CSV data. Use a Google Sheets link and enable link sharing (view access)."
+			)
+		)
+	return _rows_from_csv_bytes(content)
 
 
 def _get_or_create_stock(raw_ticker: str, investment_hint: str) -> str:
@@ -254,43 +377,18 @@ def _assert_can_import_for_investor(investor: str) -> None:
 		)
 
 
-@frappe.whitelist()
-def import_scope_template_excel(file_url: str, investor: str):
-	"""
-	Import Sample Global Stocks Template .xlsx into Growe Holding.
-
-	:param file_url: Uploaded File ``file_url`` (Desk attach or portal ``upload_file``).
-	:param investor: Growe Member name (must match the signed-in member unless System Manager).
-	"""
+def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: str) -> dict:
+	"""Shared import for Excel, CSV, and Google Sheets (same Scope template columns)."""
 	_assert_can_import_for_investor(investor)
-
-	try:
-		import openpyxl
-	except ImportError as e:
-		frappe.throw(f"openpyxl is required: {e}")
-
-	path = _get_excel_path(file_url)
-	wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
-	try:
-		ws = wb.active
-		rows = [tuple(r) for r in ws.iter_rows(values_only=True)]
-	finally:
-		wb.close()
 
 	active_rows, sold_rows = _split_active_and_sold(rows)
 	created = 0
 	errors: list[str] = []
 	for i, row in enumerate(active_rows):
 		try:
-			purchase = row[0]
 			investment = _norm_cell(row[1]) or _norm_cell(row[2])
 			raw_tk = _norm_cell(row[2])
-			if isinstance(purchase, datetime):
-				use_date = purchase.date().isoformat()
-			elif isinstance(purchase, date):
-				use_date = purchase.isoformat()
-			else:
-				use_date = today()
+			use_date = _parse_date_cell(row[0])
 
 			stock_doc = _get_or_create_stock(raw_tk, investment)
 			ticker_sym = frappe.db.get_value("Growe Stock", stock_doc, "ticker") or raw_tk
@@ -307,25 +405,23 @@ def import_scope_template_excel(file_url: str, investor: str):
 			created += 1
 		except Exception as e:
 			errors.append(f"Active row {i + 1}: {e!s}")
-			frappe.log_error(title="Holding import active row", message=f"{e!s}\n{row}")
+			frappe.log_error(
+				title="Holding import active row",
+				message=f"{source_label}\n{e!s}\n{row}",
+			)
 
 	for j, row in enumerate(sold_rows):
 		try:
-			purchase = row[0]
-			sell_raw = row[1]
 			raw_tk = _norm_cell(row[2])
-			if isinstance(purchase, datetime):
-				use_date = purchase.date().isoformat()
-			elif isinstance(purchase, date):
-				use_date = purchase.isoformat()
-			else:
-				use_date = today()
+			use_date = _parse_date_cell(row[0])
+			sell_raw = row[1]
 			if isinstance(sell_raw, datetime):
 				sold_date = sell_raw.date().isoformat()
 			elif isinstance(sell_raw, date):
 				sold_date = sell_raw.isoformat()
 			else:
-				sold_date = None
+				s = _norm_cell(sell_raw)
+				sold_date = str(getdate(s)) if s else None
 
 			stock_doc = _get_or_create_stock(raw_tk, "")
 			ticker_sym = frappe.db.get_value("Growe Stock", stock_doc, "ticker") or raw_tk
@@ -342,7 +438,10 @@ def import_scope_template_excel(file_url: str, investor: str):
 			created += 1
 		except Exception as e:
 			errors.append(f"Sold row {j + 1}: {e!s}")
-			frappe.log_error(title="Holding import sold row", message=f"{e!s}\n{row}")
+			frappe.log_error(
+				title="Holding import sold row",
+				message=f"{source_label}\n{e!s}\n{row}",
+			)
 
 	frappe.db.commit()
 	return {
@@ -351,4 +450,33 @@ def import_scope_template_excel(file_url: str, investor: str):
 		"active_rows": len(active_rows),
 		"sold_rows": len(sold_rows),
 		"errors": errors,
+		"source": source_label,
 	}
+
+
+@frappe.whitelist()
+def import_scope_template_excel(file_url: str, investor: str):
+	"""
+	Import Sample Global Stocks Template .xlsx into Growe Holding.
+
+	:param file_url: Uploaded File ``file_url`` (Desk attach or portal ``upload_file``).
+	:param investor: Growe Member name (must match the signed-in member unless System Manager).
+	"""
+	path = _get_uploaded_file_path(file_url)
+	rows = _rows_from_excel_path(path)
+	return _import_scope_template_rows(rows, investor, "Excel")
+
+
+@frappe.whitelist()
+def import_scope_template_csv(file_url: str, investor: str):
+	"""Import Scope template from an uploaded .csv file."""
+	path = _get_uploaded_file_path(file_url)
+	rows = _rows_from_csv_path(path)
+	return _import_scope_template_rows(rows, investor, "CSV")
+
+
+@frappe.whitelist()
+def import_scope_template_spreadsheet(spreadsheet_url: str, investor: str):
+	"""Import Scope template from a public Google Sheets link (exported as CSV)."""
+	rows = _fetch_spreadsheet_rows(spreadsheet_url)
+	return _import_scope_template_rows(rows, investor, "Google Sheets")

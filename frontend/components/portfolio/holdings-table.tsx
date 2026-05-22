@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, useMemo, useEffect, useCallback, useRef, type ChangeEvent } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   ChevronDown, ChevronRight, Plus, MoreVertical, Pencil, Trash2,
-  TrendingUp, TrendingDown, ChevronsUpDown, Check, Search, Sheet, Loader2,
+  TrendingUp, TrendingDown, ChevronsUpDown, Check, Search,
 } from 'lucide-react'
-import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -35,13 +34,13 @@ import {
   addHolding as apiAddHolding,
   updateHolding as apiUpdateHolding,
   deleteHolding as apiDeleteHolding,
-  importHoldingsFromExcel,
   searchStocks,
   getCurrencies,
   type AddHoldingData,
   type GroweStock,
 } from '@/services/portfolio'
 import { usePortfolio } from '@/hooks/use-portfolio'
+import { StackExcelBulkImport } from '@/components/stack/stack-excel-bulk-import'
 import type { AssetClass, Holding } from '@/types'
 import { cn } from '@/lib/utils'
 
@@ -555,59 +554,6 @@ export function HoldingsTable() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingHolding, setEditingHolding] = useState<Holding | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
-  const [excelConfirmOpen, setExcelConfirmOpen] = useState(false)
-  const [pendingExcelFile, setPendingExcelFile] = useState<File | null>(null)
-  const [excelImportRunning, setExcelImportRunning] = useState(false)
-  const excelInputRef = useRef<HTMLInputElement>(null)
-
-  const handleExcelPick = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    const lower = file.name.toLowerCase()
-    if (!lower.endsWith('.xlsx') && !lower.endsWith('.xls')) {
-      toast.error('Invalid file', {
-        description: 'Please choose an Excel file (.xlsx or .xls).',
-      })
-      return
-    }
-    setPendingExcelFile(file)
-    setExcelConfirmOpen(true)
-  }
-
-  const handleCancelExcelImport = () => {
-    setExcelConfirmOpen(false)
-    setPendingExcelFile(null)
-  }
-
-  const handleStartExcelImport = async () => {
-    const file = pendingExcelFile
-    if (!file) return
-    setExcelConfirmOpen(false)
-    setPendingExcelFile(null)
-    setExcelImportRunning(true)
-    const toastId = toast.loading('Uploading file and importing holdings…')
-    try {
-      const result = await importHoldingsFromExcel(file)
-      const errs = (result.errors || []).filter(Boolean)
-      const msg = [
-        `Created ${result.created} holding(s).`,
-        `Sheet: ${result.active_rows ?? '—'} active row(s), ${result.sold_rows ?? '—'} sold row(s).`,
-        ...(errs.length ? [`Some rows were skipped: ${errs.slice(0, 5).join(' · ')}`] : []),
-      ].join(' ')
-      toast.success(msg, { id: toastId })
-      void reload().catch(() => {
-        toast.error('Import succeeded but holdings could not be refreshed.')
-      })
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Import failed. Check your connection and try again.',
-        { id: toastId },
-      )
-    } finally {
-      setExcelImportRunning(false)
-    }
-  }
 
   const holdingsByClass = useMemo(() => {
     const grouped: Record<AssetClass, Holding[]> = {
@@ -639,60 +585,11 @@ export function HoldingsTable() {
 
   return (
     <>
-      <input
-        ref={excelInputRef}
-        type="file"
-        accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-        className="hidden"
-        onChange={handleExcelPick}
-      />
-
-      <Dialog open={excelConfirmOpen} onOpenChange={(open) => { if (!open) handleCancelExcelImport() }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Import holdings from Excel</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 text-sm text-muted-foreground">
-            <p>
-              Ready to import <span className="font-medium text-foreground">{pendingExcelFile?.name ?? 'your file'}</span>.
-              This uses the Scope / global stocks layout (active positions and sold rows).
-            </p>
-            <p>New tickers will create <strong className="font-medium text-foreground">Sumstack Stock</strong> records. Values stay in USD.</p>
-          </div>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button type="button" variant="outline" onClick={handleCancelExcelImport} disabled={excelImportRunning}>
-              Cancel
-            </Button>
-            <Button type="button" onClick={handleStartExcelImport} disabled={excelImportRunning || !pendingExcelFile}>
-              {excelImportRunning ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Working…
-                </>
-              ) : (
-                'Start import'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <Card>
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 pb-2">
           <CardTitle className="text-base">Your Holdings</CardTitle>
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 gap-1"
-              disabled={excelImportRunning}
-              onClick={() => excelInputRef.current?.click()}
-              title="Scope-style global stocks template (.xlsx)"
-            >
-              <Sheet className="h-4 w-4" />
-              <span className="hidden sm:inline">Import Excel</span>
-            </Button>
+            <StackExcelBulkImport variant="compact" className="h-8" onSuccess={reload} />
             <Button size="sm" className="h-8 gap-1" onClick={() => { setEditingHolding(null); setDialogOpen(true) }}>
               <Plus className="h-4 w-4" />
               <span className="hidden sm:inline">Add Holding</span>
@@ -702,12 +599,11 @@ export function HoldingsTable() {
         <CardContent className="space-y-2">
           {holdings.length === 0 ? (
             <div className="py-12 text-center space-y-3">
-              <p className="text-muted-foreground">No holdings yet. Add investments manually or import your Scope / global stocks Excel.</p>
+              <p className="text-muted-foreground">
+                No holdings yet. Add investments manually or bulk-upload Excel, CSV, or a Google Sheet.
+              </p>
               <div className="flex flex-wrap justify-center gap-2">
-                <Button variant="outline" disabled={excelImportRunning} onClick={() => excelInputRef.current?.click()}>
-                  <Sheet className="mr-2 h-4 w-4" />
-                  Import Excel
-                </Button>
+                <StackExcelBulkImport onSuccess={reload} />
                 <Button onClick={() => { setEditingHolding(null); setDialogOpen(true) }}>
                   <Plus className="mr-2 h-4 w-4" />Add Holding
                 </Button>

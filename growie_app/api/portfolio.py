@@ -612,6 +612,26 @@ def import_holdings_excel(file_url: str):
 	return import_scope_template_excel(file_url=file_url, investor=member)
 
 
+@frappe.whitelist()
+def import_holdings_csv(file_url: str):
+	"""Import Scope / global stocks template from CSV (.csv upload via ``upload_file``)."""
+	member = _member_name()
+	from growie_app.utils.holdings_excel_import import import_scope_template_csv
+
+	return import_scope_template_csv(file_url=file_url, investor=member)
+
+
+@frappe.whitelist()
+def import_holdings_spreadsheet(spreadsheet_url: str):
+	"""Import Scope template from a public Google Sheets link."""
+	member = _member_name()
+	from growie_app.utils.holdings_excel_import import import_scope_template_spreadsheet
+
+	return import_scope_template_spreadsheet(
+		spreadsheet_url=spreadsheet_url, investor=member
+	)
+
+
 # ── Delete ────────────────────────────────────────────────────────────────────
 
 @frappe.whitelist()
