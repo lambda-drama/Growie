@@ -129,19 +129,29 @@ def _build_portfolio_html(member: str) -> str:
 		"Growe Holding",
 		filters={"investor": member, "sold": 0},
 		fields=[
-			"name", "asset_class", "asset_name", "value_kes",
-			"cost_basis_kes", "quantity", "ticker", "currency", "date_added",
+			"name",
+			"asset_class",
+			"asset_name",
+			"value_kes",
+			"cost_basis_kes",
+			"quantity",
+			"ticker",
+			"currency",
+			"date_added",
+			"buying_price",
 		],
 		order_by="value_kes desc",
 	)
 	summary = get_portfolio_summary()
 	table_rows = ""
+	from growie_app.api.stack import _stack_holding_row
+
 	for r in rows:
-		d = _holding_to_dict(r)
+		d = _stack_holding_row(r)
 		val = flt(d.get("valueKES"))
-		cost = flt(d.get("costBasisKES"))
-		gain = val - cost
-		gain_pct = (gain / cost * 100) if cost > 0 else 0
+		cost = flt(d.get("costAtAvgKES") or d.get("costBasisKES"))
+		gain = flt(d.get("unrealizedGainKES"))
+		gain_pct = flt(d.get("gainPercent"))
 		table_rows += f"""<tr>
 		  <td>{frappe.utils.escape_html(d.get('ticker') or d.get('name') or '')}</td>
 		  <td>{frappe.utils.escape_html(_ASSET_LABELS.get(d.get('assetClass', ''), d.get('assetClass', '')))}</td>

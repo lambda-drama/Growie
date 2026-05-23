@@ -17,6 +17,11 @@ export interface Holding {
   notes?: string
   currentPriceKES?: number
   changePercent?: number
+  avgBuyPrice?: number
+  currentPrice?: number
+  costAtAvgKES?: number
+  gainPercent?: number
+  unrealizedGainKES?: number
 }
 
 export interface Portfolio {

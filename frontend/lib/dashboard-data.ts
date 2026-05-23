@@ -49,7 +49,10 @@ export function groupByAssetClass(holdings: Holding[]): AssetClassGroup[] {
   return ASSET_CLASS_ORDER.map((assetClass) => {
     const list = map.get(assetClass) ?? []
     const totalValueKES = list.reduce((s, h) => s + h.valueKES, 0)
-    const totalCostKES = list.reduce((s, h) => s + h.costBasisKES, 0)
+    const totalCostKES = list.reduce(
+      (s, h) => s + (h.costAtAvgKES ?? h.costBasisKES),
+      0
+    )
     const gainPercent =
       totalCostKES > 0 ? ((totalValueKES - totalCostKES) / totalCostKES) * 100 : 0
     const tickers = [...new Set(list.map((h) => h.ticker || h.name).filter(Boolean))]
@@ -94,7 +97,8 @@ export function computeDashboardMetrics(
   const totalValueKES =
     summary?.totalValueKES ?? holdings.reduce((s, h) => s + h.valueKES, 0)
   const totalCostKES =
-    summary?.totalCostKES ?? holdings.reduce((s, h) => s + h.costBasisKES, 0)
+    summary?.totalCostKES ??
+    holdings.reduce((s, h) => s + (h.costAtAvgKES ?? h.costBasisKES), 0)
   const gainKES = summary?.gainKES ?? totalValueKES - totalCostKES
   const gainPercent =
     summary?.gainPercent ??

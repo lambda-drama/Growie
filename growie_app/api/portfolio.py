@@ -85,6 +85,30 @@ def _holding_to_dict(h) -> dict:
 	}
 
 
+def _price_gain_percent(avg_buy: float, current: float) -> float:
+	"""Unrealized % from average buy price vs current price per share."""
+	if avg_buy <= 0:
+		return 0.0
+	return (current - avg_buy) / avg_buy * 100.0
+
+
+def _cost_at_avg_kes(
+	qty: float,
+	avg_buy_native: float,
+	currency: str,
+	purchase_date: str,
+) -> float:
+	"""Total cost in KES at average buy price (qty × avg buy), for P&L vs current value."""
+	if qty <= 0 or avg_buy_native <= 0:
+		return 0.0
+	amount_native = qty * avg_buy_native
+	currency = (currency or "USD").upper()
+	if currency == "KES":
+		return flt(amount_native)
+	kpu = kes_per_unit_foreign(currency, purchase_date, strict=False)
+	return flt(amount_native * kpu) if kpu > 0 else 0.0
+
+
 def _growe_usd_to_kes_fallback() -> float:
 	"""Last-resort USD→KES when ERPNext has no row for the requested date."""
 	try:
@@ -363,42 +387,67 @@ def get_kes_to_currency_multiplier(to_currency: str = "KES"):
 @frappe.whitelist()
 def get_holdings():
 	"""Return all holdings for the current user."""
+	from growie_app.api.stack import _stack_holding_row
+
 	member = _member_name()
 	rows = frappe.get_all(
 		"Growe Holding",
 		filters={"investor": member},
 		fields=[
-			"name", "asset_class", "asset_name", "value_kes",
-			"cost_basis_kes", "quantity", "ticker",
-			"date_added", "last_updated", "notes", "currency",
+			"name",
+			"asset_class",
+			"asset_name",
+			"value_kes",
+			"cost_basis_kes",
+			"quantity",
+			"ticker",
+			"date_added",
+			"last_updated",
+			"notes",
+			"currency",
+			"buying_price",
 		],
 		order_by="date_added desc",
 	)
-	return [_holding_to_dict(r) for r in rows]
+	return [_stack_holding_row(r) for r in rows]
 
 
 @frappe.whitelist()
 def get_portfolio_summary():
 	"""
-	Return total portfolio value, allocation breakdown, and gain/loss vs cost basis.
+	Return total portfolio value, allocation breakdown, and gain/loss vs cost at avg buy.
 	"""
+	from growie_app.api.stack import _stack_holding_row
+
 	member = _member_name()
 	rows = frappe.get_all(
 		"Growe Holding",
 		filters={"investor": member},
-		fields=["asset_class", "value_kes", "cost_basis_kes"],
+		fields=[
+			"name",
+			"asset_class",
+			"asset_name",
+			"value_kes",
+			"cost_basis_kes",
+			"quantity",
+			"ticker",
+			"date_added",
+			"currency",
+			"buying_price",
+		],
 	)
 
+	holdings = [_stack_holding_row(r) for r in rows]
 	total_value = 0.0
 	total_cost = 0.0
 	allocation: dict = {"mmf": 0.0, "real-estate": 0.0, "nse-stocks": 0.0, "global-stocks": 0.0}
 
-	for r in rows:
-		val = float(r.value_kes or 0)
-		cost = float(r.cost_basis_kes or 0)
+	for h in holdings:
+		val = float(h.get("valueKES") or 0)
+		cost = float(h.get("costAtAvgKES") or h.get("costBasisKES") or 0)
 		total_value += val
 		total_cost += cost
-		key = _ASSET_CLASS_MAP.get(r.asset_class, "mmf")
+		key = h.get("assetClass", "mmf")
 		allocation[key] += val
 
 	gain = total_value - total_cost

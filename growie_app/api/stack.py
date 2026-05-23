@@ -10,8 +10,10 @@ from frappe.utils import flt, getdate, now_datetime, today
 from growie_app.api.portfolio import (
 	_ASSET_CLASS_MAP,
 	_ASSET_CLASS_REVERSE,
+	_cost_at_avg_kes,
 	_holding_to_dict,
 	_member_name,
+	_price_gain_percent,
 	kes_per_unit_foreign,
 	_to_kes,
 	add_holding,
@@ -149,7 +151,10 @@ def _stack_holding_row(h) -> dict:
 		kpu = kes_per_unit_foreign(currency, rate_date, strict=False) if currency != "KES" else 1.0
 		current_native = current_kes / kpu if kpu > 0 else current_kes
 
-	gain_pct = ((value - cost) / cost * 100) if cost > 0 else 0
+	gain_pct = _price_gain_percent(avg_buy_native, current_native)
+	cost_at_avg = _cost_at_avg_kes(qty, avg_buy_native, currency, purchase_date)
+	unrealized_kes = value - cost_at_avg if cost_at_avg > 0 else value - cost
+
 	market = ""
 	if row.get("stockName"):
 		market = frappe.db.get_value("Growe Stock", row["stockName"], "market") or ""
@@ -161,8 +166,9 @@ def _stack_holding_row(h) -> dict:
 			),
 			"avgBuyPrice": round(avg_buy_native, 4),
 			"currentPrice": round(current_native, 4),
+			"costAtAvgKES": round(cost_at_avg, 2),
 			"gainPercent": round(gain_pct, 2),
-			"unrealizedGainKES": round(value - cost, 2),
+			"unrealizedGainKES": round(unrealized_kes, 2),
 		}
 	)
 	return row
@@ -280,12 +286,13 @@ def get_stack_overview():
 	}
 
 	for r in rows:
-		ac = _ASSET_CLASS_MAP.get(r.asset_class, "mmf")
+		row = _stack_holding_row(r)
+		ac = row.get("assetClass", "mmf")
 		if ac not in classes:
 			continue
 		classes[ac]["positions"] += 1
-		classes[ac]["valueKES"] += flt(r.value_kes)
-		classes[ac]["costKES"] += flt(r.cost_basis_kes)
+		classes[ac]["valueKES"] += flt(row.get("valueKES"))
+		classes[ac]["costKES"] += flt(row.get("costAtAvgKES") or row.get("costBasisKES"))
 
 	out = []
 	for ac in ("nse-stocks", "global-stocks", "mmf", "real-estate"):
@@ -328,7 +335,7 @@ def get_stack_class(asset_class: str):
 
 	holdings = [_stack_holding_row(r) for r in rows]
 	total_value = sum(h["valueKES"] for h in holdings)
-	total_cost = sum(h["costBasisKES"] for h in holdings)
+	total_cost = sum(h.get("costAtAvgKES") or h["costBasisKES"] for h in holdings)
 	gain = total_value - total_cost
 
 	return {
