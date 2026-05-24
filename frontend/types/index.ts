@@ -19,6 +19,10 @@ export interface Holding {
   changePercent?: number
   avgBuyPrice?: number
   currentPrice?: number
+  /** Position value in holding.currency (legacy column value_kes). */
+  valueNative?: number
+  /** Position value converted to KES for totals. */
+  valueInKES?: number
   costAtAvgKES?: number
   gainPercent?: number
   unrealizedGainKES?: number

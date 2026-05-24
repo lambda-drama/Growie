@@ -35,11 +35,27 @@ def _norm_cell(val: Any) -> str:
 
 
 def _to_float(val: Any) -> float | None:
+	"""Parse numbers from Excel/CSV cells (plain, comma-separated, or currency text)."""
 	if val is None or val == "":
 		return None
-	try:
+	if isinstance(val, bool):
+		return None
+	if isinstance(val, (int, float)):
 		return float(val)
-	except (TypeError, ValueError):
+	s = str(val).strip()
+	if not s:
+		return None
+	neg = s.startswith("(") and s.endswith(")")
+	if neg:
+		s = s[1:-1].strip()
+	s = s.replace(",", "")
+	s = re.sub(r"[^\d.\-eE]", "", s)
+	if not s or s in (".", "-", "-."):
+		return None
+	try:
+		n = float(s)
+		return -n if neg else n
+	except ValueError:
 		return None
 
 
@@ -192,20 +208,45 @@ def _fetch_spreadsheet_rows(spreadsheet_url: str) -> list[tuple]:
 	return _rows_from_csv_bytes(content)
 
 
+def _holding_meta_from_stock(stock_name: str) -> tuple[str, str]:
+	"""Return (Growe Holding asset_class, currency) from the linked Growe Stock."""
+	row = frappe.db.get_value(
+		"Growe Stock",
+		stock_name,
+		["market", "currency"],
+		as_dict=True,
+	) or {}
+	market = (row.get("market") or "Global").strip()
+	currency = (row.get("currency") or "").strip().upper()
+	asset_class = {
+		"NSE": "NSE",
+		"Global": "Global",
+		"MMF": "MMF",
+		"Real Estate": "Real Estate",
+	}.get(market, "Global")
+	if not currency:
+		currency = "KES" if market == "NSE" else "USD"
+	return asset_class, currency
+
+
 def _get_or_create_stock(raw_ticker: str, investment_hint: str) -> str:
 	clean, api_raw = _normalize_ticker(raw_ticker)
 	if not clean:
 		frappe.throw(_("Missing ticker in row."))
 
-	stock_name = frappe.db.get_value(
+	matches = frappe.get_all(
 		"Growe Stock",
-		{"ticker": clean, "market": "Global"},
-		"name",
+		filters={"ticker": clean},
+		fields=["name", "market"],
+		order_by="modified desc",
 	)
-	if not stock_name:
-		stock_name = frappe.db.get_value("Growe Stock", {"ticker": clean}, "name")
-	if stock_name:
-		return stock_name
+	if len(matches) == 1:
+		return matches[0].name
+	if len(matches) > 1:
+		for m in matches:
+			if (m.market or "").strip() == "NSE":
+				return m.name
+		return matches[0].name
 
 	company = (investment_hint or "").strip() or clean
 	base = clean
@@ -232,7 +273,7 @@ def _get_or_create_stock(raw_ticker: str, investment_hint: str) -> str:
 
 
 def _split_active_and_sold(rows: list[tuple]) -> tuple[list[tuple], list[tuple]]:
-	"""rows: all values_only rows from sheet."""
+	"""rows: all values_only rows from sheet (Scope template: data from row 3 onward)."""
 	sold_idx = None
 	for i, row in enumerate(rows):
 		if row and str(row[0] or "").strip().upper() == "SOLD STOCKS":
@@ -240,7 +281,7 @@ def _split_active_and_sold(rows: list[tuple]) -> tuple[list[tuple], list[tuple]]
 			break
 
 	active_end = sold_idx if sold_idx is not None else len(rows)
-	# Data starts after row 1 (header); row 0 may be a title row
+	# Row 0 may be a title row; row 1 is headers — data starts at index 2
 	start = 2
 	active_rows: list[tuple] = []
 	for r in range(start, active_end):
@@ -249,10 +290,9 @@ def _split_active_and_sold(rows: list[tuple]) -> tuple[list[tuple], list[tuple]]
 			continue
 		if str(row[0] or "").strip().upper() == "SOLD STOCKS":
 			break
-		# Skip summary / blank blocks
-		if row[0] is None and row[2] is None:
+		if row[0] is None and len(row) > 2 and row[2] is None:
 			continue
-		if row[2] is None or str(row[2]).strip() == "":
+		if len(row) <= 2 or row[2] is None or str(row[2]).strip() == "":
 			continue
 		active_rows.append(row)
 
@@ -263,7 +303,7 @@ def _split_active_and_sold(rows: list[tuple]) -> tuple[list[tuple], list[tuple]]
 			row = rows[r]
 			if not row:
 				continue
-			if row[2] is None or str(row[2]).strip() == "":
+			if len(row) <= 2 or row[2] is None or str(row[2]).strip() == "":
 				continue
 			sold_rows.append(row)
 
@@ -294,28 +334,45 @@ def _holding_amounts_as_uploaded(
 	return float(current_value or 0), float(initial_investment or 0)
 
 
+def _row_val(row: tuple, index: int) -> Any:
+	return row[index] if index < len(row) else None
+
+
 def _insert_holding(
 	investor: str,
 	asset_name: str,
 	ticker_symbol: str,
 	row: tuple,
 	*,
+	asset_class: str,
+	currency: str,
 	sold: bool,
 	use_date: str,
 	sold_date: str | None,
 ) -> None:
-	broker = _norm_cell(row[3])
-	shares = _to_float(row[4])
-	buy_px = _to_float(row[5])
-	cur_px = _to_float(row[6])
-	init_inv = _to_float(row[7])
-	cur_val = _to_float(row[8])
-	delta_v = _to_float(row[9])
-	pct = _percent_from_excel(row[10])
-	owner = _norm_cell(row[11])
-	goal = _norm_cell(row[12])
+	# Scope template columns: 0=date, 1=investment, 2=ticker, 3=broker, 4=shares, 5=buy, …
+	broker = _norm_cell(_row_val(row, 3))
+	shares = _to_float(_row_val(row, 4))
+	buy_px = _to_float(_row_val(row, 5))
+	cur_px = _to_float(_row_val(row, 6))
+	init_inv = _to_float(_row_val(row, 7))
+	cur_val = _to_float(_row_val(row, 8))
+	delta_v = _to_float(_row_val(row, 9))
+	pct = _percent_from_excel(_row_val(row, 10))
+	owner = _norm_cell(_row_val(row, 11))
+	goal = _norm_cell(_row_val(row, 12))
+
+	qty = shares if shares is not None else 0.0
+	if (buy_px is None or buy_px <= 0) and qty > 0 and init_inv:
+		buy_px = init_inv / qty
+	if (cur_px is None or cur_px <= 0) and qty > 0 and cur_val:
+		cur_px = cur_val / qty
 
 	value_kes, cost_kes = _holding_amounts_as_uploaded(cur_val, init_inv)
+	if cost_kes <= 0 and buy_px and qty > 0:
+		cost_kes = buy_px * qty
+	if value_kes <= 0 and cur_px and qty > 0:
+		value_kes = cur_px * qty
 
 	notes_parts = []
 	if owner:
@@ -328,17 +385,17 @@ def _insert_holding(
 	doc_dict: dict = {
 		"doctype": "Growe Holding",
 		"investor": investor,
-		"asset_class": "Global",
+		"asset_class": asset_class,
 		"asset_name": asset_name,
 		"ticker": ticker_symbol,
-		"currency": "USD",
-		"quantity": shares or 0,
+		"currency": currency,
+		"quantity": qty,
 		"value_kes": value_kes,
 		"cost_basis_kes": cost_kes,
 		"date_added": getdate(use_date),
 		"broker": broker[:140] if broker else "",
 		"initial_investment_value": init_inv or 0,
-		"share_breakdown": shares,
+		"share_breakdown": qty,
 		"buying_price": buy_px or 0,
 		"current_price": cur_px or 0,
 		"delta": delta_v or 0,
@@ -386,18 +443,21 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 	errors: list[str] = []
 	for i, row in enumerate(active_rows):
 		try:
-			investment = _norm_cell(row[1]) or _norm_cell(row[2])
-			raw_tk = _norm_cell(row[2])
-			use_date = _parse_date_cell(row[0])
+			investment = _norm_cell(_row_val(row, 1)) or _norm_cell(_row_val(row, 2))
+			raw_tk = _norm_cell(_row_val(row, 2))
+			use_date = _parse_date_cell(_row_val(row, 0))
 
 			stock_doc = _get_or_create_stock(raw_tk, investment)
 			ticker_sym = frappe.db.get_value("Growe Stock", stock_doc, "ticker") or raw_tk
+			asset_class, currency = _holding_meta_from_stock(stock_doc)
 
 			_insert_holding(
 				investor,
 				stock_doc,
 				ticker_sym,
 				row,
+				asset_class=asset_class,
+				currency=currency,
 				sold=False,
 				use_date=use_date,
 				sold_date=None,
@@ -412,9 +472,9 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 
 	for j, row in enumerate(sold_rows):
 		try:
-			raw_tk = _norm_cell(row[2])
-			use_date = _parse_date_cell(row[0])
-			sell_raw = row[1]
+			raw_tk = _norm_cell(_row_val(row, 2))
+			use_date = _parse_date_cell(_row_val(row, 0))
+			sell_raw = _row_val(row, 1)
 			if isinstance(sell_raw, datetime):
 				sold_date = sell_raw.date().isoformat()
 			elif isinstance(sell_raw, date):
@@ -425,12 +485,15 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 
 			stock_doc = _get_or_create_stock(raw_tk, "")
 			ticker_sym = frappe.db.get_value("Growe Stock", stock_doc, "ticker") or raw_tk
+			asset_class, currency = _holding_meta_from_stock(stock_doc)
 
 			_insert_holding(
 				investor,
 				stock_doc,
 				ticker_sym,
 				row,
+				asset_class=asset_class,
+				currency=currency,
 				sold=True,
 				use_date=use_date,
 				sold_date=sold_date,

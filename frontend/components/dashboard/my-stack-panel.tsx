@@ -10,7 +10,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import { useAppStore, useDisplayMoney } from '@/lib/store'
-import { formatCurrency, formatPercentage, getAssetClassColorHex } from '@/lib/format'
+import { formatCurrency, formatHoldingMoney, formatHoldingPositionValue, formatPercentage, getAssetClassColorHex } from '@/lib/format'
 import { groupByAssetClass, type AssetClassGroup } from '@/lib/dashboard-data'
 import type { Holding } from '@/types'
 import { cn } from '@/lib/utils'
@@ -27,7 +27,7 @@ function AssetClassRow({
   onOpenClass: (assetClass: AssetClassGroup['assetClass']) => void
 }) {
   const [open, setOpen] = useState(false)
-  const { currency, kesToDisplayMultiplier } = useDisplayMoney()
+  const { currency, kesToDisplayMultiplier, kesPerUsd } = useDisplayMoney()
   const positive = group.gainPercent >= 0
 
   return (
@@ -87,7 +87,11 @@ function AssetClassRow({
                 </span>
                 <span className="shrink-0 text-right">
                   <span className="block font-medium">
-                    {formatCurrency(h.valueKES, currency, { kesToDisplayMultiplier, compact: true })}
+                    {formatHoldingPositionValue(h, currency, {
+                      kesToDisplayMultiplier,
+                      kesPerUsd,
+                      compact: true,
+                    })}
                   </span>
                   <span
                     className={cn(

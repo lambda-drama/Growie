@@ -12,7 +12,9 @@ from growie_app.api.portfolio import (
 	_ASSET_CLASS_REVERSE,
 	_cost_at_avg_kes,
 	_holding_to_dict,
+	is_open_holding,
 	_member_name,
+	open_holding_db_filters,
 	_price_gain_percent,
 	kes_per_unit_foreign,
 	_to_kes,
@@ -36,13 +38,15 @@ def _member_holding_tickers_by_market(
 	Split the member's open holdings into NSE vs Global ticker lists for live price fetch.
 	Optional asset_class (frontend slug) or holding_name scopes the set.
 	"""
-	filters = {"investor": member, "sold": 0}
-	if holding_name:
-		filters["name"] = holding_name
-	elif asset_class:
+	ac_label = None
+	if asset_class:
 		ac_label = _ASSET_CLASS_REVERSE.get(asset_class, asset_class)
-		if ac_label in _ASSET_CLASS_MAP:
-			filters["asset_class"] = ac_label
+		if ac_label not in _ASSET_CLASS_MAP:
+			ac_label = None
+
+	filters = open_holding_db_filters(member, ac_label)
+	if holding_name:
+		filters.append(["name", "=", holding_name])
 
 	rows = frappe.get_all(
 		"Growe Holding",
@@ -120,44 +124,64 @@ def _price_in_currency(ticker: str, currency: str, on_date: str) -> float:
 def _stack_holding_row(h) -> dict:
 	row = _holding_to_dict(h)
 	qty = float(row.get("quantity") or 0)
-	cost = float(row.get("costBasisKES") or 0)
-	value = float(row.get("valueKES") or 0)
+	# Legacy field names: amounts follow ``holding.currency`` (often USD from Excel import).
+	cost_native = float(row.get("costBasisKES") or 0)
+	value_native = float(row.get("valueKES") or 0)
 	currency = (row.get("currency") or "USD").upper()
-	# Mark-to-market / UI uses today's rate — not purchase date (stale_days often excludes old dates).
 	rate_date = str(today())
 	purchase_date = str(row.get("dateAdded") or today())
 
-	avg_buy_kes = (cost / qty) if qty > 0 else 0
-	current_kes = (value / qty) if qty > 0 else float(row.get("currentPriceKES") or 0)
-
-	# Prefer stored buying_price on doc when set
 	if isinstance(h, dict):
 		bp = flt(h.get("buying_price"))
+		stored_current = flt(h.get("current_price"))
 	else:
 		bp = flt(getattr(h, "buying_price", None))
+		stored_current = flt(getattr(h, "current_price", None))
+
+	avg_buy_native = (cost_native / qty) if qty > 0 else 0
 	if bp > 0:
 		avg_buy_native = bp
-	else:
-		kpu = kes_per_unit_foreign(currency, purchase_date, strict=False) if currency != "KES" else 1.0
-		if currency == "KES":
-			avg_buy_native = avg_buy_kes
-		elif kpu > 0:
-			avg_buy_native = avg_buy_kes / kpu
-		else:
-			avg_buy_native = 0
 
 	current_native = _price_in_currency(row.get("ticker") or "", currency, rate_date)
-	if current_native <= 0 and qty > 0:
-		kpu = kes_per_unit_foreign(currency, rate_date, strict=False) if currency != "KES" else 1.0
-		current_native = current_kes / kpu if kpu > 0 else current_kes
+	if current_native <= 0 and stored_current > 0:
+		current_native = stored_current
+	if current_native <= 0 and qty > 0 and value_native > 0:
+		current_native = value_native / qty
+
+	# Prefer market value in holding currency (stored value_kes may be KES after price refresh).
+	if current_native > 0 and qty > 0:
+		value_native = current_native * qty
+	elif value_native <= 0 and qty > 0:
+		if current_native > 0:
+			value_native = current_native * qty
+		elif stored_current > 0:
+			value_native = stored_current * qty
+			if current_native <= 0:
+				current_native = stored_current
+		elif avg_buy_native > 0:
+			value_native = avg_buy_native * qty
+
+	value_in_kes = (
+		value_native
+		if currency == "KES"
+		else _to_kes(value_native, currency, rate_date, strict=False)
+	)
 
 	gain_pct = _price_gain_percent(avg_buy_native, current_native)
 	cost_at_avg = _cost_at_avg_kes(qty, avg_buy_native, currency, purchase_date)
-	unrealized_kes = value - cost_at_avg if cost_at_avg > 0 else value - cost
+	unrealized_kes = value_in_kes - cost_at_avg if cost_at_avg > 0 else value_in_kes - (
+		_to_kes(cost_native, currency, rate_date, strict=False) if currency != "KES" else cost_native
+	)
 
 	market = ""
 	if row.get("stockName"):
 		market = frappe.db.get_value("Growe Stock", row["stockName"], "market") or ""
+
+	if currency != "KES" and value_in_kes <= 0 and value_native > 0:
+		from growie_app.api.portfolio import _growe_usd_to_kes_fallback
+
+		if currency == "USD":
+			value_in_kes = value_native * _growe_usd_to_kes_fallback()
 
 	row.update(
 		{
@@ -166,6 +190,9 @@ def _stack_holding_row(h) -> dict:
 			),
 			"avgBuyPrice": round(avg_buy_native, 4),
 			"currentPrice": round(current_native, 4),
+			"valueNative": round(value_native, 2),
+			"valueInKES": round(value_in_kes, 2),
+			"valueKES": round(value_native, 2),
 			"costAtAvgKES": round(cost_at_avg, 2),
 			"gainPercent": round(gain_pct, 2),
 			"unrealizedGainKES": round(unrealized_kes, 2),
@@ -263,7 +290,7 @@ def get_stack_overview():
 	member = _member_name()
 	rows = frappe.get_all(
 		"Growe Holding",
-		filters={"investor": member, "sold": 0},
+		filters=open_holding_db_filters(member),
 		fields=[
 			"name",
 			"asset_class",
@@ -275,6 +302,7 @@ def get_stack_overview():
 			"currency",
 			"date_added",
 			"buying_price",
+			"sold",
 		],
 	)
 
@@ -291,7 +319,7 @@ def get_stack_overview():
 		if ac not in classes:
 			continue
 		classes[ac]["positions"] += 1
-		classes[ac]["valueKES"] += flt(row.get("valueKES"))
+		classes[ac]["valueKES"] += flt(row.get("valueInKES") or row.get("valueKES"))
 		classes[ac]["costKES"] += flt(row.get("costAtAvgKES") or row.get("costBasisKES"))
 
 	out = []
@@ -315,7 +343,7 @@ def get_stack_class(asset_class: str):
 
 	rows = frappe.get_all(
 		"Growe Holding",
-		filters={"investor": member, "asset_class": ac_label, "sold": 0},
+		filters=open_holding_db_filters(member, ac_label),
 		fields=[
 			"name",
 			"asset_class",
@@ -334,7 +362,7 @@ def get_stack_class(asset_class: str):
 	)
 
 	holdings = [_stack_holding_row(r) for r in rows]
-	total_value = sum(h["valueKES"] for h in holdings)
+	total_value = sum(h.get("valueInKES") or h["valueKES"] for h in holdings)
 	total_cost = sum(h.get("costAtAvgKES") or h["costBasisKES"] for h in holdings)
 	gain = total_value - total_cost
 
@@ -383,6 +411,8 @@ def get_stack_position(holding_name: str):
 		],
 		as_dict=True,
 	)
+	if not row or not is_open_holding(row):
+		frappe.throw(_("This position has been fully sold."), frappe.DoesNotExistError)
 	holding = _stack_holding_row(row)
 	txns = frappe.get_all(
 		"Growe Holding Transaction",
@@ -614,6 +644,8 @@ def record_sell(
 	member = _member_name()
 	_assert_holding_owner(holding_name, member)
 	doc = frappe.get_doc("Growe Holding", holding_name)
+	if not is_open_holding(doc):
+		frappe.throw(_("This position is already fully sold."))
 
 	qty = flt(quantity)
 	if qty <= 0:

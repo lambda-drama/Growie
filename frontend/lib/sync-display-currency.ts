@@ -17,9 +17,16 @@ function persistDisplayCurrencyCode(code: string) {
 /** Updates global display currency + base(KES)→display multiplier (ERPNext rates). Persists choice locally. */
 export async function syncDisplayCurrencyFromCode(code: string): Promise<void> {
   const c = (code || 'USD').toUpperCase().trim()
-  const { setCurrency, setKesToDisplayMultiplier } = useAppStore.getState()
+  const { setCurrency, setKesToDisplayMultiplier, setKesPerUsd } = useAppStore.getState()
   setCurrency(c)
   persistDisplayCurrencyCode(c)
+
+  try {
+    const kpu = await getExchangeRate('KES', 'USD')
+    setKesPerUsd(typeof kpu === 'number' && kpu > 0 ? kpu : 130)
+  } catch {
+    setKesPerUsd(130)
+  }
 
   if (c === 'KES') {
     setKesToDisplayMultiplier(1)

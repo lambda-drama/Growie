@@ -11,6 +11,7 @@ from growie_app.api.portfolio import (
 	_holding_to_dict,
 	_member_name,
 	get_portfolio_summary,
+	open_holding_db_filters,
 )
 from growie_app.api.goals import get_goals
 
@@ -74,7 +75,7 @@ def _build_dashboard_html(member: str) -> str:
 	summary = get_portfolio_summary()
 	holdings = frappe.get_all(
 		"Growe Holding",
-		filters={"investor": member, "sold": 0},
+		filters=open_holding_db_filters(member),
 		fields=["name", "asset_class", "asset_name", "value_kes", "cost_basis_kes", "ticker"],
 		order_by="value_kes desc",
 		limit=10,
@@ -127,7 +128,7 @@ def _build_dashboard_html(member: str) -> str:
 def _build_portfolio_html(member: str) -> str:
 	rows = frappe.get_all(
 		"Growe Holding",
-		filters={"investor": member, "sold": 0},
+		filters=open_holding_db_filters(member),
 		fields=[
 			"name",
 			"asset_class",
@@ -219,7 +220,7 @@ def _build_goals_html(member: str) -> str:
 def _build_tax_html(member: str) -> str:
 	rows = frappe.get_all(
 		"Growe Holding",
-		filters={"investor": member, "sold": 0},
+		filters=open_holding_db_filters(member),
 		fields=["asset_name", "ticker", "value_kes", "cost_basis_kes", "asset_class"],
 	)
 	total_gain = 0.0

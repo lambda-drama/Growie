@@ -44,7 +44,7 @@ interface TradeDialogProps {
   mode: TradeMode
   holding?: StackHolding | null
   defaultAssetClass?: AssetClass
-  onSuccess: () => void
+  onSuccess?: (result?: { fullySold?: boolean }) => void
 }
 
 export function TradeDialog({
@@ -142,7 +142,7 @@ export function TradeDialog({
     try {
       const assetName = await resolveAssetName()
       if (isSell && holding) {
-        await recordSell({
+        const sellResult = await recordSell({
           holdingId: holding.id,
           quantity: qty,
           unitPrice: price > 0 ? price : undefined,
@@ -150,6 +150,10 @@ export function TradeDialog({
           notes,
           reference,
         })
+        const fullySold = (sellResult.holding?.quantity ?? 0) <= 0
+        onSuccess?.({ fullySold })
+        onOpenChange(false)
+        return
       } else {
         await recordBuy({
           holdingId: holding?.id,
@@ -163,7 +167,7 @@ export function TradeDialog({
           reference,
         })
       }
-      onSuccess()
+      onSuccess?.()
       onOpenChange(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save')

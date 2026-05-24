@@ -48,7 +48,7 @@ export function groupByAssetClass(holdings: Holding[]): AssetClassGroup[] {
 
   return ASSET_CLASS_ORDER.map((assetClass) => {
     const list = map.get(assetClass) ?? []
-    const totalValueKES = list.reduce((s, h) => s + h.valueKES, 0)
+    const totalValueKES = list.reduce((s, h) => s + (h.valueInKES ?? h.valueKES), 0)
     const totalCostKES = list.reduce(
       (s, h) => s + (h.costAtAvgKES ?? h.costBasisKES),
       0
@@ -95,7 +95,8 @@ export function computeDashboardMetrics(
   summary: PortfolioSummary | null
 ): DashboardMetrics {
   const totalValueKES =
-    summary?.totalValueKES ?? holdings.reduce((s, h) => s + h.valueKES, 0)
+    summary?.totalValueKES ??
+    holdings.reduce((s, h) => s + (h.valueInKES ?? h.valueKES), 0)
   const totalCostKES =
     summary?.totalCostKES ??
     holdings.reduce((s, h) => s + (h.costAtAvgKES ?? h.costBasisKES), 0)
