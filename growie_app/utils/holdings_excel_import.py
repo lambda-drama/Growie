@@ -192,20 +192,45 @@ def _fetch_spreadsheet_rows(spreadsheet_url: str) -> list[tuple]:
 	return _rows_from_csv_bytes(content)
 
 
+def _holding_meta_from_stock(stock_name: str) -> tuple[str, str]:
+	"""Return (Growe Holding asset_class, currency) from the linked Growe Stock."""
+	row = frappe.db.get_value(
+		"Growe Stock",
+		stock_name,
+		["market", "currency"],
+		as_dict=True,
+	) or {}
+	market = (row.get("market") or "Global").strip()
+	currency = (row.get("currency") or "").strip().upper()
+	asset_class = {
+		"NSE": "NSE",
+		"Global": "Global",
+		"MMF": "MMF",
+		"Real Estate": "Real Estate",
+	}.get(market, "Global")
+	if not currency:
+		currency = "KES" if market == "NSE" else "USD"
+	return asset_class, currency
+
+
 def _get_or_create_stock(raw_ticker: str, investment_hint: str) -> str:
 	clean, api_raw = _normalize_ticker(raw_ticker)
 	if not clean:
 		frappe.throw(_("Missing ticker in row."))
 
-	stock_name = frappe.db.get_value(
+	matches = frappe.get_all(
 		"Growe Stock",
-		{"ticker": clean, "market": "Global"},
-		"name",
+		filters={"ticker": clean},
+		fields=["name", "market"],
+		order_by="modified desc",
 	)
-	if not stock_name:
-		stock_name = frappe.db.get_value("Growe Stock", {"ticker": clean}, "name")
-	if stock_name:
-		return stock_name
+	if len(matches) == 1:
+		return matches[0].name
+	if len(matches) > 1:
+		for m in matches:
+			if (m.market or "").strip() == "NSE":
+				return m.name
+		return matches[0].name
 
 	company = (investment_hint or "").strip() or clean
 	base = clean
@@ -300,6 +325,8 @@ def _insert_holding(
 	ticker_symbol: str,
 	row: tuple,
 	*,
+	asset_class: str,
+	currency: str,
 	sold: bool,
 	use_date: str,
 	sold_date: str | None,
@@ -328,10 +355,10 @@ def _insert_holding(
 	doc_dict: dict = {
 		"doctype": "Growe Holding",
 		"investor": investor,
-		"asset_class": "Global",
+		"asset_class": asset_class,
 		"asset_name": asset_name,
 		"ticker": ticker_symbol,
-		"currency": "USD",
+		"currency": currency,
 		"quantity": shares or 0,
 		"value_kes": value_kes,
 		"cost_basis_kes": cost_kes,
@@ -392,12 +419,15 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 
 			stock_doc = _get_or_create_stock(raw_tk, investment)
 			ticker_sym = frappe.db.get_value("Growe Stock", stock_doc, "ticker") or raw_tk
+			asset_class, currency = _holding_meta_from_stock(stock_doc)
 
 			_insert_holding(
 				investor,
 				stock_doc,
 				ticker_sym,
 				row,
+				asset_class=asset_class,
+				currency=currency,
 				sold=False,
 				use_date=use_date,
 				sold_date=None,
@@ -425,12 +455,15 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 
 			stock_doc = _get_or_create_stock(raw_tk, "")
 			ticker_sym = frappe.db.get_value("Growe Stock", stock_doc, "ticker") or raw_tk
+			asset_class, currency = _holding_meta_from_stock(stock_doc)
 
 			_insert_holding(
 				investor,
 				stock_doc,
 				ticker_sym,
 				row,
+				asset_class=asset_class,
+				currency=currency,
 				sold=True,
 				use_date=use_date,
 				sold_date=sold_date,

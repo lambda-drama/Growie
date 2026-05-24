@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus, RefreshCcw } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Plus, RefreshCcw, Search, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
@@ -32,12 +33,37 @@ interface StackClassViewProps {
   onOpenPosition: (holdingId: string) => void
 }
 
+function filterHoldingsByQuery(holdings: StackHolding[], query: string): StackHolding[] {
+  const q = query.trim().toLowerCase()
+  if (!q) return holdings
+  return holdings.filter((h) => {
+    const ticker = (h.ticker || '').toLowerCase()
+    const name = (h.name || '').toLowerCase()
+    const tag = (h.marketTag || '').toLowerCase()
+    return ticker.includes(q) || name.includes(q) || tag.includes(q)
+  })
+}
+
 export function StackClassView({ assetClass, onBack, onOpenPosition }: StackClassViewProps) {
   const { detail, isLoading, error, refresh, reload } = useStackClass(assetClass)
   const { currency, kesToDisplayMultiplier } = useDisplayMoney()
   const [tradeOpen, setTradeOpen] = useState(false)
   const [tradeMode, setTradeMode] = useState<TradeMode>('buy-new')
   const [activeHolding, setActiveHolding] = useState<StackHolding | null>(null)
+  const [positionSearch, setPositionSearch] = useState('')
+
+  const showPositionSearch =
+    assetClass === 'nse-stocks' || assetClass === 'global-stocks'
+
+  useEffect(() => {
+    setPositionSearch('')
+  }, [assetClass])
+
+  const allHoldings = detail?.holdings ?? []
+  const filteredHoldings = useMemo(
+    () => filterHoldingsByQuery(allHoldings, positionSearch),
+    [allHoldings, positionSearch]
+  )
 
   const openTrade = (mode: TradeMode, holding?: StackHolding) => {
     setTradeMode(mode)
@@ -104,28 +130,74 @@ export function StackClassView({ assetClass, onBack, onOpenPosition }: StackClas
             positions={summary.positions}
           />
 
+          {showPositionSearch && allHoldings.length > 0 && (
+            <div className="relative max-w-md">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                value={positionSearch}
+                onChange={(e) => setPositionSearch(e.target.value)}
+                placeholder="Search by ticker or company name…"
+                className="h-10 pl-9 pr-9"
+                aria-label="Search positions"
+              />
+              {positionSearch ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
+                  onClick={() => setPositionSearch('')}
+                  aria-label="Clear search"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              ) : null}
+              {positionSearch.trim() && (
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  {filteredHoldings.length === 0
+                    ? 'No positions match your search.'
+                    : `${filteredHoldings.length} of ${allHoldings.length} position${
+                        allHoldings.length === 1 ? '' : 's'
+                      }`}
+                </p>
+              )}
+            </div>
+          )}
+
           <StackHoldingsCards
-            holdings={detail?.holdings ?? []}
+            holdings={filteredHoldings}
             currency={currency}
             kesToDisplayMultiplier={kesToDisplayMultiplier}
             onOpenPosition={onOpenPosition}
             onBuy={(h) => openTrade('buy-more', h)}
             onSell={(h) => openTrade('sell', h)}
+            emptyMessage={
+              allHoldings.length > 0 && positionSearch.trim()
+                ? `No positions match "${positionSearch.trim()}".`
+                : undefined
+            }
             emptyActions={
-              showBulkImport ? (
-                <>
-                  <StackExcelBulkImport onSuccess={reload} disabled={isLoading} />
+              allHoldings.length === 0 ? (
+                showBulkImport ? (
+                  <>
+                    <StackExcelBulkImport onSuccess={reload} disabled={isLoading} />
+                    <Button size="sm" className="gap-2" onClick={() => openTrade('buy-new')}>
+                      <Plus className="h-4 w-4" />
+                      Add position
+                    </Button>
+                  </>
+                ) : (
                   <Button size="sm" className="gap-2" onClick={() => openTrade('buy-new')}>
                     <Plus className="h-4 w-4" />
                     Add position
                   </Button>
-                </>
-              ) : (
-                <Button size="sm" className="gap-2" onClick={() => openTrade('buy-new')}>
-                  <Plus className="h-4 w-4" />
-                  Add position
+                )
+              ) : positionSearch.trim() && filteredHoldings.length === 0 ? (
+                <Button size="sm" variant="outline" onClick={() => setPositionSearch('')}>
+                  Clear search
                 </Button>
-              )
+              ) : undefined
             }
           />
 
@@ -142,7 +214,7 @@ export function StackClassView({ assetClass, onBack, onOpenPosition }: StackClas
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(detail?.holdings ?? []).length === 0 ? (
+                {allHoldings.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="py-12 text-center">
                       <p className="text-muted-foreground">No positions in this class yet.</p>
@@ -157,8 +229,24 @@ export function StackClassView({ assetClass, onBack, onOpenPosition }: StackClas
                       </div>
                     </TableCell>
                   </TableRow>
+                ) : filteredHoldings.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-12 text-center">
+                      <p className="text-muted-foreground">
+                        No positions match &ldquo;{positionSearch.trim()}&rdquo;.
+                      </p>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="mt-2"
+                        onClick={() => setPositionSearch('')}
+                      >
+                        Clear search
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                 ) : (
-                  detail?.holdings.map((h) => {
+                  filteredHoldings.map((h) => {
                     const positive = h.gainPercent >= 0
                     return (
                       <TableRow

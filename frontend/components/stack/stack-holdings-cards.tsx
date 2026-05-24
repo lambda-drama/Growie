@@ -17,6 +17,8 @@ interface StackHoldingsCardsProps {
   onSell: (h: StackHolding) => void
   /** Shown under the empty message on mobile (e.g. Bulk + Add position). */
   emptyActions?: ReactNode
+  /** Override default empty copy (e.g. no search matches). */
+  emptyMessage?: string
 }
 
 /** Mobile-friendly holding rows (table used from md+). */
@@ -28,11 +30,12 @@ export function StackHoldingsCards({
   onBuy,
   onSell,
   emptyActions,
+  emptyMessage,
 }: StackHoldingsCardsProps) {
   if (holdings.length === 0) {
     return (
       <div className="rounded-xl border border-dashed py-12 text-center text-sm text-muted-foreground md:hidden">
-        <p>No positions in this class yet.</p>
+        <p>{emptyMessage ?? 'No positions in this class yet.'}</p>
         {emptyActions ? (
           <div className="mt-4 flex flex-wrap justify-center gap-2">{emptyActions}</div>
         ) : null}
