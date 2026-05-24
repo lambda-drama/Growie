@@ -19,7 +19,13 @@ import { StackBreadcrumb } from '@/components/stack/stack-breadcrumb'
 import { TradeDialog, type TradeMode } from '@/components/stack/trade-dialog'
 import { useStackPosition } from '@/hooks/use-stack'
 import { useDisplayMoney } from '@/lib/store'
-import { formatCurrency, formatCurrencyNative, formatPercentage } from '@/lib/format'
+import {
+  effectiveAvgBuyNative,
+  formatCurrency,
+  formatHoldingMoney,
+  formatHoldingPositionValue,
+  formatPercentage,
+} from '@/lib/format'
 import type { AssetClass } from '@/types'
 import { STACK_BUY_BUTTON_CLASS, STACK_SELL_BUTTON_CLASS, stackTradeBadgeClass } from '@/lib/stack-ui'
 import { cn } from '@/lib/utils'
@@ -47,7 +53,7 @@ export function StackPositionView({
   onBackClass,
 }: StackPositionViewProps) {
   const { detail, isLoading, error, refresh } = useStackPosition(holdingId)
-  const { currency, kesToDisplayMultiplier } = useDisplayMoney()
+  const { currency, kesToDisplayMultiplier, kesPerUsd } = useDisplayMoney()
   const [tradeOpen, setTradeOpen] = useState(false)
   const [tradeMode, setTradeMode] = useState<TradeMode>('buy-more')
 
@@ -130,7 +136,12 @@ export function StackPositionView({
               <CardContent className="p-4">
                 <p className="text-xs text-muted-foreground">Avg buy</p>
                 <p className="mt-1 text-lg font-semibold tabular-nums">
-                  {formatCurrencyNative(holding.avgBuyPrice, (holding.currency || 'USD') as 'USD')}
+                  {formatHoldingMoney(
+                    effectiveAvgBuyNative(holding),
+                    (holding.currency || 'USD') as 'USD',
+                    currency,
+                    { kesToDisplayMultiplier, kesPerUsd }
+                  )}
                 </p>
               </CardContent>
             </Card>
@@ -138,7 +149,10 @@ export function StackPositionView({
               <CardContent className="p-4">
                 <p className="text-xs text-muted-foreground">Current price</p>
                 <p className="mt-1 text-lg font-semibold tabular-nums">
-                  {formatCurrencyNative(holding.currentPrice, (holding.currency || 'USD') as 'USD')}
+                  {formatHoldingMoney(holding.currentPrice, (holding.currency || 'USD') as 'USD', currency, {
+                    kesToDisplayMultiplier,
+                    kesPerUsd,
+                  })}
                 </p>
               </CardContent>
             </Card>
@@ -146,7 +160,10 @@ export function StackPositionView({
               <CardContent className="p-4">
                 <p className="text-xs text-muted-foreground">Value</p>
                 <p className="mt-1 text-lg font-semibold tabular-nums">
-                  {formatCurrency(holding.valueKES, currency, { kesToDisplayMultiplier })}
+                  {formatHoldingPositionValue(holding, currency, {
+                    kesToDisplayMultiplier,
+                    kesPerUsd,
+                  })}
                 </p>
                 <p
                   className={cn(
@@ -198,7 +215,10 @@ export function StackPositionView({
                         </TableCell>
                         <TableCell className="text-right tabular-nums">{tx.quantity.toLocaleString()}</TableCell>
                         <TableCell className="text-right tabular-nums hidden sm:table-cell">
-                          {formatCurrencyNative(tx.unitPrice, (tx.currency || 'USD') as 'USD')}
+                          {formatHoldingMoney(tx.unitPrice, (tx.currency || 'USD') as 'USD', currency, {
+                            kesToDisplayMultiplier,
+                            kesPerUsd,
+                          })}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {formatCurrency(tx.amountKES, currency, { kesToDisplayMultiplier })}
@@ -219,7 +239,13 @@ export function StackPositionView({
         mode={tradeMode}
         holding={holding ?? null}
         defaultAssetClass={assetClass}
-        onSuccess={refresh}
+        onSuccess={({ fullySold } = {}) => {
+          if (fullySold) {
+            onBackClass()
+            return
+          }
+          void refresh()
+        }}
       />
     </div>
   )

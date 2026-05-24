@@ -33,6 +33,29 @@ _ASSET_CLASS_MAP = {
 _ASSET_CLASS_REVERSE = {v: k for k, v in _ASSET_CLASS_MAP.items()}
 
 
+def open_holding_db_filters(investor: str, asset_class_label: str | None = None) -> list:
+	"""Frappe filters for open positions (shown in UI totals and lists)."""
+	filters = [
+		["investor", "=", investor],
+		["sold", "=", 0],
+		["quantity", ">", 0],
+	]
+	if asset_class_label:
+		filters.append(["asset_class", "=", asset_class_label])
+	return filters
+
+
+def is_open_holding(doc) -> bool:
+	"""True when the position is not fully sold and still has quantity."""
+	if isinstance(doc, dict):
+		sold = int(doc.get("sold") or 0)
+		qty = flt(doc.get("quantity"))
+	else:
+		sold = int(getattr(doc, "sold", None) or 0)
+		qty = flt(getattr(doc, "quantity", None))
+	return sold == 0 and qty > 0
+
+
 def _holding_to_dict(h) -> dict:
 	"""Convert a Frappe Growe Holding row to the frontend shape."""
 	# Resolve ticker and display name from the linked Growe Stock
@@ -392,7 +415,7 @@ def get_holdings():
 	member = _member_name()
 	rows = frappe.get_all(
 		"Growe Holding",
-		filters={"investor": member},
+		filters=open_holding_db_filters(member),
 		fields=[
 			"name",
 			"asset_class",
@@ -406,6 +429,7 @@ def get_holdings():
 			"notes",
 			"currency",
 			"buying_price",
+			"sold",
 		],
 		order_by="date_added desc",
 	)
@@ -422,7 +446,7 @@ def get_portfolio_summary():
 	member = _member_name()
 	rows = frappe.get_all(
 		"Growe Holding",
-		filters={"investor": member},
+		filters=open_holding_db_filters(member),
 		fields=[
 			"name",
 			"asset_class",
@@ -434,6 +458,7 @@ def get_portfolio_summary():
 			"date_added",
 			"currency",
 			"buying_price",
+			"sold",
 		],
 	)
 
@@ -443,7 +468,7 @@ def get_portfolio_summary():
 	allocation: dict = {"mmf": 0.0, "real-estate": 0.0, "nse-stocks": 0.0, "global-stocks": 0.0}
 
 	for h in holdings:
-		val = float(h.get("valueKES") or 0)
+		val = float(h.get("valueInKES") or h.get("valueKES") or 0)
 		cost = float(h.get("costAtAvgKES") or h.get("costBasisKES") or 0)
 		total_value += val
 		total_cost += cost
@@ -466,7 +491,7 @@ def get_portfolio_summary():
 		"gainKES": round(gain, 2),
 		"gain": round(gain, 2),  # forward-compatible alias
 		"gainPercent": round(gain_percent, 2),
-		"holdingsCount": len(rows),
+		"holdingsCount": len(holdings),
 		"allocation": allocation,
 		"allocationPercent": alloc_pct,
 	}

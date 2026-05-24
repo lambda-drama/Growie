@@ -15,6 +15,9 @@ interface AppState {
   /** Multiply portfolio amounts stored in KES for Intl display (from ERPNext). */
   kesToDisplayMultiplier: number
   setKesToDisplayMultiplier: (n: number) => void
+  /** 1 USD = X KES (ERPNext rate) — for converting per-share USD prices. */
+  kesPerUsd: number
+  setKesPerUsd: (n: number) => void
   subscriptionTier: SubscriptionTier
   setSubscriptionTier: (tier: SubscriptionTier) => void
 
@@ -71,6 +74,8 @@ export const useAppStore = create<AppState>((set) => ({
   setCurrency: (currency) => set({ currency }),
   kesToDisplayMultiplier: 1,
   setKesToDisplayMultiplier: (n) => set({ kesToDisplayMultiplier: n }),
+  kesPerUsd: 130,
+  setKesPerUsd: (n) => set({ kesPerUsd: n }),
   subscriptionTier: 'free',
   setSubscriptionTier: (tier) => set({ subscriptionTier: tier }),
 
@@ -128,6 +133,7 @@ export function useDisplayMoney() {
     useShallow((s) => ({
       currency: s.currency,
       kesToDisplayMultiplier: s.kesToDisplayMultiplier,
+      kesPerUsd: s.kesPerUsd,
     }))
   )
 }

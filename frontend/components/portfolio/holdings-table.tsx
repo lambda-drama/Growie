@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/collapsible'
 import { Badge } from '@/components/ui/badge'
 import { useAppStore, useDisplayMoney } from '@/lib/store'
-import { formatCurrency, formatCurrencyNative, formatDate, getAssetClassName, getAssetClassColor } from '@/lib/format'
+import { formatCurrency, formatCurrencyNative, formatHoldingPositionValue, formatDate, getAssetClassName, getAssetClassColor } from '@/lib/format'
 import {
   addHolding as apiAddHolding,
   updateHolding as apiUpdateHolding,
@@ -198,11 +198,20 @@ interface AssetClassSectionProps {
   holdings: Holding[]
   currency: string
   kesToDisplayMultiplier: number
+  kesPerUsd: number
   onEdit: (holding: Holding) => void
   onDelete: (id: string) => void
 }
 
-function AssetClassSection({ assetClass, holdings, currency, kesToDisplayMultiplier, onEdit, onDelete }: AssetClassSectionProps) {
+function AssetClassSection({
+  assetClass,
+  holdings,
+  currency,
+  kesToDisplayMultiplier,
+  kesPerUsd,
+  onEdit,
+  onDelete,
+}: AssetClassSectionProps) {
   const [isOpen, setIsOpen] = useState(true)
   const total = holdings.reduce((sum, h) => sum + h.valueKES, 0)
   const currencies = Array.from(new Set(holdings.map((h) => (h.currency || '').toUpperCase()).filter(Boolean)))
@@ -264,7 +273,10 @@ function AssetClassSection({ assetClass, holdings, currency, kesToDisplayMultipl
                 <div className="flex items-center gap-2">
                   <div className="text-right">
                     <span className="font-medium">
-                      {formatCurrencyNative(holding.valueKES, (holding.currency || currency).toUpperCase())}
+                      {formatHoldingPositionValue(holding, currency as 'KES', {
+                        kesToDisplayMultiplier,
+                        kesPerUsd,
+                      })}
                     </span>
                   </div>
                   <DropdownMenu>
@@ -549,7 +561,7 @@ function HoldingDialog({ open, onClose, editing, onSaved }: HoldingDialogProps) 
 // ─── Main HoldingsTable ───────────────────────────────────────────────────────
 
 export function HoldingsTable() {
-  const { currency, kesToDisplayMultiplier } = useDisplayMoney()
+  const { currency, kesToDisplayMultiplier, kesPerUsd } = useDisplayMoney()
   const { holdings, reload } = usePortfolio()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingHolding, setEditingHolding] = useState<Holding | null>(null)
@@ -617,6 +629,7 @@ export function HoldingsTable() {
                 holdings={holdingsByClass[ac]}
                 currency={currency}
                 kesToDisplayMultiplier={kesToDisplayMultiplier}
+                kesPerUsd={kesPerUsd}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
               />

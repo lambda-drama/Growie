@@ -433,9 +433,11 @@ def _save_conversation(
 
 def _build_portfolio_context(member_name: str) -> str:
 	"""Summarise all holdings for portfolio-level analysis."""
+	from growie_app.api.portfolio import open_holding_db_filters
+
 	holdings = frappe.get_all(
 		"Growe Holding",
-		filters={"investor": member_name},
+		filters=open_holding_db_filters(member_name),
 		fields=["asset_name", "ticker", "quantity", "cost_basis_kes", "value_kes", "asset_class", "notes"],
 	)
 	if not holdings:

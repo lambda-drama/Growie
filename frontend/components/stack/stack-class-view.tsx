@@ -21,7 +21,7 @@ import { StackExcelBulkImport } from '@/components/stack/stack-excel-bulk-import
 import { TradeDialog, type TradeMode } from '@/components/stack/trade-dialog'
 import { useStackClass } from '@/hooks/use-stack'
 import { useDisplayMoney } from '@/lib/store'
-import { formatCurrency, formatCurrencyNative, formatPercentage } from '@/lib/format'
+import { effectiveAvgBuyNative, formatHoldingMoney, formatHoldingPositionValue, formatPercentage } from '@/lib/format'
 import type { StackHolding } from '@/services/stack'
 import type { AssetClass } from '@/types'
 import { STACK_BUY_BUTTON_CLASS, STACK_SELL_BUTTON_CLASS } from '@/lib/stack-ui'
@@ -46,7 +46,7 @@ function filterHoldingsByQuery(holdings: StackHolding[], query: string): StackHo
 
 export function StackClassView({ assetClass, onBack, onOpenPosition }: StackClassViewProps) {
   const { detail, isLoading, error, refresh, reload } = useStackClass(assetClass)
-  const { currency, kesToDisplayMultiplier } = useDisplayMoney()
+  const { currency, kesToDisplayMultiplier, kesPerUsd } = useDisplayMoney()
   const [tradeOpen, setTradeOpen] = useState(false)
   const [tradeMode, setTradeMode] = useState<TradeMode>('buy-new')
   const [activeHolding, setActiveHolding] = useState<StackHolding | null>(null)
@@ -169,6 +169,8 @@ export function StackClassView({ assetClass, onBack, onOpenPosition }: StackClas
             holdings={filteredHoldings}
             currency={currency}
             kesToDisplayMultiplier={kesToDisplayMultiplier}
+            kesPerUsd={kesPerUsd}
+            displayCurrency={currency}
             onOpenPosition={onOpenPosition}
             onBuy={(h) => openTrade('buy-more', h)}
             onSell={(h) => openTrade('sell', h)}
@@ -269,18 +271,27 @@ export function StackClassView({ assetClass, onBack, onOpenPosition }: StackClas
                           {h.quantity.toLocaleString()}
                         </TableCell>
                         <TableCell className="text-right tabular-nums hidden sm:table-cell">
-                          {formatCurrencyNative(h.avgBuyPrice, (h.currency || 'USD') as 'USD', {
-                            compact: true,
-                          })}
+                          {formatHoldingMoney(
+                            effectiveAvgBuyNative(h),
+                            (h.currency || 'USD') as 'USD',
+                            currency,
+                            { kesToDisplayMultiplier, kesPerUsd, compact: true }
+                          )}
                         </TableCell>
                         <TableCell className="text-right tabular-nums hidden md:table-cell">
-                          {formatCurrencyNative(h.currentPrice, (h.currency || 'USD') as 'USD', {
+                          {formatHoldingMoney(h.currentPrice, (h.currency || 'USD') as 'USD', currency, {
+                            kesToDisplayMultiplier,
+                            kesPerUsd,
                             compact: true,
                           })}
                         </TableCell>
                         <TableCell className="text-right">
                           <span className="font-medium tabular-nums block">
-                            {formatCurrency(h.valueKES, currency, { kesToDisplayMultiplier, compact: true })}
+                            {formatHoldingPositionValue(h, currency, {
+                              kesToDisplayMultiplier,
+                              kesPerUsd,
+                              compact: true,
+                            })}
                           </span>
                           <span
                             className={cn(

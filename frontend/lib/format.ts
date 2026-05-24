@@ -65,9 +65,170 @@ export function formatCurrency(
   }
 }
 
+/** Convert a native per-share (or row) amount to KES using ERPNext USD rate when needed. */
+export function nativeAmountToKes(
+  amountNative: number,
+  nativeCurrency: string,
+  kesPerUsd: number
+): number {
+  const code = (nativeCurrency || 'USD').toUpperCase()
+  const value = Number.isFinite(amountNative) ? amountNative : 0
+  if (code === 'KES') return value
+  if (code === 'USD') {
+    const kpu = kesPerUsd > 0 ? kesPerUsd : 1
+    return value * kpu
+  }
+  return value
+}
+
+/** Convert native holding currency → header display currency (via KES hub). */
+export function nativeAmountToDisplay(
+  amountNative: number,
+  nativeCurrency: string,
+  displayCurrency: string,
+  kesPerUsd: number,
+  kesToDisplayMultiplier: number
+): number {
+  const native = (nativeCurrency || 'USD').toUpperCase()
+  const display = (displayCurrency || 'KES').toUpperCase()
+  const parsed = Number(amountNative)
+  const value = Number.isFinite(parsed) ? parsed : 0
+  if (native === display) return value
+  const amountKes = nativeAmountToKes(value, native, kesPerUsd)
+  if (display === 'KES') return amountKes
+  const m = kesToDisplayMultiplier > 0 ? kesToDisplayMultiplier : 1
+  return amountKes * m
+}
+
+/** Format an amount already expressed in the display currency (no second FX pass). */
+export function formatDisplayAmount(
+  amount: number,
+  displayCurrency: Currency = 'KES',
+  options?: { compact?: boolean }
+): string {
+  const code = (displayCurrency || 'KES').toUpperCase()
+  const converted = Number.isFinite(amount) ? amount : 0
+
+  if (options?.compact && Math.abs(converted) >= 1000000) {
+    try {
+      return new Intl.NumberFormat('en-KE', {
+        style: 'currency',
+        currency: code,
+        notation: 'compact',
+        maximumFractionDigits: 1,
+      }).format(converted)
+    } catch {
+      return `${code} ${(converted / 1000000).toFixed(2)}M`
+    }
+  }
+
+  if (options?.compact && Math.abs(converted) >= 1000) {
+    try {
+      return new Intl.NumberFormat('en-KE', {
+        style: 'currency',
+        currency: code,
+        notation: 'compact',
+        maximumFractionDigits: 1,
+      }).format(converted)
+    } catch {
+      return `${code} ${(converted / 1000).toFixed(1)}K`
+    }
+  }
+
+  const maxFrac = Math.abs(converted) > 0 && Math.abs(converted) < 1 ? 4 : 2
+  try {
+    return new Intl.NumberFormat('en-KE', {
+      style: 'currency',
+      currency: code,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: maxFrac,
+    }).format(converted)
+  } catch {
+    const sym = currencySymbols[displayCurrency as keyof typeof currencySymbols] ?? code
+    return `${sym}${converted.toLocaleString('en-KE', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: maxFrac,
+    })}`
+  }
+}
+
+/** Avg buy per share when API left buying_price at 0 (cost is in holding currency). */
+export function effectiveAvgBuyNative(holding: {
+  avgBuyPrice?: number
+  costBasisKES?: number
+  quantity?: number
+}): number {
+  if (holding.avgBuyPrice != null && holding.avgBuyPrice > 0) return holding.avgBuyPrice
+  const qty = holding.quantity ?? 0
+  const cost = holding.costBasisKES ?? 0
+  return qty > 0 ? cost / qty : 0
+}
+
+/** Total position value in the holding's native currency (not KES). */
+export function holdingPositionValueNative(holding: {
+  valueNative?: number
+  valueKES?: number
+  quantity?: number
+  currentPrice?: number
+  avgBuyPrice?: number
+  costBasisKES?: number
+}): number {
+  const native = Number(holding.valueNative)
+  if (Number.isFinite(native) && native > 0) return native
+  const legacy = Number(holding.valueKES)
+  if (Number.isFinite(legacy) && legacy > 0) return legacy
+  const qty = holding.quantity ?? 0
+  const cur = Number(holding.currentPrice)
+  if (qty > 0 && Number.isFinite(cur) && cur > 0) return cur * qty
+  const avg = effectiveAvgBuyNative(holding)
+  if (qty > 0 && avg > 0) return avg * qty
+  return 0
+}
+
+/** Format total position value in the header display currency. */
+export function formatHoldingPositionValue(
+  holding: {
+    valueNative?: number
+    valueKES?: number
+    quantity?: number
+    currentPrice?: number
+    avgBuyPrice?: number
+    costBasisKES?: number
+    currency?: string
+  },
+  displayCurrency: Currency,
+  options: { kesToDisplayMultiplier: number; kesPerUsd: number; compact?: boolean }
+): string {
+  return formatHoldingMoney(
+    holdingPositionValueNative(holding),
+    (holding.currency || 'USD') as Currency,
+    displayCurrency,
+    options
+  )
+}
+
+/**
+ * Format a holding amount stored in its row currency (per-share or total position value).
+ */
+export function formatHoldingMoney(
+  amountNative: number,
+  nativeCurrency: Currency,
+  displayCurrency: Currency,
+  options: { kesToDisplayMultiplier: number; kesPerUsd: number; compact?: boolean }
+): string {
+  const displayAmount = nativeAmountToDisplay(
+    amountNative,
+    nativeCurrency,
+    displayCurrency,
+    options.kesPerUsd,
+    options.kesToDisplayMultiplier
+  )
+  return formatDisplayAmount(displayAmount, displayCurrency, { compact: options.compact })
+}
+
 /**
  * Formats an amount already in its own currency (no conversion).
- * Use this when a row/record stores its native amount and currency together.
+ * Use for goals/transactions stored in a fixed currency — not header display toggle.
  */
 export function formatCurrencyNative(
   amount: number,

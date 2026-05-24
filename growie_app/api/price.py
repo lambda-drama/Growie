@@ -48,7 +48,7 @@ from urllib.parse import urlparse
 
 import frappe
 from frappe import _
-from frappe.utils import now_datetime
+from frappe.utils import now_datetime, today
 import requests as _requests
 import time
 
@@ -857,17 +857,30 @@ def _upsert_cache(ticker: str, market: str, price_data: dict, usd_to_kes: float,
 # ── Holding value updater ─────────────────────────────────────────────────────
 
 def _update_holdings_for_ticker(ticker: str, price_kes: float):
+	from growie_app.api.portfolio import kes_per_unit_foreign
+
+	if price_kes <= 0:
+		return
 	holdings = frappe.get_all(
 		"Growe Holding",
-		filters={"ticker": ticker},
-		fields=["name", "quantity"],
+		filters={"ticker": ticker, "sold": 0, "quantity": [">", 0]},
+		fields=["name"],
 	)
 	for h in holdings:
-		qty = float(h.quantity or 0)
+		doc = frappe.get_doc("Growe Holding", h.name)
+		qty = float(doc.quantity or 0)
 		if qty <= 0:
 			continue
-		doc = frappe.get_doc("Growe Holding", h.name)
-		doc.value_kes = round(qty * price_kes, 2)
+		ccy = (doc.currency or "USD").upper()
+		on_date = str(doc.date_added or today())
+		if ccy == "KES":
+			doc.value_kes = round(qty * price_kes, 2)
+		else:
+			kpu = kes_per_unit_foreign(ccy, on_date, strict=False)
+			if kpu > 0:
+				doc.value_kes = round(qty * (price_kes / kpu), 2)
+			else:
+				doc.value_kes = round(qty * price_kes, 2)
 		doc.last_updated = now_datetime()
 		doc.flags.ignore_permissions = True
 		doc.save()

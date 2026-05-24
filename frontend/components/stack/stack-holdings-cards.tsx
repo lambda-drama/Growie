@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { formatCurrency, formatCurrencyNative, formatPercentage } from '@/lib/format'
+import { effectiveAvgBuyNative, formatHoldingMoney, formatHoldingPositionValue, formatPercentage } from '@/lib/format'
 import type { StackHolding } from '@/services/stack'
 import { STACK_BUY_BUTTON_CLASS, STACK_SELL_BUTTON_CLASS } from '@/lib/stack-ui'
 import { cn } from '@/lib/utils'
@@ -12,6 +12,8 @@ interface StackHoldingsCardsProps {
   holdings: StackHolding[]
   currency: string
   kesToDisplayMultiplier: number
+  kesPerUsd: number
+  displayCurrency: string
   onOpenPosition: (id: string) => void
   onBuy: (h: StackHolding) => void
   onSell: (h: StackHolding) => void
@@ -26,6 +28,8 @@ export function StackHoldingsCards({
   holdings,
   currency,
   kesToDisplayMultiplier,
+  kesPerUsd,
+  displayCurrency,
   onOpenPosition,
   onBuy,
   onSell,
@@ -69,8 +73,9 @@ export function StackHoldingsCards({
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="font-semibold tabular-nums">
-                      {formatCurrency(h.valueKES, currency as 'KES', {
+                      {formatHoldingPositionValue(h, displayCurrency as 'USD', {
                         kesToDisplayMultiplier,
+                        kesPerUsd,
                         compact: true,
                       })}
                     </p>
@@ -92,9 +97,12 @@ export function StackHoldingsCards({
                   <div>
                     <dt className="text-muted-foreground">Avg buy</dt>
                     <dd className="font-medium tabular-nums">
-                      {formatCurrencyNative(h.avgBuyPrice, (h.currency || 'USD') as 'USD', {
-                        compact: true,
-                      })}
+                      {formatHoldingMoney(
+                        effectiveAvgBuyNative(h),
+                        (h.currency || 'USD') as 'USD',
+                        displayCurrency as 'USD',
+                        { kesToDisplayMultiplier, kesPerUsd, compact: true }
+                      )}
                     </dd>
                   </div>
                 </dl>
