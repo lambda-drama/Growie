@@ -56,7 +56,9 @@ export function StackMetricsGrid({
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
       <MiniMetric
         label="Monthly growth"
-        value={fmt(Math.abs(metrics.monthlyGrowthKES))}
+        value={
+          (metrics.monthlyGrowthKES >= 0 ? '' : '−') + fmt(Math.abs(metrics.monthlyGrowthKES))
+        }
         sub={formatPercentage(metrics.monthlyGrowthPercent)}
         subClassName={monthPos ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}
       />

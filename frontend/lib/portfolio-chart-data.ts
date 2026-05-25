@@ -80,7 +80,11 @@ function tickerKey(h: Holding): string {
   return (h.ticker || h.name || h.id).trim() || h.id
 }
 
-function aggregateAtDate(holdings: Holding[], asOf: Date): {
+function aggregateAtDate(
+  holdings: Holding[],
+  asOf: Date,
+  valuation: 'cost' | 'market',
+): {
   totalMarket: number
   totalInvested: number
   byTickerMarket: Record<string, number>
@@ -91,10 +95,13 @@ function aggregateAtDate(holdings: Holding[], asOf: Date): {
   let totalInvested = 0
   const byTickerMarket: Record<string, number> = {}
   for (const h of subset) {
-    totalMarket += h.valueKES
-    totalInvested += h.costBasisKES
+    const cost = h.costAtAvgKES ?? h.costBasisKES ?? 0
+    const market = h.valueInKES ?? h.valueKES ?? 0
+    const amount = valuation === 'market' ? market : cost
+    totalMarket += amount
+    totalInvested += cost
     const k = tickerKey(h)
-    byTickerMarket[k] = (byTickerMarket[k] ?? 0) + h.valueKES
+    byTickerMarket[k] = (byTickerMarket[k] ?? 0) + amount
   }
   return { totalMarket, totalInvested, byTickerMarket }
 }
@@ -109,8 +116,14 @@ export function buildTimelineBuckets(
 
   const dates = period === 'monthly' ? getMonthEndDates(first, through) : getYearEndDates(first, through)
 
-  return dates.map((asOf) => {
-    const { totalMarket, totalInvested, byTickerMarket } = aggregateAtDate(holdings, asOf)
+  return dates.map((asOf, index) => {
+    const isLatest = index === dates.length - 1
+    const valuation = isLatest ? 'market' : 'cost'
+    const { totalMarket, totalInvested, byTickerMarket } = aggregateAtDate(
+      holdings,
+      asOf,
+      valuation,
+    )
     const sortKey = asOf.getTime()
     if (period === 'monthly') {
       const label = asOf.toLocaleDateString('en-KE', { month: 'short', year: 'numeric' })
@@ -158,7 +171,10 @@ export function buildPortfolioHoldingLineRows(
       sortKey: b.sortKey,
     }
     for (const h of holdings) {
-      row[h.id] = holdingDate(h).getTime() <= t ? h.valueKES : 0
+      row[h.id] =
+        holdingDate(h).getTime() <= t
+          ? h.valueInKES ?? h.valueKES ?? 0
+          : 0
     }
     return row
   })
@@ -193,8 +209,8 @@ export function groupByTicker(holdings: Holding[]): TickerAggregate[] {
     }
     g.lots += 1
     g.quantity += h.quantity
-    g.costBasis += h.costBasisKES
-    g.marketValue += h.valueKES
+    g.costBasis += h.costAtAvgKES ?? h.costBasisKES ?? 0
+    g.marketValue += h.valueInKES ?? h.valueKES ?? 0
     g.holdings.push(h)
   }
   return Array.from(map.values()).sort((a, b) => b.marketValue - a.marketValue)

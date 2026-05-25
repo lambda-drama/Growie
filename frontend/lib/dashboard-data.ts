@@ -74,6 +74,35 @@ export function groupByAssetClass(holdings: Holding[]): AssetClassGroup[] {
   }).filter((g) => g.holdings.length > 0)
 }
 
+/**
+ * Month-over-month change: current market value vs cost basis of lots held at prior month-end.
+ * (We do not store historical prices; past months use invested capital, now uses live value.)
+ */
+export function computeMonthOverMonthGrowth(holdings: Holding[]): {
+  monthlyGrowthKES: number
+  monthlyGrowthPercent: number
+} {
+  if (!holdings.length) return { monthlyGrowthKES: 0, monthlyGrowthPercent: 0 }
+
+  const now = new Date()
+  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
+
+  const valueNow = holdings.reduce((s, h) => s + (h.valueInKES ?? h.valueKES ?? 0), 0)
+  const basisLastMonth = holdings
+    .filter((h) => new Date(h.dateAdded).getTime() <= endOfLastMonth.getTime())
+    .reduce((s, h) => s + (h.costAtAvgKES ?? h.costBasisKES ?? 0), 0)
+
+  const monthlyGrowthKES = valueNow - basisLastMonth
+  const monthlyGrowthPercent =
+    basisLastMonth > 0
+      ? (monthlyGrowthKES / basisLastMonth) * 100
+      : valueNow > 0
+        ? 100
+        : 0
+
+  return { monthlyGrowthKES, monthlyGrowthPercent }
+}
+
 export function getNetPortfolioSeries(holdings: Holding[], monthCount = 6): NetPortfolioPoint[] {
   const buckets = buildTimelineBuckets(holdings, 'monthly')
   const slice = buckets.slice(-monthCount)
@@ -105,11 +134,7 @@ export function computeDashboardMetrics(
     summary?.gainPercent ??
     (totalCostKES > 0 ? (gainKES / totalCostKES) * 100 : 0)
 
-  const series = getNetPortfolioSeries(holdings, 6)
-  const last = series[series.length - 1]
-  const prev = series.length > 1 ? series[series.length - 2] : null
-  const monthlyGrowthKES = last && prev ? last.valueKES - prev.valueKES : 0
-  const monthlyGrowthPercent = last?.monthGrowthPercent ?? 0
+  const { monthlyGrowthKES, monthlyGrowthPercent } = computeMonthOverMonthGrowth(holdings)
 
   const groups = groupByAssetClass(holdings)
   const activeClasses = groups.length
