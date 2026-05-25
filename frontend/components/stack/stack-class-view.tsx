@@ -10,6 +10,7 @@ import { StackSummaryCards } from '@/components/stack/stack-summary-cards'
 import { StackTickerGroups } from '@/components/stack/stack-ticker-groups'
 import { StackClassHoldingsTable } from '@/components/stack/stack-class-holdings-table'
 import { StackExcelBulkImport } from '@/components/stack/stack-excel-bulk-import'
+import { StackHoldingDetailSheet } from '@/components/stack/stack-holding-detail-sheet'
 import { TradeDialog, type TradeMode } from '@/components/stack/trade-dialog'
 import { useStackClass } from '@/hooks/use-stack'
 import { useDisplayMoney } from '@/lib/store'
@@ -41,6 +42,8 @@ export function StackClassView({ assetClass, onBack }: StackClassViewProps) {
   const [tradeMode, setTradeMode] = useState<TradeMode>('buy-new')
   const [activeHolding, setActiveHolding] = useState<StackHolding | null>(null)
   const [positionSearch, setPositionSearch] = useState('')
+  const [detailHolding, setDetailHolding] = useState<StackHolding | null>(null)
+  const [detailOpen, setDetailOpen] = useState(false)
 
   const showPositionSearch =
     assetClass === 'nse-stocks' || assetClass === 'global-stocks'
@@ -63,6 +66,11 @@ export function StackClassView({ assetClass, onBack }: StackClassViewProps) {
     setTradeMode(mode)
     setActiveHolding(holding ?? null)
     setTradeOpen(true)
+  }
+
+  const openHoldingDetail = (holding: StackHolding) => {
+    setDetailHolding(holding)
+    setDetailOpen(true)
   }
 
   const summary = detail?.summary
@@ -165,6 +173,7 @@ export function StackClassView({ assetClass, onBack }: StackClassViewProps) {
               displayCurrency={currency}
               kesToDisplayMultiplier={kesToDisplayMultiplier}
               kesPerUsd={kesPerUsd}
+              onOpenHolding={openHoldingDetail}
               onBuy={(h) => openTrade('buy-more', h)}
               onSell={(h) => openTrade('sell', h)}
               emptyMessage={
@@ -203,6 +212,7 @@ export function StackClassView({ assetClass, onBack }: StackClassViewProps) {
               displayCurrency={currency}
               kesToDisplayMultiplier={kesToDisplayMultiplier}
               kesPerUsd={kesPerUsd}
+              onOpenHolding={openHoldingDetail}
               onBuy={(h) => openTrade('buy-more', h)}
               onSell={(h) => openTrade('sell', h)}
             />
@@ -230,13 +240,31 @@ export function StackClassView({ assetClass, onBack }: StackClassViewProps) {
         </>
       ) : null}
 
+      <StackHoldingDetailSheet
+        holding={detailHolding}
+        open={detailOpen}
+        onOpenChange={(open) => {
+          setDetailOpen(open)
+          if (!open) setDetailHolding(null)
+        }}
+        onBuy={(h) => {
+          setDetailOpen(false)
+          openTrade('buy-more', h)
+        }}
+        onSell={(h) => {
+          setDetailOpen(false)
+          openTrade('sell', h)
+        }}
+        onDeleted={() => void reload()}
+      />
+
       <TradeDialog
         open={tradeOpen}
         onOpenChange={setTradeOpen}
         mode={tradeMode}
         holding={activeHolding}
         defaultAssetClass={assetClass}
-        onSuccess={refresh}
+        onSuccess={() => void refresh()}
       />
     </div>
   )
