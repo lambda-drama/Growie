@@ -705,5 +705,90 @@ def record_sell(
 	}
 
 
+def _recompute_holding_from_transactions(holding_name: str):
+	"""Rebuild holding qty/cost/sold state from remaining ledger rows."""
+	doc = frappe.get_doc("Growe Holding", holding_name)
+	txns = frappe.get_all(
+		"Growe Holding Transaction",
+		filters={"holding": holding_name},
+		fields=["transaction_type", "quantity", "amount_kes", "transaction_date"],
+		order_by="transaction_date asc, creation asc",
+	)
+
+	qty = 0.0
+	cost = 0.0
+	last_sell_date = None
+	for t in txns:
+		q = flt(t.quantity)
+		if (t.transaction_type or "").strip() == "Buy":
+			qty += q
+			cost += flt(t.amount_kes)
+		else:
+			if qty > 0:
+				cost_removed = (cost / qty) * q
+				cost = max(cost - cost_removed, 0)
+			qty -= q
+			last_sell_date = t.transaction_date
+
+	ccy = (doc.currency or "USD").upper()
+	date_str = str(today())
+
+	if qty <= 0:
+		doc.quantity = 0
+		doc.cost_basis_kes = 0
+		doc.value_kes = 0
+		doc.buying_price = 0
+		doc.sold = 1
+		doc.sold_date = last_sell_date or doc.sold_date
+	else:
+		doc.quantity = qty
+		doc.cost_basis_kes = cost
+		doc.sold = 0
+		doc.sold_date = None
+		_revalue_holding(doc, date_str)
+		doc.buying_price = _native_unit_price_from_kes(cost, qty, ccy, date_str)
+
+	doc.last_updated = now_datetime()
+	doc.flags.ignore_permissions = True
+	doc.save()
+	return doc
+
+
+@frappe.whitelist()
+def delete_holding_transaction(transaction_name: str):
+	"""Delete a buy/sell ledger row and recalculate the linked holding."""
+	member = _member_name()
+	if not transaction_name or not frappe.db.exists("Growe Holding Transaction", transaction_name):
+		frappe.throw(_("Transaction not found."))
+
+	txn = frappe.get_doc("Growe Holding Transaction", transaction_name)
+	if txn.member != member:
+		frappe.throw(_("You are not authorised to delete this transaction."), frappe.PermissionError)
+
+	holding_name = txn.holding
+	_assert_holding_owner(holding_name, member)
+
+	frappe.delete_doc("Growe Holding Transaction", transaction_name, force=1)
+	doc = _recompute_holding_from_transactions(holding_name)
+	frappe.db.commit()
+
+	holding_row = None
+	fully_removed = False
+	if frappe.db.exists("Growe Holding", holding_name):
+		row = frappe.db.get_value("Growe Holding", holding_name, "*", as_dict=True)
+		if row and is_open_holding(row):
+			holding_row = _stack_holding_row(row)
+		else:
+			fully_removed = True
+	else:
+		fully_removed = True
+
+	return {
+		"deleted": transaction_name,
+		"holding": holding_row,
+		"fullyRemoved": fully_removed,
+	}
+
+
 # Re-export stock search for frontend
 get_stocks = search_stocks

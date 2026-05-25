@@ -30,6 +30,7 @@ interface StackClassHoldingsTableProps {
   displayCurrency: string
   kesToDisplayMultiplier: number
   kesPerUsd: number
+  onOpenHolding: (h: StackHolding) => void
   onBuy: (h: StackHolding) => void
   onSell: (h: StackHolding) => void
 }
@@ -39,6 +40,7 @@ function HoldingTableRow({
   displayCurrency,
   kesToDisplayMultiplier,
   kesPerUsd,
+  onOpenHolding,
   onBuy,
   onSell,
   lotMode,
@@ -47,6 +49,7 @@ function HoldingTableRow({
   displayCurrency: string
   kesToDisplayMultiplier: number
   kesPerUsd: number
+  onOpenHolding: (h: StackHolding) => void
   onBuy: (h: StackHolding) => void
   onSell: (h: StackHolding) => void
   lotMode?: boolean
@@ -56,7 +59,10 @@ function HoldingTableRow({
 
   return (
     <TableRow className={lotMode ? 'bg-muted/25' : undefined}>
-      <TableCell className={lotMode ? 'pl-10' : undefined}>
+      <TableCell
+        className={cn('cursor-pointer hover:bg-muted/40', lotMode && 'pl-10')}
+        onClick={() => onOpenHolding(holding)}
+      >
         {lotMode ? (
           <>
             <span className="font-medium">Lot · {formatDate(holding.dateAdded)}</span>
@@ -76,22 +82,36 @@ function HoldingTableRow({
           </>
         )}
       </TableCell>
-      <TableCell className="text-right tabular-nums">{holding.quantity.toLocaleString()}</TableCell>
-      <TableCell className="text-right tabular-nums hidden sm:table-cell">
+      <TableCell
+        className="cursor-pointer text-right tabular-nums hover:bg-muted/40"
+        onClick={() => onOpenHolding(holding)}
+      >
+        {holding.quantity.toLocaleString()}
+      </TableCell>
+      <TableCell
+        className="cursor-pointer text-right tabular-nums hidden hover:bg-muted/40 sm:table-cell"
+        onClick={() => onOpenHolding(holding)}
+      >
         {formatHoldingMoney(effectiveAvgBuyNative(holding), ccy, displayCurrency as 'USD', {
           kesToDisplayMultiplier,
           kesPerUsd,
           compact: true,
         })}
       </TableCell>
-      <TableCell className="text-right tabular-nums hidden md:table-cell">
+      <TableCell
+        className="cursor-pointer text-right tabular-nums hidden hover:bg-muted/40 md:table-cell"
+        onClick={() => onOpenHolding(holding)}
+      >
         {formatHoldingMoney(holding.currentPrice, ccy, displayCurrency as 'USD', {
           kesToDisplayMultiplier,
           kesPerUsd,
           compact: true,
         })}
       </TableCell>
-      <TableCell className="text-right">
+      <TableCell
+        className="cursor-pointer text-right hover:bg-muted/40"
+        onClick={() => onOpenHolding(holding)}
+      >
         <span className="font-medium tabular-nums block">
           {formatHoldingPositionValue(holding, displayCurrency as 'USD', {
             kesToDisplayMultiplier,
@@ -203,7 +223,7 @@ function GroupSummaryRow({
           {formatPercentage(group.gainPercent)}
         </span>
       </TableCell>
-      <TableCell onClick={(e) => e.stopPropagation()} />
+      <TableCell />
     </TableRow>
   )
 }
@@ -213,6 +233,7 @@ function TickerGroupTableRows({
   displayCurrency,
   kesToDisplayMultiplier,
   kesPerUsd,
+  onOpenHolding,
   onBuy,
   onSell,
 }: {
@@ -220,6 +241,7 @@ function TickerGroupTableRows({
   displayCurrency: string
   kesToDisplayMultiplier: number
   kesPerUsd: number
+  onOpenHolding: (h: StackHolding) => void
   onBuy: (h: StackHolding) => void
   onSell: (h: StackHolding) => void
 }) {
@@ -233,6 +255,7 @@ function TickerGroupTableRows({
         displayCurrency={displayCurrency}
         kesToDisplayMultiplier={kesToDisplayMultiplier}
         kesPerUsd={kesPerUsd}
+        onOpenHolding={onOpenHolding}
         onBuy={onBuy}
         onSell={onSell}
       />
@@ -256,6 +279,7 @@ function TickerGroupTableRows({
               displayCurrency={displayCurrency}
               kesToDisplayMultiplier={kesToDisplayMultiplier}
               kesPerUsd={kesPerUsd}
+              onOpenHolding={onOpenHolding}
               onBuy={onBuy}
               onSell={onSell}
               lotMode
@@ -271,6 +295,7 @@ export function StackClassHoldingsTable({
   displayCurrency,
   kesToDisplayMultiplier,
   kesPerUsd,
+  onOpenHolding,
   onBuy,
   onSell,
 }: StackClassHoldingsTableProps) {
@@ -299,6 +324,7 @@ export function StackClassHoldingsTable({
               displayCurrency={displayCurrency}
               kesToDisplayMultiplier={kesToDisplayMultiplier}
               kesPerUsd={kesPerUsd}
+              onOpenHolding={onOpenHolding}
               onBuy={onBuy}
               onSell={onSell}
             />

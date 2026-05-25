@@ -1,33 +1,24 @@
 'use client'
 
 import { useState } from 'react'
-import { format, parseISO } from 'date-fns'
 import { RefreshCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { StackBreadcrumb } from '@/components/stack/stack-breadcrumb'
+import { StackHoldingTransactions } from '@/components/stack/stack-holding-transactions'
 import { TradeDialog, type TradeMode } from '@/components/stack/trade-dialog'
 import { useStackPosition } from '@/hooks/use-stack'
 import { useDisplayMoney } from '@/lib/store'
 import {
   effectiveAvgBuyNative,
-  formatCurrency,
   formatHoldingMoney,
   formatHoldingPositionValue,
   formatPercentage,
 } from '@/lib/format'
 import type { AssetClass } from '@/types'
-import { STACK_BUY_BUTTON_CLASS, STACK_SELL_BUTTON_CLASS, stackTradeBadgeClass } from '@/lib/stack-ui'
+import { STACK_BUY_BUTTON_CLASS, STACK_SELL_BUTTON_CLASS } from '@/lib/stack-ui'
 import { cn } from '@/lib/utils'
 
 interface StackPositionViewProps {
@@ -35,15 +26,6 @@ interface StackPositionViewProps {
   assetClass: AssetClass
   onBackOverview: () => void
   onBackClass: () => void
-}
-
-function formatTxDate(value: string) {
-  if (!value) return '—'
-  try {
-    const d = parseISO(value.includes('T') ? value : `${value}T00:00:00`)
-    if (!Number.isNaN(d.getTime())) return format(d, 'd MMM yyyy')
-  } catch { /**/ }
-  return value
 }
 
 export function StackPositionView({
@@ -56,6 +38,7 @@ export function StackPositionView({
   const { currency, kesToDisplayMultiplier, kesPerUsd } = useDisplayMoney()
   const [tradeOpen, setTradeOpen] = useState(false)
   const [tradeMode, setTradeMode] = useState<TradeMode>('buy-more')
+  const [txRefreshKey, setTxRefreshKey] = useState(0)
 
   const holding = detail?.holding
   const label = holding ? `${holding.ticker || holding.name}` : 'Position'
@@ -64,6 +47,8 @@ export function StackPositionView({
     setTradeMode(mode)
     setTradeOpen(true)
   }
+
+  const bumpTransactions = () => setTxRefreshKey((k) => k + 1)
 
   return (
     <div className="space-y-6">
@@ -181,53 +166,20 @@ export function StackPositionView({
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Transaction history</CardTitle>
+              <CardTitle className="text-base">Trades — use ⋮ on a row to delete</CardTitle>
             </CardHeader>
             <CardContent className="overflow-x-auto p-0 pb-2">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right hidden sm:table-cell">Price</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(detail?.transactions ?? []).length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
-                        No transactions yet.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    detail?.transactions.map((tx) => (
-                      <TableRow key={tx.id}>
-                        <TableCell>{formatTxDate(tx.transactionDate)}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={stackTradeBadgeClass(tx.type === 'Buy')}
-                          >
-                            {tx.type}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">{tx.quantity.toLocaleString()}</TableCell>
-                        <TableCell className="text-right tabular-nums hidden sm:table-cell">
-                          {formatHoldingMoney(tx.unitPrice, (tx.currency || 'USD') as 'USD', currency, {
-                            kesToDisplayMultiplier,
-                            kesPerUsd,
-                          })}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatCurrency(tx.amountKES, currency, { kesToDisplayMultiplier })}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+              <StackHoldingTransactions
+                holdingId={holdingId}
+                refreshKey={txRefreshKey}
+                onHoldingUpdated={(_h, fullyRemoved) => {
+                  if (fullyRemoved) {
+                    onBackClass()
+                    return
+                  }
+                  void refresh()
+                }}
+              />
             </CardContent>
           </Card>
         </>
@@ -240,6 +192,7 @@ export function StackPositionView({
         holding={holding ?? null}
         defaultAssetClass={assetClass}
         onSuccess={({ fullySold } = {}) => {
+          bumpTransactions()
           if (fullySold) {
             onBackClass()
             return

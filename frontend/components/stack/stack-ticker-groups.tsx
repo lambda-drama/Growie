@@ -15,6 +15,7 @@ interface StackTickerGroupsProps {
   displayCurrency: string
   kesToDisplayMultiplier: number
   kesPerUsd: number
+  onOpenHolding: (h: StackHolding) => void
   onBuy: (h: StackHolding) => void
   onSell: (h: StackHolding) => void
   emptyMessage?: string
@@ -106,6 +107,7 @@ function TickerGroupBlock({
   displayCurrency,
   kesToDisplayMultiplier,
   kesPerUsd,
+  onOpenHolding,
   onBuy,
   onSell,
 }: {
@@ -113,6 +115,7 @@ function TickerGroupBlock({
   displayCurrency: string
   kesToDisplayMultiplier: number
   kesPerUsd: number
+  onOpenHolding: (h: StackHolding) => void
   onBuy: (h: StackHolding) => void
   onSell: (h: StackHolding) => void
 }) {
@@ -127,6 +130,7 @@ function TickerGroupBlock({
         displayCurrency={displayCurrency}
         kesToDisplayMultiplier={kesToDisplayMultiplier}
         kesPerUsd={kesPerUsd}
+        onOpen={onOpenHolding}
         onBuy={onBuy}
         onSell={onSell}
       />
@@ -150,6 +154,7 @@ function TickerGroupBlock({
             displayCurrency={displayCurrency}
             kesToDisplayMultiplier={kesToDisplayMultiplier}
             kesPerUsd={kesPerUsd}
+            onOpen={onOpenHolding}
             onBuy={onBuy}
             onSell={onSell}
             nested
@@ -166,6 +171,7 @@ export function StackTickerGroups({
   displayCurrency,
   kesToDisplayMultiplier,
   kesPerUsd,
+  onOpenHolding,
   onBuy,
   onSell,
   emptyMessage,
@@ -193,6 +199,7 @@ export function StackTickerGroups({
             displayCurrency={displayCurrency}
             kesToDisplayMultiplier={kesToDisplayMultiplier}
             kesPerUsd={kesPerUsd}
+            onOpenHolding={onOpenHolding}
             onBuy={onBuy}
             onSell={onSell}
           />

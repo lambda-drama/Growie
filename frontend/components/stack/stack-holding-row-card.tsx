@@ -18,6 +18,7 @@ export interface StackHoldingRowCardProps {
   displayCurrency: string
   kesToDisplayMultiplier: number
   kesPerUsd: number
+  onOpen: (h: StackHolding) => void
   onBuy: (h: StackHolding) => void
   onSell: (h: StackHolding) => void
   /** Inside a ticker group (tier 3). */
@@ -27,12 +28,13 @@ export interface StackHoldingRowCardProps {
   showTradeButtons?: boolean
 }
 
-/** Single holding row — same layout as the original My Stack position cards. */
+/** Single holding row — tap header/stats for detail sheet; Buy/Sell stay on the row. */
 export function StackHoldingRowCard({
   holding,
   displayCurrency,
   kesToDisplayMultiplier,
   kesPerUsd,
+  onOpen,
   onBuy,
   onSell,
   nested = false,
@@ -45,11 +47,15 @@ export function StackHoldingRowCard({
   return (
     <div
       className={cn(
-        'bg-card p-4 shadow-sm',
+        'bg-card shadow-sm',
         nested ? 'border-t border-border first:border-t-0' : 'rounded-xl border border-border'
       )}
     >
-      <div className="w-full text-left">
+      <button
+        type="button"
+        className="w-full p-4 text-left transition-colors hover:bg-muted/30"
+        onClick={() => onOpen(holding)}
+      >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -106,13 +112,13 @@ export function StackHoldingRowCard({
             </dd>
           </div>
         </dl>
-      </div>
+      </button>
       {showTradeButtons ? (
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex gap-2 px-4 pb-4">
           <Button
             variant="outline"
             size="sm"
-            className={cn('flex-1', STACK_BUY_BUTTON_CLASS)}
+            className={cn('min-w-0 flex-1', STACK_BUY_BUTTON_CLASS)}
             onClick={() => onBuy(holding)}
           >
             Buy
@@ -120,7 +126,7 @@ export function StackHoldingRowCard({
           <Button
             variant="outline"
             size="sm"
-            className={cn('flex-1', STACK_SELL_BUTTON_CLASS)}
+            className={cn('min-w-0 flex-1', STACK_SELL_BUTTON_CLASS)}
             onClick={() => onSell(holding)}
           >
             Sell

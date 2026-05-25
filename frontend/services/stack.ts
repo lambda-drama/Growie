@@ -244,4 +244,22 @@ export async function recordSell(payload: RecordTradePayload & { holdingId: stri
   throw new Error(extractError(data))
 }
 
+export async function deleteHoldingTransaction(transactionId: string): Promise<{
+  deleted: string
+  holding: StackHolding | null
+  fullyRemoved: boolean
+}> {
+  const res = await fetch('/api/method/growie_app.api.stack.delete_holding_transaction', {
+    method: 'POST',
+    credentials: 'include',
+    headers: postHeaders(),
+    body: JSON.stringify({ transaction_name: transactionId }),
+  })
+  const data = await res.json()
+  if (data?.message) {
+    return data.message as { deleted: string; holding: StackHolding | null; fullyRemoved: boolean }
+  }
+  throw new Error(extractError(data))
+}
+
 export { searchStocks }
