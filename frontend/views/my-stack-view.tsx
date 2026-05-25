@@ -2,7 +2,6 @@
 
 import { StackOverview } from '@/components/stack/stack-overview'
 import { StackClassView } from '@/components/stack/stack-class-view'
-import { StackPositionView } from '@/components/stack/stack-position-view'
 import { useAppStore } from '@/lib/store'
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
@@ -38,28 +37,12 @@ export function MyStackView() {
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-5 pb-6 sm:space-y-6 sm:pb-8">
-      {stackNav.screen === 'overview' && (
-        <StackOverview
-          onOpenClass={handleOpenClass}
-        />
-      )}
+      {stackNav.screen === 'overview' && <StackOverview onOpenClass={handleOpenClass} />}
 
       {stackNav.screen === 'class' && (
         <StackClassView
           assetClass={stackNav.assetClass}
           onBack={() => setStackNav({ screen: 'overview' })}
-          onOpenPosition={(holdingId) =>
-            setStackNav({ screen: 'position', holdingId, assetClass: stackNav.assetClass })
-          }
-        />
-      )}
-
-      {stackNav.screen === 'position' && (
-        <StackPositionView
-          holdingId={stackNav.holdingId}
-          assetClass={stackNav.assetClass}
-          onBackOverview={() => setStackNav({ screen: 'overview' })}
-          onBackClass={() => setStackNav({ screen: 'class', assetClass: stackNav.assetClass })}
         />
       )}
     </div>

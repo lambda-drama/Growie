@@ -3,34 +3,24 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, RefreshCcw, Search, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { StackBreadcrumb } from '@/components/stack/stack-breadcrumb'
 import { StackSummaryCards } from '@/components/stack/stack-summary-cards'
-import { StackHoldingsCards } from '@/components/stack/stack-holdings-cards'
+import { StackTickerGroups } from '@/components/stack/stack-ticker-groups'
+import { StackClassHoldingsTable } from '@/components/stack/stack-class-holdings-table'
 import { StackExcelBulkImport } from '@/components/stack/stack-excel-bulk-import'
 import { TradeDialog, type TradeMode } from '@/components/stack/trade-dialog'
 import { useStackClass } from '@/hooks/use-stack'
 import { useDisplayMoney } from '@/lib/store'
-import { effectiveAvgBuyNative, formatHoldingMoney, formatHoldingPositionValue, formatPercentage } from '@/lib/format'
+import { groupHoldingsByTicker } from '@/lib/stack-ticker-groups'
 import type { StackHolding } from '@/services/stack'
 import type { AssetClass } from '@/types'
-import { STACK_BUY_BUTTON_CLASS, STACK_SELL_BUTTON_CLASS } from '@/lib/stack-ui'
 import { cn } from '@/lib/utils'
 
 interface StackClassViewProps {
   assetClass: AssetClass
   onBack: () => void
-  onOpenPosition: (holdingId: string) => void
 }
 
 function filterHoldingsByQuery(holdings: StackHolding[], query: string): StackHolding[] {
@@ -44,7 +34,7 @@ function filterHoldingsByQuery(holdings: StackHolding[], query: string): StackHo
   })
 }
 
-export function StackClassView({ assetClass, onBack, onOpenPosition }: StackClassViewProps) {
+export function StackClassView({ assetClass, onBack }: StackClassViewProps) {
   const { detail, isLoading, error, refresh, reload } = useStackClass(assetClass)
   const { currency, kesToDisplayMultiplier, kesPerUsd } = useDisplayMoney()
   const [tradeOpen, setTradeOpen] = useState(false)
@@ -64,6 +54,10 @@ export function StackClassView({ assetClass, onBack, onOpenPosition }: StackClas
     () => filterHoldingsByQuery(allHoldings, positionSearch),
     [allHoldings, positionSearch]
   )
+  const tickerGroupCount = useMemo(
+    () => groupHoldingsByTicker(filteredHoldings).length,
+    [filteredHoldings]
+  )
 
   const openTrade = (mode: TradeMode, holding?: StackHolding) => {
     setTradeMode(mode)
@@ -81,7 +75,7 @@ export function StackClassView({ assetClass, onBack, onOpenPosition }: StackClas
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">{detail?.label ?? 'Asset class'}</h1>
-          <p className="text-muted-foreground">Positions and trades in this class</p>
+          <p className="text-muted-foreground">Positions in this class</p>
         </div>
         <div className="flex w-full gap-2 sm:w-auto">
           <Button
@@ -155,180 +149,84 @@ export function StackClassView({ assetClass, onBack, onOpenPosition }: StackClas
               ) : null}
               {positionSearch.trim() && (
                 <p className="mt-1.5 text-xs text-muted-foreground">
-                  {filteredHoldings.length === 0
-                    ? 'No positions match your search.'
-                    : `${filteredHoldings.length} of ${allHoldings.length} position${
-                        allHoldings.length === 1 ? '' : 's'
+                  {tickerGroupCount === 0
+                    ? 'No tickers match your search.'
+                    : `${tickerGroupCount} ticker${tickerGroupCount === 1 ? '' : 's'} · ${filteredHoldings.length} lot${
+                        filteredHoldings.length === 1 ? '' : 's'
                       }`}
                 </p>
               )}
             </div>
           )}
 
-          <StackHoldingsCards
-            holdings={filteredHoldings}
-            currency={currency}
-            kesToDisplayMultiplier={kesToDisplayMultiplier}
-            kesPerUsd={kesPerUsd}
-            displayCurrency={currency}
-            onOpenPosition={onOpenPosition}
-            onBuy={(h) => openTrade('buy-more', h)}
-            onSell={(h) => openTrade('sell', h)}
-            emptyMessage={
-              allHoldings.length > 0 && positionSearch.trim()
-                ? `No positions match "${positionSearch.trim()}".`
-                : undefined
-            }
-            emptyActions={
-              allHoldings.length === 0 ? (
-                showBulkImport ? (
-                  <>
-                    <StackExcelBulkImport onSuccess={reload} disabled={isLoading} />
+          <div className="md:hidden">
+            <StackTickerGroups
+              holdings={filteredHoldings}
+              displayCurrency={currency}
+              kesToDisplayMultiplier={kesToDisplayMultiplier}
+              kesPerUsd={kesPerUsd}
+              onBuy={(h) => openTrade('buy-more', h)}
+              onSell={(h) => openTrade('sell', h)}
+              emptyMessage={
+                allHoldings.length > 0 && positionSearch.trim()
+                  ? `No tickers match "${positionSearch.trim()}".`
+                  : undefined
+              }
+              emptyActions={
+                allHoldings.length === 0 ? (
+                  showBulkImport ? (
+                    <>
+                      <StackExcelBulkImport onSuccess={reload} disabled={isLoading} />
+                      <Button size="sm" className="gap-2" onClick={() => openTrade('buy-new')}>
+                        <Plus className="h-4 w-4" />
+                        Add position
+                      </Button>
+                    </>
+                  ) : (
                     <Button size="sm" className="gap-2" onClick={() => openTrade('buy-new')}>
                       <Plus className="h-4 w-4" />
                       Add position
                     </Button>
-                  </>
-                ) : (
-                  <Button size="sm" className="gap-2" onClick={() => openTrade('buy-new')}>
-                    <Plus className="h-4 w-4" />
-                    Add position
+                  )
+                ) : positionSearch.trim() && filteredHoldings.length === 0 ? (
+                  <Button size="sm" variant="outline" onClick={() => setPositionSearch('')}>
+                    Clear search
                   </Button>
-                )
-              ) : positionSearch.trim() && filteredHoldings.length === 0 ? (
-                <Button size="sm" variant="outline" onClick={() => setPositionSearch('')}>
-                  Clear search
-                </Button>
-              ) : undefined
-            }
-          />
-
-          <div className="hidden overflow-hidden rounded-xl border md:block">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Stock</TableHead>
-                  <TableHead className="text-right">Shares</TableHead>
-                  <TableHead className="text-right hidden sm:table-cell">Avg buy</TableHead>
-                  <TableHead className="text-right hidden md:table-cell">Current</TableHead>
-                  <TableHead className="text-right">Value</TableHead>
-                  <TableHead className="w-[140px]" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {allHoldings.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="py-12 text-center">
-                      <p className="text-muted-foreground">No positions in this class yet.</p>
-                      <div className="mt-4 flex flex-wrap justify-center gap-2">
-                        {showBulkImport && (
-                          <StackExcelBulkImport onSuccess={reload} disabled={isLoading} />
-                        )}
-                        <Button size="sm" className="gap-2" onClick={() => openTrade('buy-new')}>
-                          <Plus className="h-4 w-4" />
-                          Add position
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : filteredHoldings.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="py-12 text-center">
-                      <p className="text-muted-foreground">
-                        No positions match &ldquo;{positionSearch.trim()}&rdquo;.
-                      </p>
-                      <Button
-                        variant="link"
-                        size="sm"
-                        className="mt-2"
-                        onClick={() => setPositionSearch('')}
-                      >
-                        Clear search
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredHoldings.map((h) => {
-                    const positive = h.gainPercent >= 0
-                    return (
-                      <TableRow
-                        key={h.id}
-                        className="cursor-pointer hover:bg-muted/40"
-                        onClick={() => onOpenPosition(h.id)}
-                      >
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold">{h.ticker || h.name}</span>
-                            {h.marketTag && (
-                              <Badge variant="secondary" className="text-[10px] font-normal">
-                                {h.marketTag}
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground truncate max-w-[180px]">{h.name}</p>
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {h.quantity.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums hidden sm:table-cell">
-                          {formatHoldingMoney(
-                            effectiveAvgBuyNative(h),
-                            (h.currency || 'USD') as 'USD',
-                            currency,
-                            { kesToDisplayMultiplier, kesPerUsd, compact: true }
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums hidden md:table-cell">
-                          {formatHoldingMoney(h.currentPrice, (h.currency || 'USD') as 'USD', currency, {
-                            kesToDisplayMultiplier,
-                            kesPerUsd,
-                            compact: true,
-                          })}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span className="font-medium tabular-nums block">
-                            {formatHoldingPositionValue(h, currency, {
-                              kesToDisplayMultiplier,
-                              kesPerUsd,
-                              compact: true,
-                            })}
-                          </span>
-                          <span
-                            className={cn(
-                              'text-xs tabular-nums',
-                              positive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                            )}
-                          >
-                            {formatPercentage(h.gainPercent)}
-                          </span>
-                        </TableCell>
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <div className="flex justify-end gap-1">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className={STACK_BUY_BUTTON_CLASS}
-                              onClick={() => openTrade('buy-more', h)}
-                            >
-                              Buy
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className={STACK_SELL_BUTTON_CLASS}
-                              onClick={() => openTrade('sell', h)}
-                            >
-                              Sell
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })
-                )}
-              </TableBody>
-            </Table>
+                ) : undefined
+              }
+            />
           </div>
+
+          {filteredHoldings.length > 0 ? (
+            <StackClassHoldingsTable
+              holdings={filteredHoldings}
+              displayCurrency={currency}
+              kesToDisplayMultiplier={kesToDisplayMultiplier}
+              kesPerUsd={kesPerUsd}
+              onBuy={(h) => openTrade('buy-more', h)}
+              onSell={(h) => openTrade('sell', h)}
+            />
+          ) : allHoldings.length > 0 && positionSearch.trim() ? (
+            <div className="hidden rounded-xl border py-12 text-center text-muted-foreground md:block">
+              <p>No tickers match &ldquo;{positionSearch.trim()}&rdquo;.</p>
+              <Button variant="link" size="sm" className="mt-2" onClick={() => setPositionSearch('')}>
+                Clear search
+              </Button>
+            </div>
+          ) : allHoldings.length === 0 ? (
+            <div className="hidden rounded-xl border py-12 text-center md:block">
+              <p className="text-muted-foreground">No positions in this class yet.</p>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                {showBulkImport && (
+                  <StackExcelBulkImport onSuccess={reload} disabled={isLoading} />
+                )}
+                <Button size="sm" className="gap-2" onClick={() => openTrade('buy-new')}>
+                  <Plus className="h-4 w-4" />
+                  Add position
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </>
       ) : null}
 

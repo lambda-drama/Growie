@@ -1,12 +1,13 @@
 # Copyright (c) 2026, Mania and contributors
 # For license information, please see license.txt
 """
-Parse Scope-style global stocks Excel (Sample Global Stocks Template) and create Growe Holding rows.
+Parse Scope-style stocks Excel (Sample Stocks Template with Data) and create Growe Holding rows.
 
-Sheet layout:
-- Row 1: headers (Purchase Dates, Investment, Ticker #, Broker, Shares Breakdown, …)
-- Data rows until a row with first cell == "SOLD STOCKS"
-- "SOLD STOCKS" block: header row with Purchase Period, Sell date, Ticker Number, …
+Active sheet layout (row with headers containing Ticker # and Currency):
+- Purchase Dates, Investment, Ticker #, Broker, Shares Breakdown, Buying Price, Currency,
+  Initial Investment Value, Goal
+
+Sold block: first cell == "Sold Stocks", then header row, then sold rows.
 """
 
 from __future__ import annotations
@@ -229,7 +230,114 @@ def _holding_meta_from_stock(stock_name: str) -> tuple[str, str]:
 	return asset_class, currency
 
 
-def _get_or_create_stock(raw_ticker: str, investment_hint: str) -> str:
+def _normalize_header(text: Any) -> str:
+	return re.sub(r"\s+", " ", str(text or "").strip().lower())
+
+
+def _column_map_from_header(header_row: tuple) -> dict[str, int]:
+	"""Map logical field names to column indices from a header row."""
+	aliases: dict[str, tuple[str, ...]] = {
+		"date": ("purchase dates", "purchase date", "purchase period"),
+		"sell_date": ("sell date",),
+		"investment": ("investment",),
+		"ticker": ("ticker #", "ticker number", "ticker"),
+		"broker": ("broker",),
+		"shares": ("shares breakdown", "shares"),
+		"buy_price": ("buying price",),
+		"currency": ("currency",),
+		"init_inv": ("initial investment value", "initial investment"),
+		"cur_price": ("current price",),
+		"cur_val": ("current value", "current investment value"),
+		"delta": ("change in investment value", "delta"),
+		"pct": ("percentage", "% change"),
+		"owner": ("owner",),
+		"goal": ("goal",),
+	}
+	col_map: dict[str, int] = {}
+	for idx, cell in enumerate(header_row):
+		h = _normalize_header(cell)
+		if not h:
+			continue
+		for field, variants in aliases.items():
+			if field in col_map:
+				continue
+			for v in variants:
+				if h == v or v in h:
+					col_map[field] = idx
+					break
+	return col_map
+
+
+def _parse_currency_cell(val: Any) -> str:
+	"""Normalize template currency cells (US$, KES, USD, …) to ISO codes."""
+	s = _norm_cell(val).upper().replace("$", "").strip()
+	if not s:
+		return ""
+	if s in ("US", "USD", "U.S.", "U.S.D", "US$"):
+		return "USD"
+	if s in ("KES", "KSH", "KSHS", "KSH."):
+		return "KES"
+	if s in ("EUR", "€"):
+		return "EUR"
+	if s in ("GBP", "£"):
+		return "GBP"
+	if len(s) == 3 and s.isalpha():
+		return s
+	return ""
+
+
+def _row_val_by_map(row: tuple, col_map: dict[str, int], field: str) -> Any:
+	idx = col_map.get(field)
+	if idx is None:
+		return None
+	return _row_val(row, idx)
+
+
+def _legacy_active_column_map() -> dict[str, int]:
+	"""Older Scope template without a Currency column."""
+	return {
+		"date": 0,
+		"investment": 1,
+		"ticker": 2,
+		"broker": 3,
+		"shares": 4,
+		"buy_price": 5,
+		"cur_price": 6,
+		"init_inv": 7,
+		"cur_val": 8,
+		"delta": 9,
+		"pct": 10,
+		"owner": 11,
+		"goal": 12,
+	}
+
+
+def _legacy_sold_column_map() -> dict[str, int]:
+	return {
+		"date": 0,
+		"sell_date": 1,
+		"ticker": 2,
+		"broker": 3,
+		"shares": 4,
+		"buy_price": 5,
+		"cur_price": 6,
+		"cur_val": 7,
+		"goal": 8,
+	}
+
+
+def _find_header_row_and_map(rows: list[tuple], end: int) -> tuple[int | None, dict[str, int]]:
+	for i in range(min(end, 8)):
+		row = rows[i]
+		if not row:
+			continue
+		col_map = _column_map_from_header(row)
+		if "ticker" in col_map:
+			return i, col_map
+	return None, _legacy_active_column_map()
+
+
+def _get_or_create_stock(raw_ticker: str, investment_hint: str, currency_hint: str = "") -> str:
 	clean, api_raw = _normalize_ticker(raw_ticker)
 	if not clean:
 		frappe.throw(_("Missing ticker in row."))
@@ -249,6 +357,11 @@ def _get_or_create_stock(raw_ticker: str, investment_hint: str) -> str:
 		return matches[0].name
 
 	company = (investment_hint or "").strip() or clean
+	ccy = _parse_currency_cell(currency_hint) or "USD"
+	market = "NSE" if ccy == "KES" else "Global"
+	if ccy != "KES" and ccy != "USD":
+		market = "Global"
+
 	base = clean
 	name = base
 	n = 0
@@ -261,8 +374,8 @@ def _get_or_create_stock(raw_ticker: str, investment_hint: str) -> str:
 			"doctype": "Growe Stock",
 			"ticker": clean,
 			"company_name": company[:240],
-			"market": "Global",
-			"currency": "USD",
+			"market": market,
+			"currency": ccy,
 			"api_symbol": api_raw or clean,
 			"is_active": 1,
 		}
@@ -272,8 +385,8 @@ def _get_or_create_stock(raw_ticker: str, investment_hint: str) -> str:
 	return doc.name
 
 
-def _split_active_and_sold(rows: list[tuple]) -> tuple[list[tuple], list[tuple]]:
-	"""rows: all values_only rows from sheet (Scope template: data from row 3 onward)."""
+def _split_active_and_sold(rows: list[tuple]) -> tuple[list[tuple], list[tuple], dict[str, int], dict[str, int]]:
+	"""Return active rows, sold rows, and column maps for each section."""
 	sold_idx = None
 	for i, row in enumerate(rows):
 		if row and str(row[0] or "").strip().upper() == "SOLD STOCKS":
@@ -281,8 +394,9 @@ def _split_active_and_sold(rows: list[tuple]) -> tuple[list[tuple], list[tuple]]
 			break
 
 	active_end = sold_idx if sold_idx is not None else len(rows)
-	# Row 0 may be a title row; row 1 is headers — data starts at index 2
-	start = 2
+	header_idx, active_col_map = _find_header_row_and_map(rows, active_end)
+	start = (header_idx + 1) if header_idx is not None else 2
+
 	active_rows: list[tuple] = []
 	for r in range(start, active_end):
 		row = rows[r]
@@ -292,22 +406,29 @@ def _split_active_and_sold(rows: list[tuple]) -> tuple[list[tuple], list[tuple]]
 			break
 		if row[0] is None and len(row) > 2 and row[2] is None:
 			continue
-		if len(row) <= 2 or row[2] is None or str(row[2]).strip() == "":
+		ticker_cell = _row_val_by_map(row, active_col_map, "ticker")
+		if ticker_cell is None or str(ticker_cell).strip() == "":
 			continue
 		active_rows.append(row)
 
 	sold_rows: list[tuple] = []
+	sold_col_map = _legacy_sold_column_map()
 	if sold_idx is not None:
-		hdr = sold_idx + 1
-		for r in range(hdr + 1, len(rows)):
+		sold_hdr_idx = sold_idx + 1
+		if sold_hdr_idx < len(rows):
+			parsed = _column_map_from_header(rows[sold_hdr_idx])
+			if "ticker" in parsed:
+				sold_col_map = parsed
+		for r in range(sold_hdr_idx + 1, len(rows)):
 			row = rows[r]
 			if not row:
 				continue
-			if len(row) <= 2 or row[2] is None or str(row[2]).strip() == "":
+			ticker_cell = _row_val_by_map(row, sold_col_map, "ticker")
+			if ticker_cell is None or str(ticker_cell).strip() == "":
 				continue
 			sold_rows.append(row)
 
-	return active_rows, sold_rows
+	return active_rows, sold_rows, active_col_map, sold_col_map
 
 
 def _percent_from_excel(val: Any) -> float | None:
@@ -327,9 +448,9 @@ def _holding_amounts_as_uploaded(
 	"""
 	Return (value_kes, cost_basis_kes) **numeric** amounts as they appear in the sheet.
 
-	The Scope template is USD; we set ``currency`` = USD on the holding and store the same
-	numbers in ``value_kes`` / ``cost_basis_kes`` without FX conversion, so ERPNext Currency
-	Exchange is not required for import. (Field names are legacy; amounts follow ``currency``.)
+	The template stores amounts in the row's ``Currency`` column (any supported code or symbol).
+	We set ``currency`` on the holding and store the same numbers in ``value_kes`` /
+	``cost_basis_kes`` without FX conversion (legacy field names; amounts follow ``currency``).
 	"""
 	return float(current_value or 0), float(initial_investment or 0)
 
@@ -344,23 +465,27 @@ def _insert_holding(
 	ticker_symbol: str,
 	row: tuple,
 	*,
+	col_map: dict[str, int],
 	asset_class: str,
 	currency: str,
 	sold: bool,
 	use_date: str,
 	sold_date: str | None,
 ) -> None:
-	# Scope template columns: 0=date, 1=investment, 2=ticker, 3=broker, 4=shares, 5=buy, …
-	broker = _norm_cell(_row_val(row, 3))
-	shares = _to_float(_row_val(row, 4))
-	buy_px = _to_float(_row_val(row, 5))
-	cur_px = _to_float(_row_val(row, 6))
-	init_inv = _to_float(_row_val(row, 7))
-	cur_val = _to_float(_row_val(row, 8))
-	delta_v = _to_float(_row_val(row, 9))
-	pct = _percent_from_excel(_row_val(row, 10))
-	owner = _norm_cell(_row_val(row, 11))
-	goal = _norm_cell(_row_val(row, 12))
+	broker = _norm_cell(_row_val_by_map(row, col_map, "broker"))
+	shares = _to_float(_row_val_by_map(row, col_map, "shares"))
+	buy_px = _to_float(_row_val_by_map(row, col_map, "buy_price"))
+	cur_px = _to_float(_row_val_by_map(row, col_map, "cur_price"))
+	init_inv = _to_float(_row_val_by_map(row, col_map, "init_inv"))
+	cur_val = _to_float(_row_val_by_map(row, col_map, "cur_val"))
+	delta_v = _to_float(_row_val_by_map(row, col_map, "delta"))
+	pct = _percent_from_excel(_row_val_by_map(row, col_map, "pct"))
+	owner = _norm_cell(_row_val_by_map(row, col_map, "owner"))
+	goal = _norm_cell(_row_val_by_map(row, col_map, "goal"))
+
+	sheet_currency = _parse_currency_cell(_row_val_by_map(row, col_map, "currency"))
+	if sheet_currency:
+		currency = sheet_currency
 
 	qty = shares if shares is not None else 0.0
 	if (buy_px is None or buy_px <= 0) and qty > 0 and init_inv:
@@ -373,6 +498,8 @@ def _insert_holding(
 		cost_kes = buy_px * qty
 	if value_kes <= 0 and cur_px and qty > 0:
 		value_kes = cur_px * qty
+	elif value_kes <= 0 and init_inv:
+		value_kes = init_inv
 
 	notes_parts = []
 	if owner:
@@ -438,24 +565,30 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 	"""Shared import for Excel, CSV, and Google Sheets (same Scope template columns)."""
 	_assert_can_import_for_investor(investor)
 
-	active_rows, sold_rows = _split_active_and_sold(rows)
+	active_rows, sold_rows, active_col_map, sold_col_map = _split_active_and_sold(rows)
 	created = 0
 	errors: list[str] = []
 	for i, row in enumerate(active_rows):
 		try:
-			investment = _norm_cell(_row_val(row, 1)) or _norm_cell(_row_val(row, 2))
-			raw_tk = _norm_cell(_row_val(row, 2))
-			use_date = _parse_date_cell(_row_val(row, 0))
+			investment = _norm_cell(_row_val_by_map(row, active_col_map, "investment")) or _norm_cell(
+				_row_val_by_map(row, active_col_map, "ticker")
+			)
+			raw_tk = _norm_cell(_row_val_by_map(row, active_col_map, "ticker"))
+			use_date = _parse_date_cell(_row_val_by_map(row, active_col_map, "date"))
+			sheet_ccy = _parse_currency_cell(_row_val_by_map(row, active_col_map, "currency"))
 
-			stock_doc = _get_or_create_stock(raw_tk, investment)
+			stock_doc = _get_or_create_stock(raw_tk, investment, sheet_ccy)
 			ticker_sym = frappe.db.get_value("Growe Stock", stock_doc, "ticker") or raw_tk
 			asset_class, currency = _holding_meta_from_stock(stock_doc)
+			if sheet_ccy:
+				currency = sheet_ccy
 
 			_insert_holding(
 				investor,
 				stock_doc,
 				ticker_sym,
 				row,
+				col_map=active_col_map,
 				asset_class=asset_class,
 				currency=currency,
 				sold=False,
@@ -472,9 +605,9 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 
 	for j, row in enumerate(sold_rows):
 		try:
-			raw_tk = _norm_cell(_row_val(row, 2))
-			use_date = _parse_date_cell(_row_val(row, 0))
-			sell_raw = _row_val(row, 1)
+			raw_tk = _norm_cell(_row_val_by_map(row, sold_col_map, "ticker"))
+			use_date = _parse_date_cell(_row_val_by_map(row, sold_col_map, "date"))
+			sell_raw = _row_val_by_map(row, sold_col_map, "sell_date")
 			if isinstance(sell_raw, datetime):
 				sold_date = sell_raw.date().isoformat()
 			elif isinstance(sell_raw, date):
@@ -483,7 +616,7 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 				s = _norm_cell(sell_raw)
 				sold_date = str(getdate(s)) if s else None
 
-			stock_doc = _get_or_create_stock(raw_tk, "")
+			stock_doc = _get_or_create_stock(raw_tk, "", "")
 			ticker_sym = frappe.db.get_value("Growe Stock", stock_doc, "ticker") or raw_tk
 			asset_class, currency = _holding_meta_from_stock(stock_doc)
 
@@ -492,6 +625,7 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 				stock_doc,
 				ticker_sym,
 				row,
+				col_map=sold_col_map,
 				asset_class=asset_class,
 				currency=currency,
 				sold=True,
@@ -520,7 +654,7 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 @frappe.whitelist()
 def import_scope_template_excel(file_url: str, investor: str):
 	"""
-	Import Sample Global Stocks Template .xlsx into Growe Holding.
+	Import Sample Stocks Template with Data (.xlsx) into Growe Holding.
 
 	:param file_url: Uploaded File ``file_url`` (Desk attach or portal ``upload_file``).
 	:param investor: Growe Member name (must match the signed-in member unless System Manager).
