@@ -3,14 +3,14 @@
 
 frappe.ui.form.on('Growe Holding', {
 	refresh(frm) {
-		frm.add_custom_button(__('Import from Excel (Scope template)'), () => {
+		frm.add_custom_button(__('Import from Excel (stocks template)'), () => {
 			if (!frm.doc.investor) {
 				frappe.msgprint(__('Set Investor (Growe Member) first, then import.'));
 				return;
 			}
 			frappe.confirm(
 				__(
-					'Import all active and sold stock rows from your Excel into holdings for {0}? New Growe Stock records will be created when the ticker is missing.',
+					'Import active and sold rows for {0} from Sample Stocks Template with Data (.xlsx)? Each active row needs a Currency value matching that row’s amounts. New Growe Stock records are created when the ticker is missing.',
 					[frm.doc.investor]
 				),
 				() => {

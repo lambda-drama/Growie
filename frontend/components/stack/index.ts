@@ -1,5 +1,6 @@
 export { StackOverview } from './stack-overview'
 export { StackClassView } from './stack-class-view'
+export { StackTickerGroups } from './stack-ticker-groups'
 export { StackPositionView } from './stack-position-view'
 export { StackBreadcrumb } from './stack-breadcrumb'
 export { StackHeroCard } from './stack-hero-card'

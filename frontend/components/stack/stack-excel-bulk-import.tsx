@@ -187,8 +187,8 @@ export function StackExcelBulkImport({
                 <DialogTitle>Bulk upload</DialogTitle>
               </DialogHeader>
               <p className="text-sm text-muted-foreground">
-                Do you need a sample template for global stocks? It matches the Scope layout (active
-                positions and sold rows).
+                Do you need a sample template? It includes active positions (with a Currency
+                column per row) and a sold section.
               </p>
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
                 {HOLDINGS_BULK_TEMPLATE_EXAMPLE_ROW_NOTE}
@@ -216,8 +216,9 @@ export function StackExcelBulkImport({
                 <DialogTitle>How do you want to upload?</DialogTitle>
               </DialogHeader>
               <p className="text-sm text-muted-foreground">
-                Import Scope / global stocks template (active and sold sections). Same column layout for
-                all options.
+                Import the stocks template (active and sold sections). Use the Currency column on
+                each row so amounts are imported in the correct currency. Same layout for Excel, CSV,
+                or Google Sheets.
               </p>
               <button
                 type="button"
@@ -340,7 +341,7 @@ export function StackExcelBulkImport({
                     </>
                   ) : null}
                 </p>
-                <p>Uses the Scope / global stocks layout. New tickers create Growe Stock records (USD).</p>
+                <p>New tickers create Growe Stock records using each row’s currency.</p>
               </div>
               <DialogFooter className="gap-2 sm:gap-0">
                 <Button
