@@ -49,7 +49,7 @@ export function StackClassView({ assetClass, onBack }: StackClassViewProps) {
   const [selectedBucket, setSelectedBucket] = useState<string | null>(null)
 
   const showPositionSearch =
-    assetClass === 'nse-stocks' || assetClass === 'global-stocks'
+    assetClass === 'nse-stocks' || assetClass === 'global-stocks' || assetClass === 'etf'
 
   useEffect(() => {
     setPositionSearch('')
@@ -84,7 +84,7 @@ export function StackClassView({ assetClass, onBack }: StackClassViewProps) {
   }
 
   const summary = detail?.summary
-  const showBulkImport = assetClass === 'global-stocks'
+  const showBulkImport = assetClass === 'global-stocks' || assetClass === 'etf'
 
   return (
     <div className="space-y-6">

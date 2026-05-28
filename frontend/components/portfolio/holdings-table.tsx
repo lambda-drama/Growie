@@ -44,19 +44,21 @@ import { StackExcelBulkImport } from '@/components/stack/stack-excel-bulk-import
 import type { AssetClass, Holding } from '@/types'
 import { cn } from '@/lib/utils'
 
-const assetClasses: AssetClass[] = ['mmf', 'real-estate', 'nse-stocks', 'global-stocks']
+const assetClasses: AssetClass[] = ['mmf', 'real-estate', 'nse-stocks', 'global-stocks', 'etf']
 
 const ASSET_CLASS_OPTIONS = [
   { value: 'mmf',           label: 'Money Market Fund' },
   { value: 'real-estate',   label: 'Real Estate'       },
   { value: 'nse-stocks',    label: 'NSE Stocks'        },
   { value: 'global-stocks', label: 'Global Stocks'     },
+  { value: 'etf', label: 'ETFs' },
 ]
 
 // market filter per asset class
 const CLASS_TO_MARKET: Record<string, string | undefined> = {
   'nse-stocks':    'NSE',
   'global-stocks': 'Global',
+  etf: 'ETF',
 }
 
 // ─── Stock combobox ───────────────────────────────────────────────────────────
@@ -442,6 +444,7 @@ function HoldingDialog({ open, onClose, editing, onSaved }: HoldingDialogProps) 
             <Label>
               {form.assetClass === 'nse-stocks' ? 'NSE Stock' :
                form.assetClass === 'global-stocks' ? 'Global Stock' :
+               form.assetClass === 'etf' ? 'ETF' :
                form.assetClass === 'mmf' ? 'Money Market Fund' :
                'Asset'}
               {' '}
@@ -513,7 +516,7 @@ function HoldingDialog({ open, onClose, editing, onSaved }: HoldingDialogProps) 
           </div>
 
           {/* Quantity — shown for stocks */}
-          {(form.assetClass === 'nse-stocks' || form.assetClass === 'global-stocks') && (
+          {(form.assetClass === 'nse-stocks' || form.assetClass === 'global-stocks' || form.assetClass === 'etf') && (
             <div className="space-y-1.5">
               <Label>Quantity <span className="text-muted-foreground font-normal">(shares / units)</span></Label>
               <Input
@@ -569,7 +572,7 @@ export function HoldingsTable() {
 
   const holdingsByClass = useMemo(() => {
     const grouped: Record<AssetClass, Holding[]> = {
-      'mmf': [], 'real-estate': [], 'nse-stocks': [], 'global-stocks': [],
+      'mmf': [], 'real-estate': [], 'nse-stocks': [], 'global-stocks': [], etf: [],
     }
     holdings.forEach((h) => {
       if (grouped[h.assetClass]) grouped[h.assetClass].push(h)

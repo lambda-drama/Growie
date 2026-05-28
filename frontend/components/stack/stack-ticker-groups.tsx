@@ -6,8 +6,13 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { StackBucketIcon } from '@/components/stack/stack-bucket-icon'
 import { StackHoldingRowCard } from '@/components/stack/stack-holding-row-card'
-import type { StackBucketKind } from '@/lib/stack-bucket-icons'
 import { formatCurrency, formatHoldingMoney, formatPercentage } from '@/lib/format'
+import {
+  bucketIconKind,
+  bucketLabelForTickerGroup,
+  groupingBackLabel,
+  type StackGroupingMode,
+} from '@/lib/stack-grouping'
 import { groupHoldingsByTicker, type StackTickerGroup } from '@/lib/stack-ticker-groups'
 import type { StackHolding } from '@/services/stack'
 import { cn } from '@/lib/utils'
@@ -20,7 +25,7 @@ interface StackTickerGroupsProps {
   onOpenHolding: (h: StackHolding) => void
   onBuy: (h: StackHolding) => void
   onSell: (h: StackHolding) => void
-  groupingMode: 'ticker' | 'region' | 'exchange'
+  groupingMode: StackGroupingMode
   selectedBucketKey: string | null
   onSelectBucket: (bucket: string) => void
   onBackToBuckets: () => void
@@ -29,27 +34,6 @@ interface StackTickerGroupsProps {
   onBackToGroups: () => void
   emptyMessage?: string
   emptyActions?: ReactNode
-}
-
-function inferRegion(group: StackTickerGroup): string {
-  const explicit = (group.holdings[0]?.region || '').trim()
-  if (explicit) return explicit
-  const tag = (group.marketTag || '').toLowerCase()
-  const assetClass = (group.holdings[0]?.assetClass || '').toLowerCase()
-  if (assetClass === 'nse-stocks') return 'Kenya'
-  if (assetClass === 'mmf' || assetClass === 'real-estate') return 'Local'
-  if (tag.includes('nse') || tag.includes('kenya')) return 'Kenya'
-  if (tag.includes('nasdaq') || tag.includes('nyse') || tag.includes('amex') || tag.includes('us')) return 'US'
-  if (tag.includes('lse') || tag.includes('euronext') || tag.includes('xetra') || tag.includes('europe')) return 'Europe'
-  if (tag.includes('jse') || tag.includes('africa')) return 'Africa'
-  if ((group.currency || '').toUpperCase() === 'KES') return 'Kenya'
-  return 'Global'
-}
-
-function groupBucketLabel(group: StackTickerGroup, mode: 'ticker' | 'region' | 'exchange'): string {
-  if (mode === 'region') return inferRegion(group)
-  if (mode === 'exchange') return group.holdings[0]?.exchangePlatform || group.marketTag || 'Unspecified market'
-  return 'All tickers'
 }
 
 function TickerSummaryCard({
@@ -138,7 +122,7 @@ export function StackTickerGroups({
   const bucketedGroups = useMemo(() => {
     const map = new Map<string, StackTickerGroup[]>()
     for (const group of groups) {
-      const bucket = groupBucketLabel(group, groupingMode)
+      const bucket = bucketLabelForTickerGroup(group, groupingMode)
       const list = map.get(bucket) ?? []
       list.push(group)
       map.set(bucket, list)
@@ -232,7 +216,7 @@ export function StackTickerGroups({
               <div className="flex items-center gap-3">
                 <StackBucketIcon
                   label={b.bucket}
-                  kind={(groupingMode === 'region' ? 'region' : 'exchange') as StackBucketKind}
+                  kind={bucketIconKind(groupingMode)}
                 />
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold">{b.bucket}</p>
@@ -273,7 +257,7 @@ export function StackTickerGroups({
       <div className="space-y-3">
         <Button variant="ghost" size="sm" className="gap-1 px-1" onClick={onBackToBuckets}>
           <ChevronLeft className="h-4 w-4" />
-          Back to {groupingMode === 'region' ? 'regions' : 'exchanges'}
+          Back to {groupingBackLabel(groupingMode)}
         </Button>
         <div className="rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold">
           {selectedBucketKey}

@@ -24,6 +24,7 @@ function iconTint(assetClass: AssetClass): string {
     mmf: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
     'real-estate': 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300',
     'global-stocks': 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300',
+    etf: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300',
   }
   return map[assetClass]
 }

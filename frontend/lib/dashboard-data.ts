@@ -5,9 +5,10 @@ import { getAssetClassName } from '@/lib/format'
 
 export const ASSET_CLASS_ORDER: AssetClass[] = [
   'nse-stocks',
+  'global-stocks',
+  'etf',
   'mmf',
   'real-estate',
-  'global-stocks',
 ]
 
 export interface AssetClassGroup {

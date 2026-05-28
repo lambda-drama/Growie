@@ -32,6 +32,7 @@ import type { GroweStock } from '@/services/portfolio'
 const ASSET_CLASSES: { value: AssetClass; label: string }[] = [
   { value: 'nse-stocks', label: 'NSE Stocks' },
   { value: 'global-stocks', label: 'Global Stocks' },
+  { value: 'etf', label: 'ETFs' },
   { value: 'mmf', label: 'Money Market Funds' },
   { value: 'real-estate', label: 'Real Estate' },
 ]
@@ -99,6 +100,7 @@ export function TradeDialog({
 
   useEffect(() => {
     if (assetClass === 'nse-stocks') setCurrency('KES')
+    if (assetClass === 'etf' || assetClass === 'global-stocks') setCurrency('USD')
   }, [assetClass])
 
   const handleStockSelect = (stock: GroweStock, inferred?: AssetClass) => {

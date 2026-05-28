@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StackHeroCard } from '@/components/stack/stack-hero-card'
 import { StackMetricsGrid } from '@/components/stack/stack-metrics-grid'
+import { StackAnalyticsSection } from '@/components/stack/stack-analytics-section'
 import { StackBucketIcon } from '@/components/stack/stack-bucket-icon'
 import { StackClassList } from '@/components/stack/stack-class-list'
 import { StackTickerGroups } from '@/components/stack/stack-ticker-groups'
@@ -18,6 +19,12 @@ import { usePortfolio } from '@/hooks/use-portfolio'
 import { useAuth } from '@/hooks/use-auth'
 import { useAppStore, useDisplayMoney } from '@/lib/store'
 import { computeDashboardMetrics } from '@/lib/dashboard-data'
+import {
+  bucketIconKind,
+  bucketLabelForHolding,
+  groupingListTitle,
+  isBucketGroupingMode,
+} from '@/lib/stack-grouping'
 import { firstNameFrom, timeGreeting } from '@/lib/stack-ui'
 import type { StackClassSummary } from '@/services/stack'
 import type { StackHolding } from '@/services/stack'
@@ -47,13 +54,10 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
   }
 
   const groupedOverviewRows = useMemo(() => {
-    if (stackGroupingMode === 'ticker') return []
+    if (!isBucketGroupingMode(stackGroupingMode)) return []
     const map = new Map<string, { value: number; cost: number; positions: number; classCounts: Record<string, number> }>()
     for (const h of holdings) {
-      const key =
-        stackGroupingMode === 'region'
-          ? (h.region || (h.assetClass === 'nse-stocks' || h.assetClass === 'mmf' || h.assetClass === 'real-estate' ? 'Africa' : 'Global'))
-          : (h.exchangePlatform || (h.assetClass === 'nse-stocks' || h.assetClass === 'mmf' || h.assetClass === 'real-estate' ? 'NSE' : 'Global'))
+      const key = bucketLabelForHolding(h, stackGroupingMode)
       const row = map.get(key) ?? { value: 0, cost: 0, positions: 0, classCounts: {} }
       row.value += h.valueInKES ?? h.valueKES ?? 0
       row.cost += h.costAtAvgKES ?? h.costBasisKES ?? 0
@@ -75,14 +79,10 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
   }, [holdings, stackGroupingMode])
 
   const selectedBucketHoldings = useMemo(() => {
-    if (!selectedOverviewBucket || stackGroupingMode === 'ticker') return []
-    return holdings.filter((h) => {
-      const key =
-        stackGroupingMode === 'region'
-          ? (h.region || (h.assetClass === 'nse-stocks' || h.assetClass === 'mmf' || h.assetClass === 'real-estate' ? 'Africa' : 'Global'))
-          : (h.exchangePlatform || (h.assetClass === 'nse-stocks' || h.assetClass === 'mmf' || h.assetClass === 'real-estate' ? 'NSE' : 'Global'))
-      return key === selectedOverviewBucket
-    })
+    if (!selectedOverviewBucket || !isBucketGroupingMode(stackGroupingMode)) return []
+    return holdings.filter(
+      (h) => bucketLabelForHolding(h, stackGroupingMode) === selectedOverviewBucket
+    )
   }, [holdings, selectedOverviewBucket, stackGroupingMode])
 
   const metrics = useMemo(
@@ -114,8 +114,7 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
     : user?.email?.split('@')[0] ?? 'there'
 
   /** Region/exchange tier 2+ — hide blue hero only; keep the four metric cards (same as ticker class view). */
-  const overviewInDrillDown =
-    stackGroupingMode !== 'ticker' && selectedOverviewBucket != null
+  const overviewInDrillDown = isBucketGroupingMode(stackGroupingMode) && selectedOverviewBucket != null
 
   return (
     <div className="space-y-5 sm:space-y-6">
@@ -249,7 +248,7 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
             <section>
               {!overviewInDrillDown ? (
                 <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  My stack by {stackGroupingMode}
+                  My stack by {groupingListTitle(stackGroupingMode)}
                 </h2>
               ) : null}
               {!selectedOverviewBucket ? (
@@ -266,7 +265,7 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
                       >
                       <StackBucketIcon
                         label={row.label}
-                        kind={stackGroupingMode === 'region' ? 'region' : 'exchange'}
+                        kind={bucketIconKind(stackGroupingMode)}
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-semibold text-foreground sm:text-base">
@@ -310,7 +309,7 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
                       setSelectedOverviewGroupKey(null)
                     }}
                   >
-                    Back to {stackGroupingMode}
+                    Back to {groupingListTitle(stackGroupingMode)}
                   </Button>
                   <div className="rounded-xl border border-border px-4 py-2 text-sm font-semibold">
                     {selectedOverviewBucket}
@@ -353,6 +352,9 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
               )}
             </section>
           )}
+          {!overviewInDrillDown ? (
+            <StackAnalyticsSection holdings={holdings as StackHolding[]} />
+          ) : null}
         </>
       )}
 

@@ -21,7 +21,13 @@ import {
   formatPercentage,
 } from '@/lib/format'
 import { StackBucketIcon } from '@/components/stack/stack-bucket-icon'
-import type { StackBucketKind } from '@/lib/stack-bucket-icons'
+import {
+  bucketIconKind,
+  bucketLabelForTickerGroup,
+  groupingBackLabel,
+  groupingBucketColumnLabel,
+  type StackGroupingMode,
+} from '@/lib/stack-grouping'
 import { groupHoldingsByTicker, type StackTickerGroup } from '@/lib/stack-ticker-groups'
 import type { StackHolding } from '@/services/stack'
 import { STACK_BUY_BUTTON_CLASS, STACK_SELL_BUTTON_CLASS } from '@/lib/stack-ui'
@@ -35,34 +41,13 @@ interface StackClassHoldingsTableProps {
   onOpenHolding: (h: StackHolding) => void
   onBuy: (h: StackHolding) => void
   onSell: (h: StackHolding) => void
-  groupingMode: 'ticker' | 'region' | 'exchange'
+  groupingMode: StackGroupingMode
   selectedBucketKey: string | null
   onSelectBucket: (bucket: string) => void
   onBackToBuckets: () => void
   selectedGroupKey: string | null
   onSelectGroup: (groupKey: string) => void
   onBackToGroups: () => void
-}
-
-function inferRegion(group: StackTickerGroup): string {
-  const explicit = (group.holdings[0]?.region || '').trim()
-  if (explicit) return explicit
-  const tag = (group.marketTag || '').toLowerCase()
-  const assetClass = (group.holdings[0]?.assetClass || '').toLowerCase()
-  if (assetClass === 'nse-stocks') return 'Kenya'
-  if (assetClass === 'mmf' || assetClass === 'real-estate') return 'Local'
-  if (tag.includes('nse') || tag.includes('kenya')) return 'Kenya'
-  if (tag.includes('nasdaq') || tag.includes('nyse') || tag.includes('amex') || tag.includes('us')) return 'US'
-  if (tag.includes('lse') || tag.includes('euronext') || tag.includes('xetra') || tag.includes('europe')) return 'Europe'
-  if (tag.includes('jse') || tag.includes('africa')) return 'Africa'
-  if ((group.currency || '').toUpperCase() === 'KES') return 'Kenya'
-  return 'Global'
-}
-
-function groupBucketLabel(group: StackTickerGroup, mode: 'ticker' | 'region' | 'exchange'): string {
-  if (mode === 'region') return inferRegion(group)
-  if (mode === 'exchange') return group.holdings[0]?.exchangePlatform || group.marketTag || 'Unspecified market'
-  return 'All tickers'
 }
 
 function HoldingTableRow({
@@ -275,7 +260,7 @@ export function StackClassHoldingsTable({
   const bucketedGroups = useMemo(() => {
     const map = new Map<string, StackTickerGroup[]>()
     for (const group of groups) {
-      const bucket = groupBucketLabel(group, groupingMode)
+      const bucket = bucketLabelForTickerGroup(group, groupingMode)
       const list = map.get(bucket) ?? []
       list.push(group)
       map.set(bucket, list)
@@ -372,7 +357,7 @@ export function StackClassHoldingsTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>{groupingMode === 'region' ? 'Region' : 'Exchange'}</TableHead>
+              <TableHead>{groupingBucketColumnLabel(groupingMode)}</TableHead>
               <TableHead className="text-right">Tickers</TableHead>
               <TableHead className="text-right">Lots</TableHead>
               <TableHead className="text-right">Value</TableHead>
@@ -391,7 +376,7 @@ export function StackClassHoldingsTable({
                   <div className="flex items-center gap-3">
                     <StackBucketIcon
                       label={b.bucket}
-                      kind={(groupingMode === 'region' ? 'region' : 'exchange') as StackBucketKind}
+                      kind={bucketIconKind(groupingMode)}
                       className="h-9 w-9 sm:h-10 sm:w-10"
                     />
                     <span className="font-semibold">{b.bucket}</span>
@@ -430,7 +415,7 @@ export function StackClassHoldingsTable({
         <div className="border-b px-3 py-2">
           <Button variant="ghost" size="sm" className="gap-1 px-1" onClick={onBackToBuckets}>
             <ChevronLeft className="h-4 w-4" />
-            Back to {groupingMode === 'region' ? 'regions' : 'exchanges'}
+            Back to {groupingBackLabel(groupingMode)}
           </Button>
         </div>
         <Table>

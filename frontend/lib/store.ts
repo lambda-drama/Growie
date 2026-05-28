@@ -5,8 +5,8 @@ import { useShallow } from 'zustand/react/shallow'
 import {
   persistStackGroupingMode,
   readStoredStackGroupingMode,
-  type StackGroupingMode,
 } from '@/lib/stack-grouping-prefs'
+import type { StackGroupingMode } from '@/lib/stack-grouping'
 import type { AssetClass, Holding, HealthScore, Currency, SubscriptionTier } from '@/types'
 
 export type { StackGroupingMode }

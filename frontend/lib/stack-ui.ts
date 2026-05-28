@@ -5,6 +5,7 @@ export const ASSET_CLASS_SHORT: Record<AssetClass, string> = {
   mmf: 'MMF',
   'real-estate': 'RE',
   'global-stocks': 'Global',
+  etf: 'ETF',
 }
 
 export const ASSET_CLASS_MOBILE_LABEL: Record<AssetClass, string> = {
@@ -12,6 +13,7 @@ export const ASSET_CLASS_MOBILE_LABEL: Record<AssetClass, string> = {
   mmf: 'Money mkt funds',
   'real-estate': 'Real estate',
   'global-stocks': 'Global stocks',
+  etf: 'ETFs',
 }
 
 export const ASSET_CLASS_INITIAL: Record<AssetClass, string> = {
@@ -19,6 +21,7 @@ export const ASSET_CLASS_INITIAL: Record<AssetClass, string> = {
   mmf: 'M',
   'real-estate': 'R',
   'global-stocks': 'G',
+  etf: 'E',
 }
 
 export function stackPositionsLabel(assetClass: AssetClass, count: number): string {

@@ -1,6 +1,6 @@
 // ─── Asset Classes ───────────────────────────────────────────────────────────
 
-export type AssetClass = 'mmf' | 'real-estate' | 'nse-stocks' | 'global-stocks'
+export type AssetClass = 'mmf' | 'real-estate' | 'nse-stocks' | 'global-stocks' | 'etf'
 
 export interface Holding {
   id: string
@@ -15,6 +15,8 @@ export interface Holding {
   marketTag?: string
   region?: string
   exchangePlatform?: string
+  sector?: string
+  broker?: string
   dateAdded: string
   lastUpdated: string
   notes?: string

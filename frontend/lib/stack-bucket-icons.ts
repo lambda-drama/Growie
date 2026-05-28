@@ -1,4 +1,4 @@
-export type StackBucketKind = 'region' | 'exchange'
+export type StackBucketKind = 'region' | 'exchange' | 'security'
 
 type BucketIconStyle = { tint: string; hex: string }
 
@@ -84,6 +84,29 @@ const EXCHANGE_STYLES: Record<string, BucketIconStyle> = {
   },
 }
 
+const SECURITY_STYLES: Record<string, BucketIconStyle> = {
+  stocks: {
+    tint: 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300',
+    hex: '#0284c7',
+  },
+  etfs: {
+    tint: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300',
+    hex: '#4f46e5',
+  },
+  'money market funds': {
+    tint: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
+    hex: '#059669',
+  },
+  'real estate': {
+    tint: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300',
+    hex: '#d97706',
+  },
+  other: {
+    tint: 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-300',
+    hex: '#64748b',
+  },
+}
+
 const FALLBACK_PALETTE: BucketIconStyle[] = [
   { tint: 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300', hex: '#0284c7' },
   { tint: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300', hex: '#059669' },
@@ -109,6 +132,9 @@ function hashLabel(label: string): number {
 
 function lookupStyle(label: string, kind: StackBucketKind): BucketIconStyle {
   const key = normalizeBucketKey(label)
+  if (kind === 'security') {
+    return SECURITY_STYLES[key] ?? FALLBACK_PALETTE[hashLabel(key || label) % FALLBACK_PALETTE.length]
+  }
   const map = kind === 'region' ? REGION_STYLES : EXCHANGE_STYLES
   if (map[key]) return map[key]
   return FALLBACK_PALETTE[hashLabel(key || label) % FALLBACK_PALETTE.length]

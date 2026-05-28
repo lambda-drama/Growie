@@ -47,6 +47,7 @@ import type { AssetClass } from '@/types'
 const CLASS_TO_MARKET: Record<string, string | undefined> = {
   'nse-stocks': 'NSE',
   'global-stocks': 'Global',
+  etf: 'ETF',
 }
 
 interface StackStockPickerProps {
@@ -71,7 +72,7 @@ export function StackStockPicker({
   const [addOpen, setAddOpen] = useState(false)
   const [newTicker, setNewTicker] = useState('')
   const [newName, setNewName] = useState('')
-  const [newMarket, setNewMarket] = useState<'NSE' | 'Global'>('Global')
+  const [newMarket, setNewMarket] = useState<'NSE' | 'Global' | 'ETF'>('Global')
   const [newRegion, setNewRegion] = useState('auto')
   const [newExchange, setNewExchange] = useState('auto')
   const [regions, setRegions] = useState<string[]>([])
@@ -80,7 +81,8 @@ export function StackStockPicker({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const market = CLASS_TO_MARKET[assetClass]
-  const showStockSearch = assetClass === 'nse-stocks' || assetClass === 'global-stocks'
+  const showStockSearch =
+    assetClass === 'nse-stocks' || assetClass === 'global-stocks' || assetClass === 'etf'
 
   const doSearch = useCallback(
     async (q: string) => {
@@ -133,8 +135,9 @@ export function StackStockPicker({
     if (!newTicker.trim()) return
     setAdding(true)
     try {
-      const m = assetClass === 'nse-stocks' ? 'NSE' : newMarket
-      const defaultRegion = m === 'NSE' ? 'Kenya' : 'Global'
+      const m =
+        assetClass === 'nse-stocks' ? 'NSE' : assetClass === 'etf' ? 'ETF' : newMarket
+      const defaultRegion = m === 'NSE' ? 'Kenya' : m === 'ETF' ? 'USA' : 'Global'
       const created = await createStock({
         ticker: newTicker.trim(),
         companyName: newName.trim() || newTicker.trim(),
@@ -250,18 +253,22 @@ export function StackStockPicker({
               <Label>Company name</Label>
               <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="NVIDIA Corporation" />
             </div>
-            {assetClass === 'global-stocks' && (
+            {(assetClass === 'global-stocks' || assetClass === 'etf') && (
               <div className="grid gap-2">
                 <Label>Market</Label>
-                <Select value={newMarket} onValueChange={(v) => setNewMarket(v as 'NSE' | 'Global')}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Global">Global</SelectItem>
-                    <SelectItem value="NSE">NSE</SelectItem>
-                  </SelectContent>
-                </Select>
+                {assetClass === 'etf' ? (
+                  <p className="text-sm text-muted-foreground">ETF (exchange-traded fund)</p>
+                ) : (
+                  <Select value={newMarket} onValueChange={(v) => setNewMarket(v as 'NSE' | 'Global' | 'ETF')}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Global">Global</SelectItem>
+                      <SelectItem value="NSE">NSE</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             )}
             <div className="grid gap-2">
@@ -271,7 +278,10 @@ export function StackStockPicker({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="auto">Auto ({assetClass === 'nse-stocks' ? 'Kenya' : 'Global'})</SelectItem>
+                  <SelectItem value="auto">
+                    Auto (
+                    {assetClass === 'nse-stocks' ? 'Kenya' : assetClass === 'etf' ? 'USA' : 'Global'})
+                  </SelectItem>
                   {regions.map((r) => (
                     <SelectItem key={r} value={r}>
                       {r}
