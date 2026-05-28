@@ -174,8 +174,18 @@ def _stack_holding_row(h) -> dict:
 	)
 
 	market = ""
+	region = ""
+	exchange_platform = ""
 	if row.get("stockName"):
-		market = frappe.db.get_value("Growe Stock", row["stockName"], "market") or ""
+		stock_meta = frappe.db.get_value(
+			"Growe Stock",
+			row["stockName"],
+			["market", "region", "exchange_platform"],
+			as_dict=True,
+		) or {}
+		market = stock_meta.get("market") or ""
+		region = stock_meta.get("region") or ""
+		exchange_platform = stock_meta.get("exchange_platform") or ""
 
 	if currency != "KES" and value_in_kes <= 0 and value_native > 0:
 		from growie_app.api.portfolio import _growe_usd_to_kes_fallback
@@ -188,6 +198,8 @@ def _stack_holding_row(h) -> dict:
 			"marketTag": market or _market_tag_for_holding(
 				frappe._dict(asset_class=_ASSET_CLASS_REVERSE.get(row.get("assetClass"), ""))
 			),
+			"region": region,
+			"exchangePlatform": exchange_platform,
 			"avgBuyPrice": round(avg_buy_native, 4),
 			"currentPrice": round(current_native, 4),
 			"valueNative": round(value_native, 2),
@@ -446,6 +458,8 @@ def create_stock(
 	company_name: str,
 	market: str = "Global",
 	currency: str = "USD",
+	region: str = None,
+	exchange_platform: str = None,
 ):
 	"""Create a Growe Stock (e.g. when user adds a new listing)."""
 	_member_name()
@@ -455,6 +469,8 @@ def create_stock(
 	mkt = (market or "Global").strip()
 	if mkt not in ("NSE", "Global"):
 		frappe.throw(_("Market must be NSE or Global."))
+	region_val = (region or ("Kenya" if mkt == "NSE" else "Global")).strip()
+	exchange_val = (exchange_platform or mkt).strip()
 
 	existing = frappe.db.get_value("Growe Stock", {"ticker": clean, "market": mkt}, "name")
 	if existing:
@@ -464,6 +480,8 @@ def create_stock(
 			"company_name": frappe.db.get_value("Growe Stock", existing, "company_name"),
 			"market": mkt,
 			"currency": frappe.db.get_value("Growe Stock", existing, "currency") or currency,
+			"region": frappe.db.get_value("Growe Stock", existing, "region") or region_val,
+			"exchange_platform": frappe.db.get_value("Growe Stock", existing, "exchange_platform") or exchange_val,
 			"assetClass": _asset_class_from_market(mkt),
 			"created": False,
 		}
@@ -475,6 +493,8 @@ def create_stock(
 			"company_name": (company_name or clean).strip()[:240],
 			"market": mkt,
 			"currency": (currency or "USD").upper(),
+			"region": region_val,
+			"exchange_platform": exchange_val,
 			"is_active": 1,
 		}
 	)
@@ -487,8 +507,181 @@ def create_stock(
 		"company_name": doc.company_name,
 		"market": doc.market,
 		"currency": doc.currency,
+		"region": doc.region,
+		"exchange_platform": doc.exchange_platform,
 		"assetClass": _asset_class_from_market(doc.market),
 		"created": True,
+	}
+
+
+@frappe.whitelist()
+def get_regions(query: str = "", limit: int = 50):
+	filters = {}
+	if query:
+		return frappe.db.sql(
+			"""
+			SELECT name
+			FROM `tabGrowe Region`
+			WHERE name LIKE %(q)s
+			ORDER BY name ASC
+			LIMIT %(limit)s
+			""",
+			{"q": f"%{query}%", "limit": int(limit)},
+			as_dict=True,
+		)
+	return frappe.get_all("Growe Region", filters=filters, fields=["name"], order_by="name asc", limit=int(limit))
+
+
+@frappe.whitelist()
+def get_exchange_platforms(query: str = "", limit: int = 50):
+	filters = {}
+	if query:
+		return frappe.db.sql(
+			"""
+			SELECT name
+			FROM `tabGrowe Exchange Platform`
+			WHERE name LIKE %(q)s
+			ORDER BY name ASC
+			LIMIT %(limit)s
+			""",
+			{"q": f"%{query}%", "limit": int(limit)},
+			as_dict=True,
+		)
+	return frappe.get_all(
+		"Growe Exchange Platform",
+		filters=filters,
+		fields=["name"],
+		order_by="name asc",
+		limit=int(limit),
+	)
+
+
+@frappe.whitelist()
+def seed_region_exchange_masters():
+	"""Create baseline Region + Exchange master rows if missing."""
+	regions = ["USA", "Africa", "Asia", "Europe", "Middle East"]
+	exchanges = ["NSE", "NYSE", "NASDAQ", "LSE", "Euronext", "JPX", "HKEX", "JSE"]
+
+	for name in regions:
+		if not frappe.db.exists("Growe Region", name):
+			doc = frappe.get_doc({"doctype": "Growe Region", "region_name": name})
+			doc.flags.ignore_permissions = True
+			doc.insert()
+
+	for name in exchanges:
+		if not frappe.db.exists("Growe Exchange Platform", name):
+			doc = frappe.get_doc(
+				{"doctype": "Growe Exchange Platform", "platform_name": name}
+			)
+			doc.flags.ignore_permissions = True
+			doc.insert()
+
+	frappe.db.commit()
+	return {"regions_seeded": len(regions), "exchanges_seeded": len(exchanges)}
+
+
+def _infer_region_exchange_for_stock(stock: dict) -> tuple[str, str]:
+	"""Infer region/exchange for a Growe Stock using market + api symbol hints."""
+	market = (stock.get("market") or "").strip()
+	api_symbol = (stock.get("api_symbol") or "").strip().upper()
+	ticker = (stock.get("ticker") or "").strip().upper()
+
+	if market == "NSE":
+		return "Africa", "NSE"
+
+	if api_symbol:
+		if ":" in api_symbol:
+			pfx = api_symbol.split(":", 1)[0]
+			if pfx in ("NASDAQ", "NYSE", "AMEX"):
+				return "USA", pfx
+			if pfx in ("LSE", "EURONEXT", "XETRA"):
+				return "Europe", pfx
+			if pfx in ("JSE",):
+				return "Africa", pfx
+			if pfx in ("HKEX", "JPX", "TSE"):
+				return "Asia", "JPX" if pfx == "TSE" else pfx
+
+		if api_symbol.endswith(".L"):
+			return "Europe", "LSE"
+		if api_symbol.endswith(".PA"):
+			return "Europe", "Euronext"
+		if api_symbol.endswith(".AS"):
+			return "Europe", "Euronext"
+		if api_symbol.endswith(".DE"):
+			return "Europe", "XETRA"
+		if api_symbol.endswith(".TO"):
+			return "USA", "NYSE"
+		if api_symbol.endswith(".HK"):
+			return "Asia", "HKEX"
+		if api_symbol.endswith(".JO"):
+			return "Africa", "JSE"
+
+	if ticker.endswith(".L"):
+		return "Europe", "LSE"
+	if ticker.endswith(".HK"):
+		return "Asia", "HKEX"
+	if ticker.endswith(".JO"):
+		return "Africa", "JSE"
+
+	# Default for Global/unknown market stocks.
+	return "USA", "NASDAQ"
+
+
+@frappe.whitelist()
+def backfill_stock_region_exchange(dry_run: int = 0):
+	"""Backfill region + exchange_platform for Growe Stock records."""
+	rows = frappe.get_all(
+		"Growe Stock",
+		fields=["name", "market", "ticker", "api_symbol", "region", "exchange_platform"],
+		limit=0,
+	)
+	changed = 0
+	already_set = 0
+	skipped = 0
+	updates = []
+	do_commit = int(dry_run or 0) == 0
+
+	for row in rows:
+		cur_region = (row.get("region") or "").strip()
+		cur_exchange = (row.get("exchange_platform") or "").strip()
+		if cur_region and cur_exchange:
+			already_set += 1
+			continue
+
+		region, exchange = _infer_region_exchange_for_stock(row)
+		if not region or not exchange:
+			skipped += 1
+			continue
+
+		if do_commit:
+			frappe.db.set_value("Growe Stock", row["name"], "region", cur_region or region, update_modified=False)
+			frappe.db.set_value(
+				"Growe Stock",
+				row["name"],
+				"exchange_platform",
+				cur_exchange or exchange,
+				update_modified=False,
+			)
+		changed += 1
+		if len(updates) < 50:
+			updates.append(
+				{
+					"name": row["name"],
+					"region": cur_region or region,
+					"exchange_platform": cur_exchange or exchange,
+				}
+			)
+
+	if do_commit:
+		frappe.db.commit()
+
+	return {
+		"dry_run": not do_commit,
+		"total": len(rows),
+		"changed": changed,
+		"already_set": already_set,
+		"skipped": skipped,
+		"sample_updates": updates,
 	}
 
 
@@ -514,7 +707,19 @@ def infer_asset_class(asset_name: str):
 	if not frappe.db.exists("Growe Stock", asset_name):
 		frappe.throw(_("Stock not found."))
 	ac, market = _infer_asset_class_from_stock(asset_name)
-	return {"assetClass": ac, "market": market, "marketTag": market}
+	meta = frappe.db.get_value(
+		"Growe Stock",
+		asset_name,
+		["region", "exchange_platform"],
+		as_dict=True,
+	) or {}
+	return {
+		"assetClass": ac,
+		"market": market,
+		"marketTag": market,
+		"region": meta.get("region") or "",
+		"exchangePlatform": meta.get("exchange_platform") or "",
+	}
 
 
 @frappe.whitelist()

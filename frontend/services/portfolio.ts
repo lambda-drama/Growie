@@ -10,6 +10,8 @@ export interface GroweStock {
   company_name: string // e.g. Safaricom PLC
   market: string       // NSE | Global
   currency: string     // KES | USD
+  region?: string
+  exchange_platform?: string
 }
 
 export interface PortfolioSummary {

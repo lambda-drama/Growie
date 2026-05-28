@@ -2,7 +2,14 @@
 
 import { create } from 'zustand'
 import { useShallow } from 'zustand/react/shallow'
+import {
+  persistStackGroupingMode,
+  readStoredStackGroupingMode,
+  type StackGroupingMode,
+} from '@/lib/stack-grouping-prefs'
 import type { AssetClass, Holding, HealthScore, Currency, SubscriptionTier } from '@/types'
+
+export type { StackGroupingMode }
 
 /**
  * Global UI and portfolio state.
@@ -51,6 +58,10 @@ interface AppState {
       | { screen: 'class'; assetClass: AssetClass }
       | { screen: 'position'; holdingId: string; assetClass: AssetClass }
   ) => void
+  stackGroupingMode: StackGroupingMode
+  setStackGroupingMode: (mode: StackGroupingMode) => void
+  /** Restore grouping from localStorage after client mount (avoids SSR mismatch). */
+  hydrateStackGroupingMode: () => void
 }
 
 // Exchange rates (simplified — fetch from a live API in production)
@@ -125,6 +136,15 @@ export const useAppStore = create<AppState>((set) => ({
 
   stackNav: { screen: 'overview' },
   setStackNav: (nav) => set({ stackNav: nav }),
+  stackGroupingMode: 'ticker',
+  setStackGroupingMode: (mode) => {
+    persistStackGroupingMode(mode)
+    set({ stackGroupingMode: mode })
+  },
+  hydrateStackGroupingMode: () => {
+    const stored = readStoredStackGroupingMode()
+    set({ stackGroupingMode: stored })
+  },
 }))
 
 /** Subscribe to both code + ERPNext-derived multiplier so amounts update when rates load. */

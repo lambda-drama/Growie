@@ -34,7 +34,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import { searchStocks, createStock, inferAssetClass } from '@/services/stack'
+import {
+  searchStocks,
+  createStock,
+  inferAssetClass,
+  getRegions,
+  getExchangePlatforms,
+} from '@/services/stack'
 import type { GroweStock } from '@/services/portfolio'
 import type { AssetClass } from '@/types'
 
@@ -66,6 +72,10 @@ export function StackStockPicker({
   const [newTicker, setNewTicker] = useState('')
   const [newName, setNewName] = useState('')
   const [newMarket, setNewMarket] = useState<'NSE' | 'Global'>('Global')
+  const [newRegion, setNewRegion] = useState('auto')
+  const [newExchange, setNewExchange] = useState('auto')
+  const [regions, setRegions] = useState<string[]>([])
+  const [exchanges, setExchanges] = useState<string[]>([])
   const [adding, setAdding] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -91,6 +101,23 @@ export function StackStockPicker({
     if (open && showStockSearch) doSearch(query)
   }, [open, showStockSearch]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (!addOpen) return
+    void (async () => {
+      try {
+        const [regionList, exchangeList] = await Promise.all([
+          getRegions('', 200),
+          getExchangePlatforms('', 200),
+        ])
+        setRegions(regionList)
+        setExchanges(exchangeList)
+      } catch {
+        setRegions([])
+        setExchanges([])
+      }
+    })()
+  }, [addOpen])
+
   const handlePick = async (stock: GroweStock) => {
     try {
       const inferred = await inferAssetClass(stock.name)
@@ -107,10 +134,13 @@ export function StackStockPicker({
     setAdding(true)
     try {
       const m = assetClass === 'nse-stocks' ? 'NSE' : newMarket
+      const defaultRegion = m === 'NSE' ? 'Kenya' : 'Global'
       const created = await createStock({
         ticker: newTicker.trim(),
         companyName: newName.trim() || newTicker.trim(),
         market: m,
+        region: newRegion === 'auto' ? defaultRegion : newRegion,
+        exchangePlatform: newExchange === 'auto' ? m : newExchange,
       })
       const stock: GroweStock = {
         name: created.name,
@@ -123,6 +153,8 @@ export function StackStockPicker({
       setAddOpen(false)
       setNewTicker('')
       setNewName('')
+      setNewRegion('auto')
+      setNewExchange('auto')
     } finally {
       setAdding(false)
     }
@@ -232,6 +264,40 @@ export function StackStockPicker({
                 </Select>
               </div>
             )}
+            <div className="grid gap-2">
+              <Label>Region</Label>
+              <Select value={newRegion} onValueChange={setNewRegion}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto ({assetClass === 'nse-stocks' ? 'Kenya' : 'Global'})</SelectItem>
+                  {regions.map((r) => (
+                    <SelectItem key={r} value={r}>
+                      {r}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Exchange platform</Label>
+              <Select value={newExchange} onValueChange={setNewExchange}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">
+                    Auto ({assetClass === 'nse-stocks' ? 'NSE' : newMarket})
+                  </SelectItem>
+                  {exchanges.map((e) => (
+                    <SelectItem key={e} value={e}>
+                      {e}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddOpen(false)}>

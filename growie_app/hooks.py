@@ -32,6 +32,12 @@ fixtures = [
 	{
 		"doctype": "Growe Sector",
 	},
+	{
+		"doctype": "Growe Region",
+	},
+	{
+		"doctype": "Growe Exchange Platform",
+	},
  {
 	 "doctype":"Growe Stock"
  },

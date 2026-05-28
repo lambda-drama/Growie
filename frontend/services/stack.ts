@@ -42,6 +42,8 @@ export interface StackClassSummary {
 
 export interface StackHolding extends Holding {
   marketTag: string
+  region?: string
+  exchangePlatform?: string
   avgBuyPrice: number
   currentPrice: number
   gainPercent: number
@@ -163,6 +165,8 @@ export async function createStock(payload: {
   companyName: string
   market: 'NSE' | 'Global'
   currency?: string
+  region?: string
+  exchangePlatform?: string
 }): Promise<GroweStock & { assetClass: AssetClass; created: boolean }> {
   const res = await fetch('/api/method/growie_app.api.stack.create_stock', {
     method: 'POST',
@@ -173,6 +177,8 @@ export async function createStock(payload: {
       company_name: payload.companyName,
       market: payload.market,
       currency: payload.currency ?? 'USD',
+      region: payload.region,
+      exchange_platform: payload.exchangePlatform,
     }),
   })
   const data = await res.json()
@@ -184,9 +190,48 @@ export async function createStock(payload: {
       company_name: m.company_name as string,
       market: m.market as string,
       currency: m.currency as string,
+      region: (m.region as string | undefined) ?? undefined,
+      exchange_platform: (m.exchange_platform as string | undefined) ?? undefined,
       assetClass: m.assetClass as AssetClass,
       created: Boolean(m.created),
     }
+  }
+  throw new Error(extractError(data))
+}
+
+export async function getRegions(query = '', limit = 100): Promise<string[]> {
+  const params = new URLSearchParams()
+  if (query.trim()) params.set('query', query.trim())
+  params.set('limit', String(limit))
+  const res = await fetch(`/api/method/growie_app.api.stack.get_regions?${params.toString()}`, {
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  })
+  const data = await res.json()
+  if (Array.isArray(data?.message)) {
+    return data.message
+      .map((row: Record<string, unknown>) => String(row.name || '').trim())
+      .filter(Boolean)
+  }
+  throw new Error(extractError(data))
+}
+
+export async function getExchangePlatforms(query = '', limit = 100): Promise<string[]> {
+  const params = new URLSearchParams()
+  if (query.trim()) params.set('query', query.trim())
+  params.set('limit', String(limit))
+  const res = await fetch(
+    `/api/method/growie_app.api.stack.get_exchange_platforms?${params.toString()}`,
+    {
+      credentials: 'include',
+      headers: { Accept: 'application/json' },
+    }
+  )
+  const data = await res.json()
+  if (Array.isArray(data?.message)) {
+    return data.message
+      .map((row: Record<string, unknown>) => String(row.name || '').trim())
+      .filter(Boolean)
   }
   throw new Error(extractError(data))
 }

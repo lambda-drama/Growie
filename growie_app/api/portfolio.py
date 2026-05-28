@@ -62,12 +62,13 @@ def _holding_to_dict(h) -> dict:
 	stock_name = h.get("asset_name") or ""
 	display_name = stock_name
 	ticker = h.get("ticker") or ""
+	stock = None
 
 	if stock_name:
 		stock = frappe.db.get_value(
 			"Growe Stock",
 			stock_name,
-			["ticker", "company_name", "market"],
+			["ticker", "company_name", "market", "region", "exchange_platform"],
 			as_dict=True,
 		)
 		if stock:
@@ -99,6 +100,9 @@ def _holding_to_dict(h) -> dict:
 		"costBasis": float(h.get("cost_basis_kes") or 0),  # forward-compatible alias
 		"quantity": float(h.get("quantity") or 0),
 		"ticker": ticker,
+		"marketTag": (stock.market if stock_name and stock else "") or "",
+		"region": (stock.region if stock_name and stock else "") or "",
+		"exchangePlatform": (stock.exchange_platform if stock_name and stock else "") or "",
 		"dateAdded": str(h.get("date_added") or today()),
 		"lastUpdated": str(h.get("last_updated") or ""),
 		"notes": h.get("notes") or "",
@@ -310,7 +314,7 @@ def search_stocks(query: str = "", market: str = None, limit: int = 20):
 	if query:
 		results = frappe.db.sql(
 			"""
-			SELECT name, ticker, company_name, market, currency
+			SELECT name, ticker, company_name, market, currency, region, exchange_platform
 			FROM `tabGrowe Stock`
 			WHERE is_active = 1
 			  AND (
@@ -330,7 +334,7 @@ def search_stocks(query: str = "", market: str = None, limit: int = 20):
 		results = frappe.get_all(
 			"Growe Stock",
 			filters=filters,
-			fields=["name", "ticker", "company_name", "market", "currency"],
+			fields=["name", "ticker", "company_name", "market", "currency", "region", "exchange_platform"],
 			order_by="ticker asc",
 			limit=int(limit),
 		)

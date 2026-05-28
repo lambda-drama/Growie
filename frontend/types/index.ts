@@ -12,6 +12,9 @@ export interface Holding {
   quantity: number
   ticker: string
   currency?: string
+  marketTag?: string
+  region?: string
+  exchangePlatform?: string
   dateAdded: string
   lastUpdated: string
   notes?: string

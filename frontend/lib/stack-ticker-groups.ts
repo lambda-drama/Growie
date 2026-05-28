@@ -14,6 +14,7 @@ export interface StackTickerGroup {
   totalCostInKES: number
   gainPercent: number
   weightedAvgBuyNative: number
+  weightedCurrentNative: number
 }
 
 function groupKey(h: StackHolding): string {
@@ -32,6 +33,18 @@ function weightedAvgBuyNative(lots: StackHolding[]): number {
     qty += q
   }
   return qty > 0 ? cost / qty : 0
+}
+
+function weightedCurrentNative(lots: StackHolding[]): number {
+  let value = 0
+  let qty = 0
+  for (const h of lots) {
+    const q = h.quantity ?? 0
+    if (q <= 0) continue
+    value += (h.currentPrice ?? 0) * q
+    qty += q
+  }
+  return qty > 0 ? value / qty : 0
 }
 
 /** Tier 2: combine open holdings in a class by ticker (+ currency). */
@@ -72,6 +85,7 @@ export function groupHoldingsByTicker(holdings: StackHolding[]): StackTickerGrou
       totalCostInKES,
       gainPercent,
       weightedAvgBuyNative: weightedAvgBuyNative(sorted),
+      weightedCurrentNative: weightedCurrentNative(sorted),
     })
   }
 
