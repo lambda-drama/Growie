@@ -1,0 +1,58 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Growe Exchange Platform",
+  "modified": "2026-05-28 16:21:27.656353",
+  "name": "NSE",
+  "platform_name": "NSE"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Exchange Platform",
+  "modified": "2026-05-28 16:21:27.659260",
+  "name": "NYSE",
+  "platform_name": "NYSE"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Exchange Platform",
+  "modified": "2026-05-28 16:21:27.659703",
+  "name": "NASDAQ",
+  "platform_name": "NASDAQ"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Exchange Platform",
+  "modified": "2026-05-28 16:21:27.660109",
+  "name": "LSE",
+  "platform_name": "LSE"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Exchange Platform",
+  "modified": "2026-05-28 16:21:27.660522",
+  "name": "Euronext",
+  "platform_name": "Euronext"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Exchange Platform",
+  "modified": "2026-05-28 16:21:27.660926",
+  "name": "JPX",
+  "platform_name": "JPX"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Exchange Platform",
+  "modified": "2026-05-28 16:21:27.661579",
+  "name": "HKEX",
+  "platform_name": "HKEX"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Exchange Platform",
+  "modified": "2026-05-28 16:21:27.662058",
+  "name": "JSE",
+  "platform_name": "JSE"
+ }
+]

@@ -6,7 +6,10 @@ import {
   persistStackGroupingMode,
   readStoredStackGroupingMode,
 } from '@/lib/stack-grouping-prefs'
-import type { StackGroupingMode } from '@/lib/stack-grouping'
+import {
+  DEFAULT_STACK_GROUPING_MODE,
+  type StackGroupingMode,
+} from '@/lib/stack-grouping'
 import type { AssetClass, Holding, HealthScore, Currency, SubscriptionTier } from '@/types'
 
 export type { StackGroupingMode }
@@ -136,7 +139,7 @@ export const useAppStore = create<AppState>((set) => ({
 
   stackNav: { screen: 'overview' },
   setStackNav: (nav) => set({ stackNav: nav }),
-  stackGroupingMode: 'ticker',
+  stackGroupingMode: DEFAULT_STACK_GROUPING_MODE,
   setStackGroupingMode: (mode) => {
     persistStackGroupingMode(mode)
     set({ stackGroupingMode: mode })

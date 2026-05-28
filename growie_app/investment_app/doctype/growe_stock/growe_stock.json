@@ -8,6 +8,7 @@
   "ticker",
   "company_name",
   "market",
+  "instrument_type",
   "region",
   "exchange_platform",
   "column_break_enxt",
@@ -46,6 +47,16 @@
    "in_standard_filter": 1,
    "label": "Market",
    "options": "NSE\nGlobal\nETF"
+  },
+  {
+   "default": "Stock",
+   "description": "Individual stock vs exchange-traded fund (ETF). Used for Group by and analytics.",
+   "fieldname": "instrument_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Instrument Type",
+   "options": "Stock\nETF"
   },
   {
    "fieldname": "region",

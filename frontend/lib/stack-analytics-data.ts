@@ -17,6 +17,13 @@ export interface StackChartSlice {
   color: string
 }
 
+export interface StackComparisonRow {
+  id: string
+  name: string
+  initial: number
+  current: number
+}
+
 export const STACK_CHART_PALETTE = [
   '#0ea5e9',
   '#6366f1',
@@ -152,4 +159,86 @@ export function etfsOnlySlices(holdings: StackHolding[]): StackChartSlice[] {
 /** Shares & ETFs combined value (for aggregate comparison section). */
 export function sharesAndEtfsAggregateSlices(holdings: StackHolding[]): StackChartSlice[] {
   return allHoldingsSlices(holdings)
+}
+
+function stocksHoldings(holdings: StackHolding[]): StackHolding[] {
+  return holdings.filter(
+    (h) => h.assetClass === 'nse-stocks' || h.assetClass === 'global-stocks'
+  )
+}
+
+function etfHoldings(holdings: StackHolding[]): StackHolding[] {
+  return holdings.filter(isEtfHolding)
+}
+
+function returnSlicesFromGroups(
+  groups: ReturnType<typeof groupHoldingsByTicker>,
+  maxSlices: number,
+  order: 'asc' | 'desc'
+): StackChartSlice[] {
+  const rows = groups
+    .filter((g) => g.totalCostInKES > 0)
+    .map((g) => ({
+      id: g.key,
+      name: (g.displayName || g.ticker || '').trim(),
+      value: Math.round(g.gainPercent * 10) / 10,
+    }))
+    .sort((a, b) => (order === 'desc' ? b.value - a.value : a.value - b.value))
+    .slice(0, maxSlices)
+
+  if (!rows.length) return []
+  return rows.map((row, i) => ({
+    ...row,
+    percentage: row.value,
+    color: row.value >= 0 ? '#10b981' : '#e11d48',
+  }))
+}
+
+/** Stock tickers ranked by unrealized return %. */
+export function stocksByReturnSlices(holdings: StackHolding[], maxSlices = 12): StackChartSlice[] {
+  const groups = groupHoldingsByTicker(stocksHoldings(holdings))
+  return returnSlicesFromGroups(groups, maxSlices, 'desc')
+}
+
+export function topPerformerStocksSlices(holdings: StackHolding[], maxSlices = 5): StackChartSlice[] {
+  const groups = groupHoldingsByTicker(stocksHoldings(holdings))
+  return returnSlicesFromGroups(
+    groups.filter((g) => g.gainPercent > 0),
+    maxSlices,
+    'desc'
+  )
+}
+
+export function underperformerStocksSlices(holdings: StackHolding[], maxSlices = 5): StackChartSlice[] {
+  const groups = groupHoldingsByTicker(stocksHoldings(holdings))
+  return returnSlicesFromGroups(
+    groups.filter((g) => g.gainPercent < 0),
+    maxSlices,
+    'asc'
+  )
+}
+
+export function tickerCostVsValueRows(
+  holdings: StackHolding[],
+  maxSlices = 12
+): StackComparisonRow[] {
+  const groups = groupHoldingsByTicker(holdings)
+  return [...groups]
+    .filter((g) => g.totalCostInKES > 0 || g.totalValueInKES > 0)
+    .sort((a, b) => b.totalValueInKES - a.totalValueInKES)
+    .slice(0, maxSlices)
+    .map((g) => ({
+      id: g.key,
+      name: g.ticker || g.displayName,
+      initial: g.totalCostInKES,
+      current: g.totalValueInKES,
+    }))
+}
+
+export function allStocksCostVsValueRows(holdings: StackHolding[]): StackComparisonRow[] {
+  return tickerCostVsValueRows(stocksHoldings(holdings), 14)
+}
+
+export function allEtfsCostVsValueRows(holdings: StackHolding[]): StackComparisonRow[] {
+  return tickerCostVsValueRows(etfHoldings(holdings), 14)
 }
