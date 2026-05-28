@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Loader2, Trash2 } from 'lucide-react'
+import { Loader2, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   AlertDialog,
@@ -44,6 +44,7 @@ interface StackHoldingDetailSheetProps {
   onOpenChange: (open: boolean) => void
   onBuy: (holding: StackHolding) => void
   onSell: (holding: StackHolding) => void
+  onEdit: (holding: StackHolding) => void
   onDeleted: () => void
 }
 
@@ -53,6 +54,7 @@ export function StackHoldingDetailSheet({
   onOpenChange,
   onBuy,
   onSell,
+  onEdit,
   onDeleted,
 }: StackHoldingDetailSheetProps) {
   const holdingId = open && holdingProp ? holdingProp.id : null
@@ -204,19 +206,30 @@ export function StackHoldingDetailSheet({
                   Sell
                 </Button>
               </div>
-              <Button
-                variant="outline"
-                className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
-                disabled={!holding || deleting}
-                onClick={() => setConfirmDelete(true)}
-              >
-                {deleting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Trash2 className="mr-2 h-4 w-4" />
-                )}
-                Delete position
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  disabled={!holding}
+                  onClick={() => holding && onEdit(holding)}
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  disabled={!holding || deleting}
+                  onClick={() => setConfirmDelete(true)}
+                >
+                  {deleting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="mr-2 h-4 w-4" />
+                  )}
+                  Delete
+                </Button>
+              </div>
             </div>
           </SheetFooter>
         </SheetContent>

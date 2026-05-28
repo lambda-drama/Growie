@@ -13,7 +13,7 @@ import { StackExcelBulkImport } from '@/components/stack/stack-excel-bulk-import
 import { StackHoldingDetailSheet } from '@/components/stack/stack-holding-detail-sheet'
 import { TradeDialog, type TradeMode } from '@/components/stack/trade-dialog'
 import { useStackClass } from '@/hooks/use-stack'
-import { useDisplayMoney } from '@/lib/store'
+import { useAppStore, useDisplayMoney } from '@/lib/store'
 import { groupHoldingsByTicker } from '@/lib/stack-ticker-groups'
 import type { StackHolding } from '@/services/stack'
 import type { AssetClass } from '@/types'
@@ -38,19 +38,29 @@ function filterHoldingsByQuery(holdings: StackHolding[], query: string): StackHo
 export function StackClassView({ assetClass, onBack }: StackClassViewProps) {
   const { detail, isLoading, error, refresh, reload } = useStackClass(assetClass)
   const { currency, kesToDisplayMultiplier, kesPerUsd } = useDisplayMoney()
+  const { stackGroupingMode } = useAppStore()
   const [tradeOpen, setTradeOpen] = useState(false)
   const [tradeMode, setTradeMode] = useState<TradeMode>('buy-new')
   const [activeHolding, setActiveHolding] = useState<StackHolding | null>(null)
   const [positionSearch, setPositionSearch] = useState('')
   const [detailHolding, setDetailHolding] = useState<StackHolding | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
+  const [selectedTickerGroup, setSelectedTickerGroup] = useState<string | null>(null)
+  const [selectedBucket, setSelectedBucket] = useState<string | null>(null)
 
   const showPositionSearch =
-    assetClass === 'nse-stocks' || assetClass === 'global-stocks'
+    assetClass === 'nse-stocks' || assetClass === 'global-stocks' || assetClass === 'etf'
 
   useEffect(() => {
     setPositionSearch('')
+    setSelectedTickerGroup(null)
+    setSelectedBucket(null)
   }, [assetClass])
+
+  useEffect(() => {
+    setSelectedTickerGroup(null)
+    setSelectedBucket(null)
+  }, [positionSearch, stackGroupingMode])
 
   const allHoldings = detail?.holdings ?? []
   const filteredHoldings = useMemo(
@@ -74,7 +84,7 @@ export function StackClassView({ assetClass, onBack }: StackClassViewProps) {
   }
 
   const summary = detail?.summary
-  const showBulkImport = assetClass === 'global-stocks'
+  const showBulkImport = assetClass === 'global-stocks' || assetClass === 'etf'
 
   return (
     <div className="space-y-6">
@@ -176,6 +186,19 @@ export function StackClassView({ assetClass, onBack }: StackClassViewProps) {
               onOpenHolding={openHoldingDetail}
               onBuy={(h) => openTrade('buy-more', h)}
               onSell={(h) => openTrade('sell', h)}
+              groupingMode={stackGroupingMode}
+              selectedBucketKey={selectedBucket}
+              onSelectBucket={(bucket) => {
+                setSelectedTickerGroup(null)
+                setSelectedBucket(bucket)
+              }}
+              onBackToBuckets={() => {
+                setSelectedTickerGroup(null)
+                setSelectedBucket(null)
+              }}
+              selectedGroupKey={selectedTickerGroup}
+              onSelectGroup={(group) => setSelectedTickerGroup(group)}
+              onBackToGroups={() => setSelectedTickerGroup(null)}
               emptyMessage={
                 allHoldings.length > 0 && positionSearch.trim()
                   ? `No tickers match "${positionSearch.trim()}".`
@@ -215,6 +238,19 @@ export function StackClassView({ assetClass, onBack }: StackClassViewProps) {
               onOpenHolding={openHoldingDetail}
               onBuy={(h) => openTrade('buy-more', h)}
               onSell={(h) => openTrade('sell', h)}
+              groupingMode={stackGroupingMode}
+              selectedBucketKey={selectedBucket}
+              onSelectBucket={(bucket) => {
+                setSelectedTickerGroup(null)
+                setSelectedBucket(bucket)
+              }}
+              onBackToBuckets={() => {
+                setSelectedTickerGroup(null)
+                setSelectedBucket(null)
+              }}
+              selectedGroupKey={selectedTickerGroup}
+              onSelectGroup={setSelectedTickerGroup}
+              onBackToGroups={() => setSelectedTickerGroup(null)}
             />
           ) : allHoldings.length > 0 && positionSearch.trim() ? (
             <div className="hidden rounded-xl border py-12 text-center text-muted-foreground md:block">
@@ -254,6 +290,10 @@ export function StackClassView({ assetClass, onBack }: StackClassViewProps) {
         onSell={(h) => {
           setDetailOpen(false)
           openTrade('sell', h)
+        }}
+        onEdit={(h) => {
+          setDetailOpen(false)
+          openTrade('buy-more', h)
         }}
         onDeleted={() => void reload()}
       />

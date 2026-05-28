@@ -304,6 +304,7 @@ export function getAssetClassName(assetClass: string): string {
     'real-estate': 'Real Estate',
     'nse-stocks': 'NSE Stocks',
     'global-stocks': 'Global Stocks',
+    etf: 'ETFs',
   }
   return names[assetClass] || assetClass
 }
@@ -314,6 +315,7 @@ export function getAssetClassColor(assetClass: string): string {
     'real-estate': 'bg-chart-2',
     'nse-stocks': 'bg-chart-3',
     'global-stocks': 'bg-chart-4',
+    etf: 'bg-chart-5',
   }
   return colors[assetClass] || 'bg-chart-5'
 }
@@ -324,6 +326,7 @@ export function getAssetClassColorHex(assetClass: string): string {
     'real-estate': '#D4A24C', // Gold
     'nse-stocks': '#1E3A5F',  // Navy
     'global-stocks': '#0D9488', // Teal
+    etf: '#6366F1', // Indigo
   }
   return colors[assetClass] || '#6B7280'
 }

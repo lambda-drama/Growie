@@ -47,7 +47,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Asset Class",
-   "options": "MMF\nReal Estate\nNSE\nGlobal"
+   "options": "MMF\nReal Estate\nNSE\nGlobal\nETF"
   },
   {
    "fieldname": "asset_name",

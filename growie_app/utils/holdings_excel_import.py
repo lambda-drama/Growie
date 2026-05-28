@@ -222,6 +222,7 @@ def _holding_meta_from_stock(stock_name: str) -> tuple[str, str]:
 	asset_class = {
 		"NSE": "NSE",
 		"Global": "Global",
+		"ETF": "ETF",
 		"MMF": "MMF",
 		"Real Estate": "Real Estate",
 	}.get(market, "Global")

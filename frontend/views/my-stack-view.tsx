@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { StackOverview } from '@/components/stack/stack-overview'
 import { StackClassView } from '@/components/stack/stack-class-view'
 import { useAppStore } from '@/lib/store'
@@ -9,7 +10,11 @@ import type { StackClassSummary } from '@/services/stack'
 
 export function MyStackView() {
   const { isAuthenticated } = useAuth()
-  const { setAuthModal, stackNav, setStackNav } = useAppStore()
+  const { setAuthModal, stackNav, setStackNav, hydrateStackGroupingMode } = useAppStore()
+
+  useEffect(() => {
+    hydrateStackGroupingMode()
+  }, [hydrateStackGroupingMode])
 
   if (!isAuthenticated) {
     return (

@@ -28,6 +28,7 @@ _ASSET_CLASS_MAP = {
 	"Real Estate": "real-estate",
 	"NSE": "nse-stocks",
 	"Global": "global-stocks",
+	"ETF": "etf",
 }
 
 _ASSET_CLASS_REVERSE = {v: k for k, v in _ASSET_CLASS_MAP.items()}
@@ -56,23 +57,46 @@ def is_open_holding(doc) -> bool:
 	return sold == 0 and qty > 0
 
 
+def _load_growe_stock_meta(stock_name: str, ticker: str, asset_class_label: str = None) -> dict:
+	"""
+	Load Growe Stock metadata for a holding.
+	If the linked stock's ticker disagrees with the holding ticker, resolve by holding ticker instead
+	(avoid classifying SCOM as an ETF when asset_name points at the wrong stock).
+	"""
+	fields = ["ticker", "company_name", "market", "region", "exchange_platform", "sector"]
+	stock_name = (stock_name or "").strip()
+	ticker = (ticker or "").strip().upper()
+	stock = None
+
+	if stock_name:
+		stock = frappe.db.get_value("Growe Stock", stock_name, fields, as_dict=True)
+		if stock and ticker and (stock.get("ticker") or "").strip().upper() != ticker:
+			stock = None
+
+	if not stock and ticker:
+		filters = {"ticker": ticker, "is_active": 1}
+		if asset_class_label == "NSE Stocks":
+			filters["market"] = "NSE"
+		elif asset_class_label == "Global Stocks":
+			filters["market"] = "Global"
+		elif asset_class_label == "ETF":
+			filters["market"] = "ETF"
+		stock = frappe.db.get_value("Growe Stock", filters, fields, as_dict=True)
+		if not stock:
+			stock = frappe.db.get_value("Growe Stock", {"ticker": ticker, "is_active": 1}, fields, as_dict=True)
+
+	return stock or {}
+
+
 def _holding_to_dict(h) -> dict:
 	"""Convert a Frappe Growe Holding row to the frontend shape."""
-	# Resolve ticker and display name from the linked Growe Stock
 	stock_name = h.get("asset_name") or ""
 	display_name = stock_name
 	ticker = h.get("ticker") or ""
-
-	if stock_name:
-		stock = frappe.db.get_value(
-			"Growe Stock",
-			stock_name,
-			["ticker", "company_name", "market"],
-			as_dict=True,
-		)
-		if stock:
-			display_name = stock.company_name or stock_name
-			ticker = ticker or stock.ticker or ""
+	stock = _load_growe_stock_meta(stock_name, ticker, h.get("asset_class"))
+	if stock:
+		display_name = stock.get("company_name") or stock_name
+		ticker = ticker or stock.get("ticker") or ""
 
 	# Latest cached price for this ticker
 	price_kes = None
@@ -99,6 +123,11 @@ def _holding_to_dict(h) -> dict:
 		"costBasis": float(h.get("cost_basis_kes") or 0),  # forward-compatible alias
 		"quantity": float(h.get("quantity") or 0),
 		"ticker": ticker,
+		"marketTag": (stock.get("market") if stock else "") or "",
+		"region": (stock.get("region") if stock else "") or "",
+		"exchangePlatform": (stock.get("exchange_platform") if stock else "") or "",
+		"sector": (stock.get("sector") if stock else "") or "",
+		"broker": (h.get("broker") or "").strip(),
 		"dateAdded": str(h.get("date_added") or today()),
 		"lastUpdated": str(h.get("last_updated") or ""),
 		"notes": h.get("notes") or "",
@@ -310,7 +339,7 @@ def search_stocks(query: str = "", market: str = None, limit: int = 20):
 	if query:
 		results = frappe.db.sql(
 			"""
-			SELECT name, ticker, company_name, market, currency
+			SELECT name, ticker, company_name, market, currency, region, exchange_platform
 			FROM `tabGrowe Stock`
 			WHERE is_active = 1
 			  AND (
@@ -330,7 +359,7 @@ def search_stocks(query: str = "", market: str = None, limit: int = 20):
 		results = frappe.get_all(
 			"Growe Stock",
 			filters=filters,
-			fields=["name", "ticker", "company_name", "market", "currency"],
+			fields=["name", "ticker", "company_name", "market", "currency", "region", "exchange_platform"],
 			order_by="ticker asc",
 			limit=int(limit),
 		)
@@ -429,6 +458,7 @@ def get_holdings():
 			"notes",
 			"currency",
 			"buying_price",
+			"broker",
 			"sold",
 		],
 		order_by="date_added desc",
@@ -465,7 +495,13 @@ def get_portfolio_summary():
 	holdings = [_stack_holding_row(r) for r in rows]
 	total_value = 0.0
 	total_cost = 0.0
-	allocation: dict = {"mmf": 0.0, "real-estate": 0.0, "nse-stocks": 0.0, "global-stocks": 0.0}
+	allocation: dict = {
+		"mmf": 0.0,
+		"real-estate": 0.0,
+		"nse-stocks": 0.0,
+		"global-stocks": 0.0,
+		"etf": 0.0,
+	}
 
 	for h in holdings:
 		val = float(h.get("valueInKES") or h.get("valueKES") or 0)
