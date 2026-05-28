@@ -63,7 +63,15 @@ def _load_growe_stock_meta(stock_name: str, ticker: str, asset_class_label: str 
 	If the linked stock's ticker disagrees with the holding ticker, resolve by holding ticker instead
 	(avoid classifying SCOM as an ETF when asset_name points at the wrong stock).
 	"""
-	fields = ["ticker", "company_name", "market", "region", "exchange_platform", "sector"]
+	fields = [
+		"ticker",
+		"company_name",
+		"market",
+		"instrument_type",
+		"region",
+		"exchange_platform",
+		"sector",
+	]
 	stock_name = (stock_name or "").strip()
 	ticker = (ticker or "").strip().upper()
 	stock = None
@@ -86,6 +94,20 @@ def _load_growe_stock_meta(stock_name: str, ticker: str, asset_class_label: str 
 			stock = frappe.db.get_value("Growe Stock", {"ticker": ticker, "is_active": 1}, fields, as_dict=True)
 
 	return stock or {}
+
+
+def _instrument_type_slug(stock: dict) -> str:
+	"""Frontend slug: stock | etf (from Growe Stock instrument_type)."""
+	if not stock:
+		return "stock"
+	it = (stock.get("instrument_type") or "").strip()
+	if it == "ETF":
+		return "etf"
+	if it == "Stock":
+		return "stock"
+	if (stock.get("market") or "").strip() == "ETF":
+		return "etf"
+	return "stock"
 
 
 def _holding_to_dict(h) -> dict:
@@ -127,6 +149,7 @@ def _holding_to_dict(h) -> dict:
 		"region": (stock.get("region") if stock else "") or "",
 		"exchangePlatform": (stock.get("exchange_platform") if stock else "") or "",
 		"sector": (stock.get("sector") if stock else "") or "",
+		"instrumentType": _instrument_type_slug(stock),
 		"broker": (h.get("broker") or "").strip(),
 		"dateAdded": str(h.get("date_added") or today()),
 		"lastUpdated": str(h.get("last_updated") or ""),

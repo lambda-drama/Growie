@@ -22,7 +22,10 @@ import { computeDashboardMetrics } from '@/lib/dashboard-data'
 import {
   bucketIconKind,
   bucketLabelForHolding,
+  GROUP_BY_OPTIONS,
   groupingListTitle,
+  holdingMatchesGroupingMode,
+  isAssetClassOverviewMode,
   isBucketGroupingMode,
 } from '@/lib/stack-grouping'
 import { firstNameFrom, timeGreeting } from '@/lib/stack-ui'
@@ -57,6 +60,7 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
     if (!isBucketGroupingMode(stackGroupingMode)) return []
     const map = new Map<string, { value: number; cost: number; positions: number; classCounts: Record<string, number> }>()
     for (const h of holdings) {
+      if (!holdingMatchesGroupingMode(h, stackGroupingMode)) continue
       const key = bucketLabelForHolding(h, stackGroupingMode)
       const row = map.get(key) ?? { value: 0, cost: 0, positions: 0, classCounts: {} }
       row.value += h.valueInKES ?? h.valueKES ?? 0
@@ -81,7 +85,9 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
   const selectedBucketHoldings = useMemo(() => {
     if (!selectedOverviewBucket || !isBucketGroupingMode(stackGroupingMode)) return []
     return holdings.filter(
-      (h) => bucketLabelForHolding(h, stackGroupingMode) === selectedOverviewBucket
+      (h) =>
+        holdingMatchesGroupingMode(h, stackGroupingMode) &&
+        bucketLabelForHolding(h, stackGroupingMode) === selectedOverviewBucket
     )
   }, [holdings, selectedOverviewBucket, stackGroupingMode])
 
@@ -102,7 +108,8 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
     [classes]
   )
 
-  const assetClassCount = classes.filter((c) => c.positions > 0).length || classes.length
+  const activeClasses = useMemo(() => classes.filter((c) => c.positions > 0), [classes])
+  const assetClassCount = activeClasses.length || classes.length
   const isLoading = stackLoading && classes.length === 0
   const metricsReady = !portfolioLoading || holdings.length > 0
 
@@ -202,44 +209,40 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
 
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-muted-foreground">Group by:</span>
-            <Button
-              size="sm"
-              variant={stackGroupingMode === 'ticker' ? 'default' : 'outline'}
-              onClick={() => {
-                setStackGroupingMode('ticker')
-                setSelectedOverviewBucket(null)
-                setSelectedOverviewGroupKey(null)
-              }}
-            >
-              Ticker
-            </Button>
-            <Button
-              size="sm"
-              variant={stackGroupingMode === 'region' ? 'default' : 'outline'}
-              onClick={() => {
-                setStackGroupingMode('region')
-                setSelectedOverviewBucket(null)
-                setSelectedOverviewGroupKey(null)
-              }}
-            >
-              Region
-            </Button>
-            <Button
-              size="sm"
-              variant={stackGroupingMode === 'exchange' ? 'default' : 'outline'}
-              onClick={() => {
-                setStackGroupingMode('exchange')
-                setSelectedOverviewBucket(null)
-                setSelectedOverviewGroupKey(null)
-              }}
-            >
-              Exchange
-            </Button>
+            {GROUP_BY_OPTIONS.filter((o) => !o.hidden).map(({ mode, label }) => (
+              <Button
+                key={mode}
+                size="sm"
+                variant={stackGroupingMode === mode ? 'default' : 'outline'}
+                onClick={() => {
+                  setStackGroupingMode(mode)
+                  setSelectedOverviewBucket(null)
+                  setSelectedOverviewGroupKey(null)
+                }}
+              >
+                {label}
+              </Button>
+            ))}
+            {GROUP_BY_OPTIONS.filter((o) => o.hidden).map(({ mode, label }) => (
+              <Button
+                key={mode}
+                size="sm"
+                variant={isAssetClassOverviewMode(stackGroupingMode) ? 'secondary' : 'ghost'}
+                className="text-muted-foreground"
+                onClick={() => {
+                  setStackGroupingMode(mode)
+                  setSelectedOverviewBucket(null)
+                  setSelectedOverviewGroupKey(null)
+                }}
+              >
+                {label}
+              </Button>
+            ))}
           </div>
 
-          {stackGroupingMode === 'ticker' ? (
+          {isAssetClassOverviewMode(stackGroupingMode) ? (
             <StackClassList
-              classes={classes}
+              classes={activeClasses}
               currency={currency}
               kesToDisplayMultiplier={kesToDisplayMultiplier}
               onOpenClass={onOpenClass}

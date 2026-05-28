@@ -1,0 +1,37 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Growe Region",
+  "modified": "2026-05-28 16:21:27.518641",
+  "name": "USA",
+  "region_name": "USA"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Region",
+  "modified": "2026-05-28 16:21:27.650883",
+  "name": "Africa",
+  "region_name": "Africa"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Region",
+  "modified": "2026-05-28 16:21:27.651472",
+  "name": "Asia",
+  "region_name": "Asia"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Region",
+  "modified": "2026-05-28 16:21:27.651975",
+  "name": "Europe",
+  "region_name": "Europe"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Region",
+  "modified": "2026-05-28 16:21:27.652432",
+  "name": "Middle East",
+  "region_name": "Middle East"
+ }
+]

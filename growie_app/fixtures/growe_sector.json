@@ -79,13 +79,6 @@
  {
   "docstatus": 0,
   "doctype": "Growe Sector",
-  "growe_sector": "Technology",
-  "modified": "2026-04-24 23:41:07.998243",
-  "name": "Technology"
- },
- {
-  "docstatus": 0,
-  "doctype": "Growe Sector",
   "growe_sector": "ETF",
   "modified": "2026-04-24 23:50:45.547928",
   "name": "ETF"
@@ -145,5 +138,12 @@
   "growe_sector": "MMF",
   "modified": "2026-04-24 23:57:11.285250",
   "name": "MMF"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Technology",
+  "modified": "2026-04-24 23:41:07.998243",
+  "name": "Technology"
  }
 ]

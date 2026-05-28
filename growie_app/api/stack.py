@@ -89,6 +89,11 @@ def _asset_class_from_market(market: str) -> str:
 	return ""
 
 
+def _instrument_type_for_market(market: str) -> str:
+	m = (market or "").strip()
+	return "ETF" if m == "ETF" else "Stock"
+
+
 def _market_tag_for_holding(holding_doc) -> str:
 	ac = holding_doc.asset_class or ""
 	if ac == "NSE":
@@ -196,6 +201,7 @@ def _stack_holding_row(h) -> dict:
 			"region": region,
 			"exchangePlatform": exchange_platform,
 			"sector": sector,
+			"instrumentType": row.get("instrumentType") or "stock",
 			"broker": (row.get("broker") or "").strip(),
 			"avgBuyPrice": round(avg_buy_native, 4),
 			"currentPrice": round(current_native, 4),
@@ -476,6 +482,7 @@ def create_stock(
 	else:
 		region_val = (region or "Global").strip()
 	exchange_val = (exchange_platform or mkt).strip()
+	instrument_val = _instrument_type_for_market(mkt)
 
 	existing = frappe.db.get_value("Growe Stock", {"ticker": clean, "market": mkt}, "name")
 	if existing:
@@ -487,6 +494,7 @@ def create_stock(
 			"currency": frappe.db.get_value("Growe Stock", existing, "currency") or currency,
 			"region": frappe.db.get_value("Growe Stock", existing, "region") or region_val,
 			"exchange_platform": frappe.db.get_value("Growe Stock", existing, "exchange_platform") or exchange_val,
+			"instrument_type": frappe.db.get_value("Growe Stock", existing, "instrument_type") or instrument_val,
 			"assetClass": _asset_class_from_market(mkt),
 			"created": False,
 		}
@@ -497,6 +505,7 @@ def create_stock(
 			"ticker": clean,
 			"company_name": (company_name or clean).strip()[:240],
 			"market": mkt,
+			"instrument_type": instrument_val,
 			"currency": (currency or "USD").upper(),
 			"region": region_val,
 			"exchange_platform": exchange_val,
@@ -626,14 +635,56 @@ def migrate_etf_market_and_asset_class(dry_run: int = 0):
 	}
 
 
+@frappe.whitelist()
+def migrate_growe_stock_instrument_type(dry_run: int = 0):
+	"""
+	Set Growe Stock instrument_type (Stock | ETF) from market / legacy sector.
+	bench --site SITE execute growie_app.api.stack.migrate_growe_stock_instrument_type
+	"""
+	rows = frappe.get_all(
+		"Growe Stock",
+		fields=["name", "market", "sector", "instrument_type"],
+		limit=0,
+	)
+	updated = 0
+	for row in rows:
+		market = (row.get("market") or "").strip()
+		sector = (row.get("sector") or "").strip().upper()
+		want = "ETF" if market == "ETF" or sector == "ETF" else "Stock"
+		cur = (row.get("instrument_type") or "").strip()
+		if cur == want:
+			continue
+		if not dry_run:
+			frappe.db.set_value(
+				"Growe Stock", row["name"], "instrument_type", want, update_modified=False
+			)
+		updated += 1
+	if not dry_run:
+		frappe.db.commit()
+	return {"updated": updated, "dry_run": bool(dry_run)}
+
+
 def _infer_region_exchange_for_stock(stock: dict) -> tuple[str, str]:
 	"""Infer region/exchange for a Growe Stock using market + api symbol hints."""
 	market = (stock.get("market") or "").strip()
 	api_symbol = (stock.get("api_symbol") or "").strip().upper()
 	ticker = (stock.get("ticker") or "").strip().upper()
+	sector = (stock.get("sector") or "").strip().upper()
 
 	if market == "NSE":
 		return "Africa", "NSE"
+
+	instrument = (stock.get("instrument_type") or "").strip()
+	if market == "ETF" or instrument == "ETF" or sector == "ETF":
+		if api_symbol and ":" in api_symbol:
+			pfx = api_symbol.split(":", 1)[0]
+			if pfx in ("NASDAQ", "NYSE", "AMEX"):
+				return "USA", pfx
+		return "USA", "NYSE"
+
+	for sym in (api_symbol, ticker):
+		if sym and (sym.endswith(".NR") or sym.endswith(".NBO")):
+			return "Africa", "NSE"
 
 	if api_symbol:
 		if ":" in api_symbol:
@@ -674,38 +725,47 @@ def _infer_region_exchange_for_stock(stock: dict) -> tuple[str, str]:
 
 
 @frappe.whitelist()
-def backfill_stock_region_exchange(dry_run: int = 0):
-	"""Backfill region + exchange_platform for Growe Stock records."""
+def backfill_stock_region_exchange(dry_run: int = 0, force: int = 0):
+	"""
+	Backfill region + exchange_platform for all Growe Stock records.
+
+	bench --site SITE execute growie_app.api.stack.backfill_stock_region_exchange
+	bench --site SITE execute growie_app.api.stack.backfill_stock_region_exchange --kwargs '{"force": 1}'
+	"""
 	rows = frappe.get_all(
 		"Growe Stock",
-		fields=["name", "market", "ticker", "api_symbol", "region", "exchange_platform"],
+		fields=["name", "market", "ticker", "api_symbol", "sector", "region", "exchange_platform"],
 		limit=0,
 	)
 	changed = 0
-	already_set = 0
+	unchanged = 0
 	skipped = 0
 	updates = []
 	do_commit = int(dry_run or 0) == 0
+	reapply = int(force or 0) == 1
 
 	for row in rows:
 		cur_region = (row.get("region") or "").strip()
 		cur_exchange = (row.get("exchange_platform") or "").strip()
-		if cur_region and cur_exchange:
-			already_set += 1
-			continue
-
 		region, exchange = _infer_region_exchange_for_stock(row)
 		if not region or not exchange:
 			skipped += 1
 			continue
 
+		new_region = region if reapply else (cur_region or region)
+		new_exchange = exchange if reapply else (cur_exchange or exchange)
+
+		if cur_region == new_region and cur_exchange == new_exchange:
+			unchanged += 1
+			continue
+
 		if do_commit:
-			frappe.db.set_value("Growe Stock", row["name"], "region", cur_region or region, update_modified=False)
+			frappe.db.set_value("Growe Stock", row["name"], "region", new_region, update_modified=False)
 			frappe.db.set_value(
 				"Growe Stock",
 				row["name"],
 				"exchange_platform",
-				cur_exchange or exchange,
+				new_exchange,
 				update_modified=False,
 			)
 		changed += 1
@@ -713,8 +773,9 @@ def backfill_stock_region_exchange(dry_run: int = 0):
 			updates.append(
 				{
 					"name": row["name"],
-					"region": cur_region or region,
-					"exchange_platform": cur_exchange or exchange,
+					"ticker": row.get("ticker"),
+					"region": new_region,
+					"exchange_platform": new_exchange,
 				}
 			)
 
@@ -723,9 +784,10 @@ def backfill_stock_region_exchange(dry_run: int = 0):
 
 	return {
 		"dry_run": not do_commit,
+		"force": reapply,
 		"total": len(rows),
 		"changed": changed,
-		"already_set": already_set,
+		"unchanged": unchanged,
 		"skipped": skipped,
 		"sample_updates": updates,
 	}

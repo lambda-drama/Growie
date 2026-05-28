@@ -1,11 +1,12 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import {
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
+  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -21,19 +22,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useDisplayMoney } from '@/lib/store'
-import { formatCurrency } from '@/lib/format'
+import { formatCurrency, formatPercentage } from '@/lib/format'
+import { cn } from '@/lib/utils'
 import {
-  allHoldingsSlices,
+  allEtfsCostVsValueRows,
+  allStocksCostVsValueRows,
   brokerSlices,
   etfsOnlySlices,
   filterHoldingsForAnalytics,
   listBrokers,
-  sharesAndEtfsAggregateSlices,
+  stocksByReturnSlices,
   stocksOnlySlices,
   stocksVsEtfsSlices,
-  type HoldingViewFilter,
+  topPerformerStocksSlices,
+  underperformerStocksSlices,
   type StackChartSlice,
+  type StackComparisonRow,
 } from '@/lib/stack-analytics-data'
 import type { StackHolding } from '@/services/stack'
 
@@ -41,12 +47,17 @@ interface StackAnalyticsSectionProps {
   holdings: StackHolding[]
 }
 
+const INITIAL_BAR = '#94a3b8'
+const CURRENT_BAR = '#0ea5e9'
+
 function ChartTooltip({
   currency,
   kesToDisplayMultiplier,
+  valueIsPercent = false,
 }: {
   currency: string
   kesToDisplayMultiplier: number
+  valueIsPercent?: boolean
 }) {
   return function TooltipContent({
     active,
@@ -61,8 +72,44 @@ function ChartTooltip({
       <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-md">
         <p className="text-sm font-medium">{row.name}</p>
         <p className="text-xs text-muted-foreground">
-          {formatCurrency(row.value, currency as 'KES', { kesToDisplayMultiplier })} ({row.percentage}
-          %)
+          {valueIsPercent
+            ? `${row.value >= 0 ? '+' : ''}${row.value}%`
+            : `${formatCurrency(row.value, currency as 'KES', { kesToDisplayMultiplier })} (${row.percentage}%)`}
+        </p>
+      </div>
+    )
+  }
+}
+
+function ComparisonTooltip({
+  currency,
+  kesToDisplayMultiplier,
+}: {
+  currency: string
+  kesToDisplayMultiplier: number
+}) {
+  return function TooltipContent({
+    active,
+    payload,
+    label,
+  }: {
+    active?: boolean
+    payload?: { dataKey: string; value: number; color: string }[]
+    label?: string
+  }) {
+    if (!active || !payload?.length) return null
+    const initial = payload.find((p) => p.dataKey === 'initial')?.value ?? 0
+    const current = payload.find((p) => p.dataKey === 'current')?.value ?? 0
+    return (
+      <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-md">
+        <p className="text-sm font-medium">{label}</p>
+        <p className="text-xs text-muted-foreground">
+          Initial:{' '}
+          {formatCurrency(initial, currency as 'KES', { kesToDisplayMultiplier })}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Current:{' '}
+          {formatCurrency(current, currency as 'KES', { kesToDisplayMultiplier })}
         </p>
       </div>
     )
@@ -93,7 +140,9 @@ function DonutCard({
     <Card className="flex min-h-[380px] flex-col">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-semibold">{title}</CardTitle>
-        {description ? <CardDescription className="text-xs leading-relaxed">{description}</CardDescription> : null}
+        {description ? (
+          <CardDescription className="text-xs leading-relaxed">{description}</CardDescription>
+        ) : null}
       </CardHeader>
       <CardContent className="flex flex-1 flex-col pb-5">
         {data.length === 0 ? (
@@ -151,7 +200,7 @@ function BarCard({
   currency,
   kesToDisplayMultiplier,
   emptyLabel,
-  layout = 'vertical',
+  valueIsPercent = false,
 }: {
   title: string
   description?: string
@@ -159,52 +208,35 @@ function BarCard({
   currency: string
   kesToDisplayMultiplier: number
   emptyLabel: string
-  layout?: 'vertical' | 'horizontal'
+  valueIsPercent?: boolean
 }) {
   const Tip = useMemo(
-    () => ChartTooltip({ currency, kesToDisplayMultiplier }),
-    [currency, kesToDisplayMultiplier]
+    () => ChartTooltip({ currency, kesToDisplayMultiplier, valueIsPercent }),
+    [currency, kesToDisplayMultiplier, valueIsPercent]
   )
-  const chartHeight =
-    layout === 'vertical' ? Math.max(260, data.length * 48) : 280
+  const labelAngle = data.length > 4 ? -32 : 0
+  const bottomMargin = data.length > 4 ? 72 : 40
 
   return (
     <Card className="flex min-h-[380px] flex-col">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-semibold">{title}</CardTitle>
-        {description ? <CardDescription className="text-xs leading-relaxed">{description}</CardDescription> : null}
+        {description ? (
+          <CardDescription className="text-xs leading-relaxed">{description}</CardDescription>
+        ) : null}
       </CardHeader>
       <CardContent className="flex flex-1 flex-col pb-5">
         {data.length === 0 ? (
           <div className="flex min-h-[260px] flex-1 items-center justify-center px-4 text-center text-sm text-muted-foreground">
             {emptyLabel}
           </div>
-        ) : layout === 'vertical' ? (
-          <div className="w-full flex-1" style={{ minHeight: chartHeight }}>
-            <ResponsiveContainer width="100%" height={chartHeight}>
-              <BarChart data={data} layout="vertical" margin={{ left: 4, right: 20, top: 8, bottom: 8 }}>
-                <XAxis type="number" hide />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  width={128}
-                  tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip content={Tip} cursor={{ fill: 'hsl(var(--muted) / 0.35)' }} />
-                <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={32}>
-                  {data.map((entry) => (
-                    <Cell key={entry.id} fill={entry.color} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
         ) : (
-          <div className="h-[280px] w-full">
+          <div className="h-[300px] w-full sm:h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data} margin={{ left: 8, right: 8, top: 8, bottom: 48 }}>
+              <BarChart
+                data={data}
+                margin={{ left: 8, right: 12, top: 12, bottom: bottomMargin }}
+              >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/60" />
                 <XAxis
                   dataKey="name"
@@ -212,17 +244,105 @@ function BarCard({
                   axisLine={false}
                   tickLine={false}
                   interval={0}
-                  angle={-28}
-                  textAnchor="end"
-                  height={56}
+                  angle={labelAngle}
+                  textAnchor={labelAngle ? 'end' : 'middle'}
+                  height={labelAngle ? 64 : 36}
                 />
-                <YAxis hide />
+                <YAxis
+                  tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={valueIsPercent ? 44 : 56}
+                  tickFormatter={(v) =>
+                    valueIsPercent ? `${v}%` : formatCurrency(v, currency as 'KES', { kesToDisplayMultiplier, compact: true })
+                  }
+                />
                 <Tooltip content={Tip} cursor={{ fill: 'hsl(var(--muted) / 0.35)' }} />
-                <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={56}>
+                <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={48}>
                   {data.map((entry) => (
                     <Cell key={entry.id} fill={entry.color} />
                   ))}
                 </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function ComparisonBarCard({
+  title,
+  description,
+  data,
+  currency,
+  kesToDisplayMultiplier,
+  emptyLabel,
+}: {
+  title: string
+  description?: string
+  data: StackComparisonRow[]
+  currency: string
+  kesToDisplayMultiplier: number
+  emptyLabel: string
+}) {
+  const Tip = useMemo(
+    () => ComparisonTooltip({ currency, kesToDisplayMultiplier }),
+    [currency, kesToDisplayMultiplier]
+  )
+  const labelAngle = data.length > 4 ? -32 : 0
+  const bottomMargin = data.length > 4 ? 72 : 48
+
+  return (
+    <Card className="flex min-h-[400px] flex-col">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-semibold">{title}</CardTitle>
+        {description ? (
+          <CardDescription className="text-xs leading-relaxed">{description}</CardDescription>
+        ) : null}
+      </CardHeader>
+      <CardContent className="flex flex-1 flex-col pb-5">
+        {data.length === 0 ? (
+          <div className="flex min-h-[260px] flex-1 items-center justify-center px-4 text-center text-sm text-muted-foreground">
+            {emptyLabel}
+          </div>
+        ) : (
+          <div className="h-[320px] w-full sm:h-[360px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={data}
+                margin={{ left: 8, right: 12, top: 12, bottom: bottomMargin }}
+                barGap={4}
+                barCategoryGap="22%"
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/60" />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                  axisLine={false}
+                  tickLine={false}
+                  interval={0}
+                  angle={labelAngle}
+                  textAnchor={labelAngle ? 'end' : 'middle'}
+                  height={labelAngle ? 64 : 40}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={56}
+                  tickFormatter={(v) =>
+                    formatCurrency(v, currency as 'KES', { kesToDisplayMultiplier, compact: true })
+                  }
+                />
+                <Tooltip content={Tip} cursor={{ fill: 'hsl(var(--muted) / 0.35)' }} />
+                <Legend
+                  wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
+                  formatter={(value) => (value === 'initial' ? 'Initial investment' : 'Current value')}
+                />
+                <Bar dataKey="initial" name="initial" fill={INITIAL_BAR} radius={[6, 6, 0, 0]} maxBarSize={36} />
+                <Bar dataKey="current" name="current" fill={CURRENT_BAR} radius={[6, 6, 0, 0]} maxBarSize={36} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -244,7 +364,7 @@ function ChartPair({
   title: string
   description: string
   donut: { title: string; description?: string; data: StackChartSlice[] }
-  bar: { title: string; description?: string; data: StackChartSlice[]; layout?: 'vertical' | 'horizontal' }
+  bar: { title: string; description?: string; data: StackChartSlice[] }
   currency: string
   kesToDisplayMultiplier: number
   emptyLabel: string
@@ -268,7 +388,6 @@ function ChartPair({
           title={bar.title}
           description={bar.description}
           data={bar.data}
-          layout={bar.layout ?? 'vertical'}
           currency={currency}
           kesToDisplayMultiplier={kesToDisplayMultiplier}
           emptyLabel={emptyLabel}
@@ -278,183 +397,259 @@ function ChartPair({
   )
 }
 
+function PerformerListCard({
+  variant,
+  rows,
+  emptyLabel,
+}: {
+  variant: 'top' | 'under'
+  rows: StackChartSlice[]
+  emptyLabel: string
+}) {
+  const isTop = variant === 'top'
+
+  return (
+    <Card className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+      <div className="flex items-center gap-2 border-b border-border px-4 py-3.5">
+        <span
+          className={cn('h-2 w-2 shrink-0 rounded-full', isTop ? 'bg-green-500' : 'bg-red-500')}
+          aria-hidden
+        />
+        <h3 className="text-xs font-bold tracking-wide text-foreground">
+          {isTop ? 'TOP PERFORMERS — STOCKS' : 'UNDERPERFORMERS — STOCKS'}
+        </h3>
+      </div>
+      {rows.length === 0 ? (
+        <p className="px-4 py-10 text-center text-sm text-muted-foreground">{emptyLabel}</p>
+      ) : (
+        <ul>
+          {rows.map((row, index) => (
+            <li
+              key={row.id}
+              className={cn(
+                'flex items-center justify-between gap-4 px-4 py-3.5',
+                index < rows.length - 1 && 'border-b border-border'
+              )}
+            >
+              <span className="min-w-0 text-sm font-bold uppercase leading-snug tracking-tight text-foreground">
+                {row.name}
+              </span>
+              <span
+                className={cn(
+                  'shrink-0 text-sm font-semibold tabular-nums',
+                  isTop ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                )}
+              >
+                {formatPercentage(row.value)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  )
+}
+
+function TabSection({
+  title,
+  description,
+  children,
+}: {
+  title: string
+  description?: string
+  children: ReactNode
+}) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
+      </div>
+      {children}
+    </div>
+  )
+}
+
 export function StackAnalyticsSection({ holdings }: StackAnalyticsSectionProps) {
   const { currency, kesToDisplayMultiplier } = useDisplayMoney()
   const [brokerFilter, setBrokerFilter] = useState<string>('all')
-  const [holdingView, setHoldingView] = useState<HoldingViewFilter>('all')
 
   const brokers = useMemo(() => listBrokers(holdings), [holdings])
   const filtered = useMemo(
-    () => filterHoldingsForAnalytics(holdings, brokerFilter, holdingView),
-    [holdings, brokerFilter, holdingView]
-  )
-  const allEquities = useMemo(
     () => filterHoldingsForAnalytics(holdings, brokerFilter, 'all'),
     [holdings, brokerFilter]
   )
 
+  const stocksVsEtfs = useMemo(() => stocksVsEtfsSlices(filtered), [filtered])
   const byBroker = useMemo(() => brokerSlices(filtered), [filtered])
-  const stocksVsEtfs = useMemo(() => stocksVsEtfsSlices(allEquities), [allEquities])
-  const aggregateHoldings = useMemo(() => sharesAndEtfsAggregateSlices(filtered), [filtered])
-  const allHoldings = useMemo(() => allHoldingsSlices(filtered), [filtered])
-  const stocksOnly = useMemo(() => stocksOnlySlices(allEquities), [allEquities])
-  const etfsOnly = useMemo(() => etfsOnlySlices(allEquities), [allEquities])
+  const topPerformers = useMemo(() => topPerformerStocksSlices(filtered), [filtered])
+  const underperformers = useMemo(() => underperformerStocksSlices(filtered), [filtered])
+  const stocksDistribution = useMemo(() => stocksOnlySlices(filtered), [filtered])
+  const stocksByReturn = useMemo(() => stocksByReturnSlices(filtered), [filtered])
+  const etfsDistribution = useMemo(() => etfsOnlySlices(filtered), [filtered])
+  const etfsCostVsValue = useMemo(() => allEtfsCostVsValueRows(filtered), [filtered])
+  const allStocksCostVsValue = useMemo(() => allStocksCostVsValueRows(filtered), [filtered])
+  const allEtfsCostVsValue = useMemo(() => allEtfsCostVsValueRows(filtered), [filtered])
+
   const emptyLabel = 'No positions match the current filters'
+  const chartProps = { currency, kesToDisplayMultiplier, emptyLabel }
 
   if (!holdings.length) return null
 
   return (
-    <section className="space-y-8 border-t border-border pt-8">
+    <section className="space-y-6 border-t border-border pt-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Portfolio insights</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Twelve charts from your stack design — donut and bar pairs for brokers, allocation, and
-            holdings. Filter by broker or focus on stocks, ETFs, or all positions.
+            Charts grouped by overview, stocks, ETFs, and comparisons. Filter by brokerage account.
           </p>
         </div>
-        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-end lg:w-auto">
-          <div className="w-full sm:w-[200px]">
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-              Brokerage
-            </label>
-            <Select value={brokerFilter} onValueChange={setBrokerFilter}>
-              <SelectTrigger className="h-10">
-                <SelectValue placeholder="All brokers" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All brokers</SelectItem>
-                {brokers.map((b) => (
-                  <SelectItem key={b} value={b}>
-                    {b}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-full sm:w-[200px]">
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-              Holdings view
-            </label>
-            <Select value={holdingView} onValueChange={(v) => setHoldingView(v as HoldingViewFilter)}>
-              <SelectTrigger className="h-10">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All shares &amp; ETFs</SelectItem>
-                <SelectItem value="stocks">Stocks only</SelectItem>
-                <SelectItem value="etfs">ETFs only</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="w-full sm:w-[220px]">
+          <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+            Brokerage
+          </label>
+          <Select value={brokerFilter} onValueChange={setBrokerFilter}>
+            <SelectTrigger className="h-10">
+              <SelectValue placeholder="All brokers" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All brokers</SelectItem>
+              {brokers.map((b) => (
+                <SelectItem key={b} value={b}>
+                  {b}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
-      <div className="space-y-10">
-        <ChartPair
-          title="1. Brokerage accounts"
-          description="Scope Markets, AIB, and other brokers — how value is split across accounts."
-          donut={{
-            title: 'By brokerage (donut)',
-            data: byBroker,
-          }}
-          bar={{
-            title: 'By brokerage (bar)',
-            data: byBroker,
-            layout: 'vertical',
-          }}
-          currency={currency}
-          kesToDisplayMultiplier={kesToDisplayMultiplier}
-          emptyLabel="Add a broker name on holdings to see this"
-        />
+      <Tabs defaultValue="overview" className="gap-6">
+        <TabsList className="h-auto w-full flex-wrap justify-start gap-1 p-1 sm:w-auto">
+          <TabsTrigger value="overview" className="px-3 sm:px-4">
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="stocks" className="px-3 sm:px-4">
+            Stocks
+          </TabsTrigger>
+          <TabsTrigger value="etfs" className="px-3 sm:px-4">
+            ETFs
+          </TabsTrigger>
+          <TabsTrigger value="charts" className="px-3 sm:px-4">
+            Charts
+          </TabsTrigger>
+        </TabsList>
 
-        <ChartPair
-          title="2. Stocks vs ETFs"
-          description="Compare total portfolio weight in individual stocks versus ETF funds."
-          donut={{
-            title: 'Stocks vs ETFs (donut)',
-            data: stocksVsEtfs,
-          }}
-          bar={{
-            title: 'Stocks vs ETFs (bar)',
-            data: stocksVsEtfs,
-            layout: 'horizontal',
-          }}
-          currency={currency}
-          kesToDisplayMultiplier={kesToDisplayMultiplier}
-          emptyLabel="No stock or ETF positions"
-        />
+        <TabsContent value="overview" className="mt-6 space-y-10">
+          <ChartPair
+            title="Stocks vs ETFs"
+            description="How your equity portfolio splits between individual stocks and ETF funds."
+            donut={{ title: 'Allocation (pie)', data: stocksVsEtfs }}
+            bar={{
+              title: 'Allocation (bar)',
+              data: stocksVsEtfs,
+            }}
+            {...chartProps}
+            emptyLabel="No stock or ETF positions"
+          />
 
-        <ChartPair
-          title="3. All shares & ETFs (aggregate)"
-          description="Every ticker combined — see which positions dominate overall value."
-          donut={{
-            title: 'Aggregate holdings (donut)',
-            data: aggregateHoldings,
-          }}
-          bar={{
-            title: 'Aggregate holdings (bar)',
-            data: aggregateHoldings,
-            layout: 'vertical',
-          }}
-          currency={currency}
-          kesToDisplayMultiplier={kesToDisplayMultiplier}
-          emptyLabel={emptyLabel}
-        />
+          <ChartPair
+            title="Portfolio by broker"
+            description="Value held across Scope Markets, AIB, and other brokerage accounts."
+            donut={{ title: 'By brokerage (pie)', data: byBroker }}
+            bar={{ title: 'By brokerage (bar)', data: byBroker }}
+            {...chartProps}
+            emptyLabel="Add a broker name on holdings to see this"
+          />
 
-        <ChartPair
-          title="4. Individual holdings"
-          description="Same aggregation with your current broker / stocks / ETFs filter applied."
-          donut={{
-            title: 'Individual holdings (donut)',
-            description: 'Largest positions by market value',
-            data: allHoldings,
-          }}
-          bar={{
-            title: 'Individual holdings (bar)',
-            data: allHoldings,
-            layout: 'vertical',
-          }}
-          currency={currency}
-          kesToDisplayMultiplier={kesToDisplayMultiplier}
-          emptyLabel={emptyLabel}
-        />
+          <div className="grid gap-4 md:grid-cols-2">
+            <PerformerListCard
+              variant="top"
+              rows={topPerformers}
+              emptyLabel="No stocks with positive returns yet"
+            />
+            <PerformerListCard
+              variant="under"
+              rows={underperformers}
+              emptyLabel="No stocks with negative returns"
+            />
+          </div>
+        </TabsContent>
 
-        <ChartPair
-          title="5. All stocks"
-          description="NSE and global stocks only — which names take the most weight."
-          donut={{
-            title: 'Stocks breakdown (donut)',
-            data: stocksOnly,
-          }}
-          bar={{
-            title: 'Stocks breakdown (bar)',
-            data: stocksOnly,
-            layout: 'vertical',
-          }}
-          currency={currency}
-          kesToDisplayMultiplier={kesToDisplayMultiplier}
-          emptyLabel="No stock positions"
-        />
+        <TabsContent value="stocks" className="mt-6 space-y-10">
+          <TabSection
+            title="Stock holdings"
+            description="Distribution of market value across NSE and global stock positions."
+          >
+            <div className="grid gap-4 lg:grid-cols-2">
+              <DonutCard
+                title="Holdings distribution (pie)"
+                data={stocksDistribution}
+                {...chartProps}
+                emptyLabel="No stock positions"
+              />
+              <BarCard
+                title="By return (bar)"
+                description="Unrealized % gain or loss per stock ticker."
+                data={stocksByReturn}
+                valueIsPercent
+                {...chartProps}
+                emptyLabel="No stock positions"
+              />
+            </div>
+          </TabSection>
+        </TabsContent>
 
-        <ChartPair
-          title="6. All ETFs"
-          description="ETF asset class only — compare fund sizes in your stack."
-          donut={{
-            title: 'ETFs breakdown (donut)',
-            data: etfsOnly,
-          }}
-          bar={{
-            title: 'ETFs breakdown (bar)',
-            data: etfsOnly,
-            layout: 'vertical',
-          }}
-          currency={currency}
-          kesToDisplayMultiplier={kesToDisplayMultiplier}
-          emptyLabel="No ETF positions — use asset class ETFs when adding"
-        />
+        <TabsContent value="etfs" className="mt-6 space-y-10">
+          <TabSection
+            title="ETF holdings"
+            description="How ETF fund value is spread across your positions."
+          >
+            <div className="grid gap-4 lg:grid-cols-2">
+              <DonutCard
+                title="ETF distribution (pie)"
+                data={etfsDistribution}
+                {...chartProps}
+                emptyLabel="No ETF positions"
+              />
+              <ComparisonBarCard
+                title="Initial investment vs current value"
+                description="Cost basis compared to today’s value for each ETF."
+                data={etfsCostVsValue}
+                {...chartProps}
+                emptyLabel="No ETF positions"
+              />
+            </div>
+          </TabSection>
+        </TabsContent>
 
-      </div>
+        <TabsContent value="charts" className="mt-6 space-y-10">
+          <TabSection
+            title="All stocks"
+            description="Initial investment vs current value for every stock ticker in your stack."
+          >
+            <ComparisonBarCard
+              title="Stocks — initial vs current"
+              data={allStocksCostVsValue}
+              {...chartProps}
+              emptyLabel="No stock positions"
+            />
+          </TabSection>
+
+          <TabSection
+            title="All ETFs"
+            description="Initial investment vs current value for every ETF in your stack."
+          >
+            <ComparisonBarCard
+              title="ETFs — initial vs current"
+              data={allEtfsCostVsValue}
+              {...chartProps}
+              emptyLabel="No ETF positions"
+            />
+          </TabSection>
+        </TabsContent>
+      </Tabs>
     </section>
   )
 }

@@ -16,6 +16,8 @@ export interface Holding {
   region?: string
   exchangePlatform?: string
   sector?: string
+  /** From Growe Stock instrument_type: stock | etf */
+  instrumentType?: 'stock' | 'etf'
   broker?: string
   dateAdded: string
   lastUpdated: string
