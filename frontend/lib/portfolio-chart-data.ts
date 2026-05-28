@@ -28,6 +28,44 @@ function holdingDate(h: Holding): Date {
   return new Date(h.dateAdded)
 }
 
+/** Last moment of the previous calendar month (e.g. 30 Apr when today is in May). */
+export function endOfPreviousCalendarMonth(now: Date = new Date()): Date {
+  return new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
+}
+
+/**
+ * Estimated portfolio value on ``asOf`` (KES): lots held by then, value interpolated
+ * from cost at purchase to today's market value. Matches backend when no snapshot exists.
+ */
+export function portfolioValueAtAsOf(
+  holdings: Holding[],
+  asOf: Date,
+  now: Date = new Date()
+): number {
+  const asOfTs = asOf.getTime()
+  const nowTs = now.getTime()
+  let total = 0
+  for (const h of holdings) {
+    const addedTs = holdingDate(h).getTime()
+    if (addedTs > asOfTs) continue
+    const marketNow = h.valueInKES ?? h.valueKES ?? 0
+    const cost = h.costAtAvgKES ?? h.costBasisKES ?? 0
+    if (marketNow <= 0 && cost <= 0) continue
+    if (nowTs <= addedTs) {
+      total += cost > 0 ? cost : marketNow
+      continue
+    }
+    if (asOfTs >= nowTs) {
+      total += marketNow
+      continue
+    }
+    const span = Math.max(1, nowTs - addedTs)
+    const frac = Math.min(1, Math.max(0, (asOfTs - addedTs) / span))
+    total += cost + (marketNow - cost) * frac
+  }
+  return total
+}
+
 export function getFirstInvestmentDate(holdings: Holding[]): Date | null {
   if (!holdings.length) return null
   let min = holdingDate(holdings[0]).getTime()

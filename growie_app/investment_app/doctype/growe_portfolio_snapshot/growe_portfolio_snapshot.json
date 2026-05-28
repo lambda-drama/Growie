@@ -1,0 +1,88 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-05-29 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "member",
+  "snapshot_date",
+  "column_break_1",
+  "total_value_kes",
+  "total_cost_kes",
+  "positions"
+ ],
+ "fields": [
+  {
+   "fieldname": "member",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Member",
+   "options": "Growe Member",
+   "reqd": 1
+  },
+  {
+   "fieldname": "snapshot_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Snapshot Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_value_kes",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Total Value (KES)",
+   "precision": "2",
+   "reqd": 1
+  },
+  {
+   "fieldname": "total_cost_kes",
+   "fieldtype": "Float",
+   "label": "Total Cost (KES)",
+   "precision": "2"
+  },
+  {
+   "fieldname": "positions",
+   "fieldtype": "Int",
+   "label": "Open Positions",
+   "default": "0"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-05-29 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Investment App",
+ "name": "Growe Portfolio Snapshot",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Website User"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "snapshot_date",
+ "sort_order": "DESC",
+ "states": []
+}

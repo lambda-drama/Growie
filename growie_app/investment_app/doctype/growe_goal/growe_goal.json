@@ -1,6 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "GG-.#####",
  "creation": "2026-05-15 18:15:05.808844",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -95,10 +96,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-15 18:22:54.605749",
+ "modified": "2026-05-29 00:29:18.446788",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Goal",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {

@@ -5,7 +5,7 @@ All endpoints require an authenticated session unless noted.
 
 import frappe
 from frappe import _
-from frappe.utils import add_days, flt, get_datetime_str, getdate, now_datetime, today
+from frappe.utils import add_days, flt, get_datetime_str, get_first_day, getdate, now_datetime, today
 
 _USD_TO_KES_FALLBACK = 130.0
 
@@ -108,6 +108,148 @@ def _instrument_type_slug(stock: dict) -> str:
 	if (stock.get("market") or "").strip() == "ETF":
 		return "etf"
 	return "stock"
+
+
+def previous_calendar_month_end(on_date=None) -> str:
+	"""ISO date string for the last day of the calendar month before ``on_date``."""
+	ref = getdate(on_date or today())
+	first_of_month = get_first_day(ref)
+	return str(add_days(first_of_month, -1))
+
+
+def _holding_value_kes(h: dict) -> float:
+	return float(h.get("valueInKES") or h.get("valueKES") or 0)
+
+
+def _holding_cost_kes(h: dict) -> float:
+	return float(h.get("costAtAvgKES") or h.get("costBasisKES") or 0)
+
+
+def _portfolio_value_at_date(holdings: list, as_of) -> float:
+	"""
+	Estimate total portfolio market value (KES) on ``as_of`` using each lot's
+	purchase date, cost, and today's refreshed value (linear in time).
+	Used when no stored snapshot exists for that date.
+	"""
+	as_of_d = getdate(as_of)
+	as_of_ts = as_of_d.toordinal()
+	now_d = getdate(today())
+	now_ts = now_d.toordinal()
+	total = 0.0
+	for h in holdings:
+		added = getdate(h.get("dateAdded") or today())
+		if added.toordinal() > as_of_ts:
+			continue
+		market_now = _holding_value_kes(h)
+		cost = _holding_cost_kes(h)
+		if market_now <= 0 and cost <= 0:
+			continue
+		if now_ts <= added.toordinal():
+			total += cost if cost > 0 else market_now
+			continue
+		if as_of_ts >= now_ts:
+			total += market_now
+			continue
+		span = max(1, now_ts - added.toordinal())
+		frac = min(1.0, max(0.0, (as_of_ts - added.toordinal()) / span))
+		total += cost + (market_now - cost) * frac
+	return total
+
+
+def record_portfolio_snapshot(
+	member: str,
+	holdings: list,
+	snapshot_date=None,
+	total_value_kes: float = None,
+	total_cost_kes: float = None,
+):
+	"""Upsert a daily portfolio total for month-over-month comparisons."""
+	snap_date = getdate(snapshot_date or today())
+	val = flt(total_value_kes)
+	if val <= 0 and holdings:
+		val = sum(_holding_value_kes(h) for h in holdings)
+	cost = flt(total_cost_kes)
+	if cost <= 0 and holdings:
+		cost = sum(_holding_cost_kes(h) for h in holdings)
+	positions = len(holdings) if holdings else 0
+
+	existing = frappe.db.get_value(
+		"Growe Portfolio Snapshot",
+		{"member": member, "snapshot_date": snap_date},
+		"name",
+	)
+	payload = {
+		"member": member,
+		"snapshot_date": snap_date,
+		"total_value_kes": round(val, 2),
+		"total_cost_kes": round(cost, 2),
+		"positions": positions,
+	}
+	if existing:
+		frappe.db.set_value("Growe Portfolio Snapshot", existing, payload, update_modified=True)
+	else:
+		doc = frappe.get_doc({"doctype": "Growe Portfolio Snapshot", **payload})
+		doc.flags.ignore_permissions = True
+		doc.insert()
+	frappe.db.commit()
+
+
+def compute_monthly_growth(member: str, holdings: list) -> dict:
+	"""
+	Month-over-month: portfolio value on the last calendar day of the prior month vs today.
+	Uses a stored snapshot when available; otherwise estimates value at that date.
+	"""
+	value_now = sum(_holding_value_kes(h) for h in holdings)
+	as_of = previous_calendar_month_end()
+	value_then = frappe.db.get_value(
+		"Growe Portfolio Snapshot",
+		{"member": member, "snapshot_date": as_of},
+		"total_value_kes",
+	)
+	source = "snapshot"
+	if value_then is None:
+		value_then = _portfolio_value_at_date(holdings, as_of)
+		source = "estimated"
+	value_then = flt(value_then)
+	growth_kes = value_now - value_then
+	growth_pct = (growth_kes / value_then * 100) if value_then > 0 else (100.0 if value_now > 0 else 0.0)
+	return {
+		"monthlyGrowthKES": round(growth_kes, 2),
+		"monthlyGrowthPercent": round(growth_pct, 2),
+		"monthlyGrowthCompareDate": as_of,
+		"monthlyGrowthValueThenKES": round(value_then, 2),
+		"monthlyGrowthValueNowKES": round(value_now, 2),
+		"monthlyGrowthSource": source,
+	}
+
+
+def record_all_member_portfolio_snapshots():
+	"""Daily job: snapshot open-holding totals for every member with positions."""
+	from growie_app.api.stack import _stack_holding_row
+
+	members = frappe.get_all("Growe Member", pluck="name")
+	for member in members:
+		rows = frappe.get_all(
+			"Growe Holding",
+			filters=open_holding_db_filters(member),
+			fields=[
+				"name",
+				"asset_class",
+				"asset_name",
+				"value_kes",
+				"cost_basis_kes",
+				"quantity",
+				"ticker",
+				"date_added",
+				"currency",
+				"buying_price",
+				"sold",
+			],
+		)
+		if not rows:
+			continue
+		holdings = [_stack_holding_row(r) for r in rows]
+		record_portfolio_snapshot(member, holdings)
 
 
 def _holding_to_dict(h) -> dict:
@@ -542,6 +684,9 @@ def get_portfolio_summary():
 		for k, v in allocation.items()
 	}
 
+	record_portfolio_snapshot(member, holdings, total_value_kes=total_value, total_cost_kes=total_cost)
+	monthly = compute_monthly_growth(member, holdings)
+
 	return {
 		"totalValueKES": round(total_value, 2),
 		"totalValue": round(total_value, 2),  # forward-compatible alias
@@ -553,6 +698,7 @@ def get_portfolio_summary():
 		"holdingsCount": len(holdings),
 		"allocation": allocation,
 		"allocationPercent": alloc_pct,
+		**monthly,
 	}
 
 
