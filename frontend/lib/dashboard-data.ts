@@ -1,6 +1,12 @@
 import type { Holding, AssetClass } from '@/types'
 import type { PortfolioSummary } from '@/services/portfolio'
-import { buildTimelineBuckets } from '@/lib/portfolio-chart-data'
+import { bucketLabelForHolding } from '@/lib/stack-grouping'
+import type { StackHolding } from '@/services/stack'
+import {
+  buildTimelineBuckets,
+  endOfPreviousCalendarMonth,
+  portfolioValueAtAsOf,
+} from '@/lib/portfolio-chart-data'
 import { getAssetClassName } from '@/lib/format'
 
 export const ASSET_CLASS_ORDER: AssetClass[] = [
@@ -76,27 +82,38 @@ export function groupByAssetClass(holdings: Holding[]): AssetClassGroup[] {
 }
 
 /**
- * Month-over-month change: current market value vs cost basis of lots held at prior month-end.
- * (We do not store historical prices; past months use invested capital, now uses live value.)
+ * Calendar month-over-month: portfolio value on the last day of the previous month vs today.
+ * Prefer API summary (uses stored snapshots when available).
  */
-export function computeMonthOverMonthGrowth(holdings: Holding[]): {
+export function computeMonthOverMonthGrowth(
+  holdings: Holding[],
+  summary?: Pick<PortfolioSummary, 'monthlyGrowthKES' | 'monthlyGrowthPercent'> | null
+): {
   monthlyGrowthKES: number
   monthlyGrowthPercent: number
 } {
+  if (
+    summary != null &&
+    typeof summary.monthlyGrowthKES === 'number' &&
+    typeof summary.monthlyGrowthPercent === 'number'
+  ) {
+    return {
+      monthlyGrowthKES: summary.monthlyGrowthKES,
+      monthlyGrowthPercent: summary.monthlyGrowthPercent,
+    }
+  }
+
   if (!holdings.length) return { monthlyGrowthKES: 0, monthlyGrowthPercent: 0 }
 
   const now = new Date()
-  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
-
+  const endOfLastMonth = endOfPreviousCalendarMonth(now)
   const valueNow = holdings.reduce((s, h) => s + (h.valueInKES ?? h.valueKES ?? 0), 0)
-  const basisLastMonth = holdings
-    .filter((h) => new Date(h.dateAdded).getTime() <= endOfLastMonth.getTime())
-    .reduce((s, h) => s + (h.costAtAvgKES ?? h.costBasisKES ?? 0), 0)
+  const valueThen = portfolioValueAtAsOf(holdings, endOfLastMonth, now)
 
-  const monthlyGrowthKES = valueNow - basisLastMonth
+  const monthlyGrowthKES = valueNow - valueThen
   const monthlyGrowthPercent =
-    basisLastMonth > 0
-      ? (monthlyGrowthKES / basisLastMonth) * 100
+    valueThen > 0
+      ? (monthlyGrowthKES / valueThen) * 100
       : valueNow > 0
         ? 100
         : 0
@@ -135,7 +152,7 @@ export function computeDashboardMetrics(
     summary?.gainPercent ??
     (totalCostKES > 0 ? (gainKES / totalCostKES) * 100 : 0)
 
-  const { monthlyGrowthKES, monthlyGrowthPercent } = computeMonthOverMonthGrowth(holdings)
+  const { monthlyGrowthKES, monthlyGrowthPercent } = computeMonthOverMonthGrowth(holdings, summary)
 
   const groups = groupByAssetClass(holdings)
   const activeClasses = groups.length
@@ -171,4 +188,33 @@ export function allocationSlices(holdings: Holding[]) {
     percentage: ((g.totalValueKES / total) * 100).toFixed(1),
     assetClass: g.assetClass,
   }))
+}
+
+export interface ExchangeAllocationSlice {
+  id: string
+  name: string
+  value: number
+  percentage: string
+}
+
+/** Portfolio allocation grouped by exchange (NSE, NYSE, NASDAQ, …). */
+export function exchangeAllocationSlices(holdings: Holding[]): ExchangeAllocationSlice[] {
+  const map = new Map<string, number>()
+  for (const h of holdings) {
+    const val = h.valueInKES ?? h.valueKES ?? 0
+    if (val <= 0) continue
+    const label = bucketLabelForHolding(h as StackHolding, 'exchange')
+    const key = label.trim() || 'Other'
+    map.set(key, (map.get(key) ?? 0) + val)
+  }
+  const total = [...map.values()].reduce((s, v) => s + v, 0)
+  if (total <= 0) return []
+  return [...map.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, value]) => ({
+      id: name.toLowerCase().replace(/\s+/g, '-'),
+      name,
+      value,
+      percentage: ((value / total) * 100).toFixed(1),
+    }))
 }

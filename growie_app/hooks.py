@@ -181,6 +181,9 @@ website_route_rules = [
 # ---------------
 
 scheduler_events = {
+	"daily": [
+		"growie_app.api.portfolio.record_all_member_portfolio_snapshots",
+	],
 	"cron": {
 		# 08:00 server time daily — gated by News Settings → Activate (see daily_news_scrape)
 		"0 8 * * *": [

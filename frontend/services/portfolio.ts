@@ -22,6 +22,14 @@ export interface PortfolioSummary {
   holdingsCount: number
   allocation: Record<string, number>
   allocationPercent: Record<string, number>
+  /** Value on last day of previous calendar month (KES). */
+  monthlyGrowthKES?: number
+  monthlyGrowthPercent?: number
+  monthlyGrowthCompareDate?: string
+  monthlyGrowthValueThenKES?: number
+  monthlyGrowthValueNowKES?: number
+  /** snapshot = stored month-end total; estimated = interpolated until snapshot exists */
+  monthlyGrowthSource?: 'snapshot' | 'estimated'
 }
 
 export interface AddHoldingData {

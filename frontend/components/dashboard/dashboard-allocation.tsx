@@ -4,8 +4,9 @@ import { useMemo } from 'react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useDisplayMoney } from '@/lib/store'
-import { formatCurrency, getAssetClassColorHex } from '@/lib/format'
-import { allocationSlices } from '@/lib/dashboard-data'
+import { formatCurrency } from '@/lib/format'
+import { getBucketIconColorHex } from '@/lib/stack-bucket-icons'
+import { exchangeAllocationSlices } from '@/lib/dashboard-data'
 import type { Holding } from '@/types'
 
 interface DashboardAllocationProps {
@@ -14,13 +15,13 @@ interface DashboardAllocationProps {
 
 export function DashboardAllocation({ holdings }: DashboardAllocationProps) {
   const { currency, kesToDisplayMultiplier } = useDisplayMoney()
-  const data = useMemo(() => allocationSlices(holdings), [holdings])
+  const data = useMemo(() => exchangeAllocationSlices(holdings), [holdings])
 
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Asset allocation
+          Allocation by exchange
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -44,8 +45,8 @@ export function DashboardAllocation({ holdings }: DashboardAllocationProps) {
                   >
                     {data.map((entry) => (
                       <Cell
-                        key={entry.assetClass}
-                        fill={getAssetClassColorHex(entry.assetClass)}
+                        key={entry.id}
+                        fill={getBucketIconColorHex(entry.name, 'exchange')}
                       />
                     ))}
                   </Pie>
@@ -69,11 +70,11 @@ export function DashboardAllocation({ holdings }: DashboardAllocationProps) {
             </div>
             <div className="mt-3 space-y-2">
               {data.map((item) => (
-                <div key={item.assetClass} className="flex items-center justify-between gap-2 text-sm">
+                <div key={item.id} className="flex items-center justify-between gap-2 text-sm">
                   <div className="flex items-center gap-2 min-w-0">
                     <span
                       className="h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: getAssetClassColorHex(item.assetClass) }}
+                      style={{ backgroundColor: getBucketIconColorHex(item.name, 'exchange') }}
                     />
                     <span className="truncate text-foreground">{item.name}</span>
                   </div>

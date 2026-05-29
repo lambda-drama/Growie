@@ -13,6 +13,7 @@ import { StackClassList } from '@/components/stack/stack-class-list'
 import { StackTickerGroups } from '@/components/stack/stack-ticker-groups'
 import { StackClassHoldingsTable } from '@/components/stack/stack-class-holdings-table'
 import { StackExcelBulkImport } from '@/components/stack/stack-excel-bulk-import'
+import { StackHoldingDetailSheet } from '@/components/stack/stack-holding-detail-sheet'
 import { TradeDialog, type TradeMode } from '@/components/stack/trade-dialog'
 import { useStackOverview } from '@/hooks/use-stack'
 import { usePortfolio } from '@/hooks/use-portfolio'
@@ -46,6 +47,8 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
   const [tradeOpen, setTradeOpen] = useState(false)
   const [tradeMode, setTradeMode] = useState<TradeMode>('buy-new')
   const [activeHolding, setActiveHolding] = useState<StackHolding | null>(null)
+  const [detailHolding, setDetailHolding] = useState<StackHolding | null>(null)
+  const [detailOpen, setDetailOpen] = useState(false)
   const { stackGroupingMode, setStackGroupingMode } = useAppStore()
   const [selectedOverviewBucket, setSelectedOverviewBucket] = useState<string | null>(null)
   const [selectedOverviewGroupKey, setSelectedOverviewGroupKey] = useState<string | null>(null)
@@ -54,6 +57,11 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
     setTradeMode(mode)
     setActiveHolding(holding ?? null)
     setTradeOpen(true)
+  }
+
+  const openHoldingDetail = (holding: StackHolding) => {
+    setDetailHolding(holding)
+    setDetailOpen(true)
   }
 
   const groupedOverviewRows = useMemo(() => {
@@ -323,7 +331,7 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
                       displayCurrency={currency}
                       kesToDisplayMultiplier={kesToDisplayMultiplier}
                       kesPerUsd={kesPerUsd}
-                      onOpenHolding={() => {}}
+                      onOpenHolding={openHoldingDetail}
                       onBuy={(h) => openTrade('buy-more', h)}
                       onSell={(h) => openTrade('sell', h)}
                       groupingMode="ticker"
@@ -340,7 +348,7 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
                     displayCurrency={currency}
                     kesToDisplayMultiplier={kesToDisplayMultiplier}
                     kesPerUsd={kesPerUsd}
-                    onOpenHolding={() => {}}
+                    onOpenHolding={openHoldingDetail}
                     onBuy={(h) => openTrade('buy-more', h)}
                     onSell={(h) => openTrade('sell', h)}
                     groupingMode="ticker"
@@ -361,12 +369,34 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
         </>
       )}
 
+      <StackHoldingDetailSheet
+        holding={detailHolding}
+        open={detailOpen}
+        onOpenChange={(open) => {
+          setDetailOpen(open)
+          if (!open) setDetailHolding(null)
+        }}
+        onBuy={(h) => {
+          setDetailOpen(false)
+          openTrade('buy-more', h)
+        }}
+        onSell={(h) => {
+          setDetailOpen(false)
+          openTrade('sell', h)
+        }}
+        onEdit={(h) => {
+          setDetailOpen(false)
+          openTrade('buy-more', h)
+        }}
+        onDeleted={() => void afterBulkImport()}
+      />
+
       <TradeDialog
         open={tradeOpen}
         onOpenChange={setTradeOpen}
         mode={tradeMode}
         holding={activeHolding}
-        onSuccess={refresh}
+        onSuccess={() => void afterBulkImport()}
       />
     </div>
   )

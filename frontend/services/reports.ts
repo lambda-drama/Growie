@@ -1,4 +1,36 @@
-export type ReportType = 'dashboard' | 'portfolio' | 'goals' | 'tax'
+export type ReportType = 'dashboard' | 'portfolio' | 'goals' | 'tax' | 'sold'
+
+export type SoldItemSource = 'transaction' | 'holding'
+
+export interface SoldTransaction {
+  id: string
+  holdingId: string
+  source: SoldItemSource
+  sourceLabel: string
+  ticker: string
+  assetName: string
+  assetClass: string
+  assetClassLabel: string
+  marketTag: string
+  quantity: number
+  unitPrice: number
+  proceedsKES: number
+  currency: string
+  transactionDate: string
+  reference: string
+  notes: string
+}
+
+export interface SoldTransactionsResponse {
+  transactions: SoldTransaction[]
+  summary: {
+    count: number
+    sellTradeCount: number
+    markedSoldCount: number
+    totalProceedsKES: number
+    displayCurrency: string
+  }
+}
 
 export interface ReportMeta {
   id: ReportType
@@ -46,8 +78,30 @@ async function getCSRF(): Promise<string> {
   return token
 }
 
-export async function previewReport(reportType: ReportType): Promise<{ title: string; html: string }> {
+export async function fetchSoldTransactions(
+  displayCurrency?: string
+): Promise<SoldTransactionsResponse> {
+  const params = new URLSearchParams()
+  if (displayCurrency) params.set('display_currency', displayCurrency.toUpperCase())
+  const qs = params.toString()
+  const res = await fetch(
+    `/api/method/growie_app.api.reports.get_sold_transactions${qs ? `?${qs}` : ''}`,
+    {
+      credentials: 'include',
+      headers: { Accept: 'application/json' },
+    }
+  )
+  const data = await res.json()
+  if (data?.exc) throw new Error('Failed to load sold transactions')
+  return data.message as SoldTransactionsResponse
+}
+
+export async function previewReport(
+  reportType: ReportType,
+  displayCurrency?: string
+): Promise<{ title: string; html: string }> {
   const params = new URLSearchParams({ report_type: reportType })
+  if (displayCurrency) params.set('display_currency', displayCurrency.toUpperCase())
   const res = await fetch(`/api/method/growie_app.api.reports.preview_report?${params}`, {
     credentials: 'include',
     headers: { Accept: 'application/json' },
@@ -58,8 +112,13 @@ export async function previewReport(reportType: ReportType): Promise<{ title: st
   return { title: m.title, html: m.html }
 }
 
-export async function downloadReportPdf(reportType: ReportType): Promise<void> {
+export async function downloadReportPdf(
+  reportType: ReportType,
+  displayCurrency?: string
+): Promise<void> {
   const csrf = await getCSRF()
+  const body: { report_type: ReportType; display_currency?: string } = { report_type: reportType }
+  if (displayCurrency) body.display_currency = displayCurrency.toUpperCase()
   const res = await fetch('/api/method/growie_app.api.reports.download_report', {
     method: 'POST',
     credentials: 'include',
@@ -67,7 +126,7 @@ export async function downloadReportPdf(reportType: ReportType): Promise<void> {
       'Content-Type': 'application/json',
       ...(csrf ? { 'X-Frappe-CSRF-Token': csrf } : {}),
     },
-    body: JSON.stringify({ report_type: reportType }),
+    body: JSON.stringify(body),
   })
 
   if (!res.ok) {

@@ -11,8 +11,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ReportsSoldTab } from '@/components/reports/reports-sold-tab'
 import { useAuth } from '@/hooks/use-auth'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, useDisplayMoney } from '@/lib/store'
 import {
   REPORT_CATALOG,
   previewReport,
@@ -23,6 +25,7 @@ import {
 export function ReportsView() {
   const { isAuthenticated } = useAuth()
   const { setAuthModal } = useAppStore()
+  const { currency } = useDisplayMoney()
   const [previewOpen, setPreviewOpen] = useState(false)
   const [previewTitle, setPreviewTitle] = useState('')
   const [previewHtml, setPreviewHtml] = useState('')
@@ -48,7 +51,7 @@ export function ReportsView() {
     setPreviewTitle('')
     setPreviewHtml('')
     try {
-      const { title, html } = await previewReport(id)
+      const { title, html } = await previewReport(id, currency)
       setPreviewTitle(title)
       setPreviewHtml(html)
     } catch (err) {
@@ -59,11 +62,17 @@ export function ReportsView() {
     }
   }
 
+  const openPreviewFromSoldTab = (title: string, html: string) => {
+    setPreviewTitle(title)
+    setPreviewHtml(html)
+    setPreviewOpen(true)
+  }
+
   const handleDownload = async (id: ReportType) => {
     setError(null)
     setDownloading(id)
     try {
-      await downloadReportPdf(id)
+      await downloadReportPdf(id, currency)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Download failed')
     } finally {
@@ -75,54 +84,77 @@ export function ReportsView() {
     <div className="mx-auto max-w-3xl space-y-6 pb-24">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">Reports</h1>
-        <p className="mt-1 text-muted-foreground">Download your portfolio or dashboard reports.</p>
+        <p className="mt-1 text-muted-foreground">
+          Download standard portfolio reports or review sold transactions.
+        </p>
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <div className="space-y-3">
-        {REPORT_CATALOG.map((report) => (
-          <Card key={report.id} className="shadow-sm">
-            <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {report.title.split(' ')[0]}
-                </p>
-                <h2 className="mt-0.5 text-base font-semibold text-foreground">{report.title}</h2>
-                <p className="mt-1 text-sm text-muted-foreground">{report.description}</p>
-              </div>
-              <div className="flex shrink-0 gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => handlePreview(report.id)}
-                  disabled={previewLoading}
-                >
-                  <Eye className="h-4 w-4" />
-                  Preview
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 border-primary text-primary hover:bg-primary/5"
-                  onClick={() => handleDownload(report.id)}
-                  disabled={downloading === report.id}
-                >
-                  {downloading === report.id ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Download className="h-4 w-4" />
-                  )}
-                  Download PDF
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <Tabs defaultValue="standard" className="gap-6">
+        <TabsList className="h-auto w-full sm:w-auto">
+          <TabsTrigger value="standard" className="flex-1 sm:flex-none">
+            Standard reports
+          </TabsTrigger>
+          <TabsTrigger value="sold" className="flex-1 sm:flex-none">
+            Sold transactions
+          </TabsTrigger>
+        </TabsList>
 
-      <p className="text-center text-xs text-muted-foreground">All reports are downloaded as PDF files.</p>
+        <TabsContent value="standard" className="mt-0 space-y-3">
+          {REPORT_CATALOG.map((report) => (
+            <Card key={report.id} className="shadow-sm">
+              <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {report.title.split(' ')[0]}
+                  </p>
+                  <h2 className="mt-0.5 text-base font-semibold text-foreground">{report.title}</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">{report.description}</p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => handlePreview(report.id)}
+                    disabled={previewLoading}
+                  >
+                    <Eye className="h-4 w-4" />
+                    Preview
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 border-primary text-primary hover:bg-primary/5"
+                    onClick={() => handleDownload(report.id)}
+                    disabled={downloading === report.id}
+                  >
+                    {downloading === report.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                    Download PDF
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+          <p className="text-center text-xs text-muted-foreground">
+            Standard reports are downloaded as PDF files.
+          </p>
+        </TabsContent>
+
+        <TabsContent value="sold" className="mt-0">
+          <ReportsSoldTab
+            onError={setError}
+            onPreview={openPreviewFromSoldTab}
+            onPreviewLoadingChange={setPreviewLoading}
+            previewLoading={previewLoading}
+          />
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-h-[90vh] max-w-4xl overflow-hidden flex flex-col p-0 gap-0">
