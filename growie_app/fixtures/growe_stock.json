@@ -2,6 +2,7 @@
  {
   "api_symbol": "BATS.L",
   "company_name": "BATS.L",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -19,6 +20,7 @@
  {
   "api_symbol": null,
   "company_name": "Kenya Power",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -36,6 +38,7 @@
  {
   "api_symbol": null,
   "company_name": "Equity Bank",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -53,6 +56,7 @@
  {
   "api_symbol": "AAPL",
   "company_name": "Apple Inc.",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -70,6 +74,7 @@
  {
   "api_symbol": "KCB.NR",
   "company_name": "KCB Group Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -87,6 +92,7 @@
  {
   "api_symbol": "EQTY.NR",
   "company_name": "Equity Group Holdings Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -104,6 +110,7 @@
  {
   "api_symbol": "COOP.NR",
   "company_name": "Co-operative Bank of Kenya Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -121,6 +128,7 @@
  {
   "api_symbol": "ABSA.NR",
   "company_name": "ABSA Bank Kenya Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -138,6 +146,7 @@
  {
   "api_symbol": "SBIC.NR",
   "company_name": "Stanbic Holdings Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -155,6 +164,7 @@
  {
   "api_symbol": "DTB.NR",
   "company_name": "Diamond Trust Bank Kenya Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -172,6 +182,7 @@
  {
   "api_symbol": "I&M.NR",
   "company_name": "I&M Holdings Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -189,6 +200,7 @@
  {
   "api_symbol": "NIC.NR",
   "company_name": "NIC Bank Group Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -206,6 +218,7 @@
  {
   "api_symbol": "HFCK.NR",
   "company_name": "HF Group Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -223,6 +236,7 @@
  {
   "api_symbol": "KPLC.NR",
   "company_name": "Kenya Power and Lighting Company Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -240,6 +254,7 @@
  {
   "api_symbol": "KEGN.NR",
   "company_name": "KenGen Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -257,6 +272,7 @@
  {
   "api_symbol": "TOTL.NR",
   "company_name": "TotalEnergies Marketing Kenya Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -274,6 +290,7 @@
  {
   "api_symbol": "KNRL.NR",
   "company_name": "KenolKobil Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -291,6 +308,7 @@
  {
   "api_symbol": "SCOM.NR",
   "company_name": "Safaricom Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -308,6 +326,7 @@
  {
   "api_symbol": "EABL.NR",
   "company_name": "East African Breweries Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -325,6 +344,7 @@
  {
   "api_symbol": "BAT.NR",
   "company_name": "British American Tobacco Kenya Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -342,6 +362,7 @@
  {
   "api_symbol": "BOC.NR",
   "company_name": "BOC Gases Kenya Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -359,6 +380,7 @@
  {
   "api_symbol": "CARB.NR",
   "company_name": "Carbacid Investments Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -376,6 +398,7 @@
  {
   "api_symbol": "UNGA.NR",
   "company_name": "Unga Group Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -393,6 +416,7 @@
  {
   "api_symbol": "MSC.NR",
   "company_name": "Marshalls East Africa Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -410,6 +434,7 @@
  {
   "api_symbol": "ORCH.NR",
   "company_name": "Orchid Insurance Brokers",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -427,6 +452,7 @@
  {
   "api_symbol": "BAMB.NR",
   "company_name": "Bamburi Cement Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -444,6 +470,7 @@
  {
   "api_symbol": "ARM.NR",
   "company_name": "ARM Cement Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -461,6 +488,7 @@
  {
   "api_symbol": "CROW.NR",
   "company_name": "Crown Paints Kenya Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -478,6 +506,7 @@
  {
   "api_symbol": "PORT.NR",
   "company_name": "Portland Cement Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -495,6 +524,7 @@
  {
   "api_symbol": "SASN.NR",
   "company_name": "Sasini Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -512,6 +542,7 @@
  {
   "api_symbol": "KUKZ.NR",
   "company_name": "Kakuzi Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -529,6 +560,7 @@
  {
   "api_symbol": "WTK.NR",
   "company_name": "Williamson Tea Kenya Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -546,6 +578,7 @@
  {
   "api_symbol": "KAPC.NR",
   "company_name": "Kapchorua Tea Kenya Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -563,6 +596,7 @@
  {
   "api_symbol": "LIMT.NR",
   "company_name": "Limuru Tea Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -580,6 +614,7 @@
  {
   "api_symbol": "CTUM.NR",
   "company_name": "Centum Investment Company Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -597,6 +632,7 @@
  {
   "api_symbol": "TCL.NR",
   "company_name": "Trans-Century Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -614,6 +650,7 @@
  {
   "api_symbol": "NSE.NR",
   "company_name": "Nairobi Securities Exchange Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -631,6 +668,7 @@
  {
   "api_symbol": "JUB.NR",
   "company_name": "Jubilee Holdings Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -648,6 +686,7 @@
  {
   "api_symbol": "BRIT.NR",
   "company_name": "Britam Holdings Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -665,6 +704,7 @@
  {
   "api_symbol": "SLAM.NR",
   "company_name": "Sanlam Kenya Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -682,6 +722,7 @@
  {
   "api_symbol": "LBTY.NR",
   "company_name": "Liberty Kenya Holdings Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -699,6 +740,7 @@
  {
   "api_symbol": "CIC.NR",
   "company_name": "CIC Insurance Group Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -716,6 +758,7 @@
  {
   "api_symbol": "NMG.NR",
   "company_name": "Nation Media Group Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -733,6 +776,7 @@
  {
   "api_symbol": "SGL.NR",
   "company_name": "Standard Group Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -750,6 +794,7 @@
  {
   "api_symbol": "LKL.NR",
   "company_name": "Longhorn Publishers Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -767,6 +812,7 @@
  {
   "api_symbol": "EXPR.NR",
   "company_name": "Express Kenya Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -784,6 +830,7 @@
  {
   "api_symbol": "SCAN.NR",
   "company_name": "ScanGroup Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -801,6 +848,7 @@
  {
   "api_symbol": "C&G.NR",
   "company_name": "Car and General Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -818,6 +866,7 @@
  {
   "api_symbol": "MRSL.NR",
   "company_name": "Marshalls East Africa Plc",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -835,6 +884,7 @@
  {
   "api_symbol": "FAHR.NR",
   "company_name": "ILAM Fahari I-REIT",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -852,6 +902,7 @@
  {
   "api_symbol": "STLBR.NR",
   "company_name": "Stanlib Fahari I-REIT",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -869,6 +920,7 @@
  {
   "api_symbol": "AAPL",
   "company_name": "Apple Inc.",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -886,6 +938,7 @@
  {
   "api_symbol": "MSFT",
   "company_name": "Microsoft Corporation",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -903,6 +956,7 @@
  {
   "api_symbol": "GOOGL",
   "company_name": "Alphabet Inc. (Google)",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -920,6 +974,7 @@
  {
   "api_symbol": "META",
   "company_name": "Meta Platforms Inc.",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -937,6 +992,7 @@
  {
   "api_symbol": "AMZN",
   "company_name": "Amazon.com Inc.",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -954,6 +1010,7 @@
  {
   "api_symbol": "NVDA",
   "company_name": "NVIDIA Corporation",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -971,6 +1028,7 @@
  {
   "api_symbol": "TSLA",
   "company_name": "Tesla Inc.",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -988,6 +1046,7 @@
  {
   "api_symbol": "VOO",
   "company_name": "Vanguard S&P 500 ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1005,6 +1064,7 @@
  {
   "api_symbol": "QQQ",
   "company_name": "Invesco QQQ Trust (Nasdaq 100)",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1022,6 +1082,7 @@
  {
   "api_symbol": "SPY",
   "company_name": "SPDR S&P 500 ETF Trust",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1039,6 +1100,7 @@
  {
   "api_symbol": "VTI",
   "company_name": "Vanguard Total Stock Market ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1056,6 +1118,7 @@
  {
   "api_symbol": "BND",
   "company_name": "Vanguard Total Bond Market ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1073,6 +1136,7 @@
  {
   "api_symbol": "GLD",
   "company_name": "SPDR Gold Shares ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1090,6 +1154,7 @@
  {
   "api_symbol": "JPM",
   "company_name": "JPMorgan Chase & Co.",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1107,6 +1172,7 @@
  {
   "api_symbol": "BAC",
   "company_name": "Bank of America Corporation",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1124,6 +1190,7 @@
  {
   "api_symbol": "BRK.B",
   "company_name": "Berkshire Hathaway Inc.",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1141,6 +1208,7 @@
  {
   "api_symbol": "JNJ",
   "company_name": "Johnson & Johnson",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1158,6 +1226,7 @@
  {
   "api_symbol": "PFE",
   "company_name": "Pfizer Inc.",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1175,6 +1244,7 @@
  {
   "api_symbol": "UNH",
   "company_name": "UnitedHealth Group Inc.",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1192,6 +1262,7 @@
  {
   "api_symbol": "KO",
   "company_name": "The Coca-Cola Company",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1209,6 +1280,7 @@
  {
   "api_symbol": "PEP",
   "company_name": "PepsiCo Inc.",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1226,6 +1298,7 @@
  {
   "api_symbol": "PG",
   "company_name": "Procter & Gamble Co.",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1243,6 +1316,7 @@
  {
   "api_symbol": "NKE",
   "company_name": "Nike Inc.",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1260,6 +1334,7 @@
  {
   "api_symbol": "NOVN",
   "company_name": "Novartis AG",
+  "country": null,
   "currency": "CHF",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1277,6 +1352,7 @@
  {
   "api_symbol": "ROG",
   "company_name": "Roche Holding AG",
+  "country": null,
   "currency": "CHF",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1294,6 +1370,7 @@
  {
   "api_symbol": "NESN",
   "company_name": "Nestlé S.A.",
+  "country": null,
   "currency": "CHF",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1311,6 +1388,7 @@
  {
   "api_symbol": "SHEL",
   "company_name": "Shell Plc",
+  "country": null,
   "currency": "GBP",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1328,6 +1406,7 @@
  {
   "api_symbol": "HSBA",
   "company_name": "HSBC Holdings Plc",
+  "country": null,
   "currency": "GBP",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1345,6 +1424,7 @@
  {
   "api_symbol": null,
   "company_name": "CIC Money Market Fund",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1362,6 +1442,7 @@
  {
   "api_symbol": null,
   "company_name": "Sanlam Money Market Fund",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1379,6 +1460,7 @@
  {
   "api_symbol": null,
   "company_name": "Britam Money Market Fund",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1396,6 +1478,7 @@
  {
   "api_symbol": null,
   "company_name": "Genesis Money Market Fund",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1413,6 +1496,7 @@
  {
   "api_symbol": null,
   "company_name": "Madrid Money Market Fund",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1430,6 +1514,7 @@
  {
   "api_symbol": null,
   "company_name": "ICE Money Market Fund",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1447,6 +1532,7 @@
  {
   "api_symbol": null,
   "company_name": "Zimele Money Market Fund",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1464,6 +1550,7 @@
  {
   "api_symbol": "UBER",
   "company_name": "UBER",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1481,6 +1568,7 @@
  {
   "api_symbol": "PLTR",
   "company_name": "PALANTIR",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1498,6 +1586,7 @@
  {
   "api_symbol": "GILD",
   "company_name": "GILEAD SCIENCES",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1515,6 +1604,7 @@
  {
   "api_symbol": "SOFI",
   "company_name": "SOFI",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1532,6 +1622,7 @@
  {
   "api_symbol": "NASDAQ:NBIS",
   "company_name": "NEBIUS",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1549,6 +1640,7 @@
  {
   "api_symbol": "NASDAQ:IBB",
   "company_name": "iShares Biotechnology ETF US",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1566,6 +1658,7 @@
  {
   "api_symbol": "WRB",
   "company_name": "W.R. Berkley Corp",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1583,6 +1676,7 @@
  {
   "api_symbol": "NYSE:SO",
   "company_name": "Southern Co",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1600,6 +1694,7 @@
  {
   "api_symbol": "PANW",
   "company_name": "Palo Alto Networks Inc.",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1617,6 +1712,7 @@
  {
   "api_symbol": "LLY",
   "company_name": "Eli Lilly & Co.",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1634,6 +1730,7 @@
  {
   "api_symbol": "HMC",
   "company_name": "Honda Motors Co.",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1651,6 +1748,7 @@
  {
   "api_symbol": "SCHW",
   "company_name": "Charles Schwab",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1668,6 +1766,7 @@
  {
   "api_symbol": "EEM",
   "company_name": "iShares MSCI Emerging Markets ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1685,6 +1784,7 @@
  {
   "api_symbol": "SLV",
   "company_name": "iShares Silver Trust",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1702,6 +1802,7 @@
  {
   "api_symbol": "VST",
   "company_name": "Vistra Corp",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1719,6 +1820,7 @@
  {
   "api_symbol": "NYSE:RTX",
   "company_name": "Raytheon Technologies",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1736,6 +1838,7 @@
  {
   "api_symbol": "IVV",
   "company_name": "iShares Core S&P 500 ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1753,6 +1856,7 @@
  {
   "api_symbol": "DIA",
   "company_name": "SPDR Dow Jones Industrial Average ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1770,6 +1874,7 @@
  {
   "api_symbol": "QQQ",
   "company_name": "Invesco QQQ Trust (Nasdaq-100)",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1787,6 +1892,7 @@
  {
   "api_symbol": "XLK",
   "company_name": "Technology Select Sector SPDR Fund",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1804,6 +1910,7 @@
  {
   "api_symbol": "VGT",
   "company_name": "Vanguard Information Technology ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1821,6 +1928,7 @@
  {
   "api_symbol": "XLF",
   "company_name": "Financial Select Sector SPDR Fund",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1838,6 +1946,7 @@
  {
   "api_symbol": "VFH",
   "company_name": "Vanguard Financials ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1855,6 +1964,7 @@
  {
   "api_symbol": "XLV",
   "company_name": "Health Care Select Sector SPDR Fund",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1872,6 +1982,7 @@
  {
   "api_symbol": "VHT",
   "company_name": "Vanguard Health Care ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1889,6 +2000,7 @@
  {
   "api_symbol": "XLE",
   "company_name": "Energy Select Sector SPDR Fund",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1906,6 +2018,7 @@
  {
   "api_symbol": "VDE",
   "company_name": "Vanguard Energy ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1923,6 +2036,7 @@
  {
   "api_symbol": "XLP",
   "company_name": "Consumer Staples Select Sector SPDR Fund",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1940,6 +2054,7 @@
  {
   "api_symbol": "XLY",
   "company_name": "Consumer Discretionary Select Sector SPDR Fund",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1957,6 +2072,7 @@
  {
   "api_symbol": "VOX",
   "company_name": "Vanguard Communication Services ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1974,6 +2090,7 @@
  {
   "api_symbol": "XLC",
   "company_name": "Communication Services Select Sector SPDR Fund",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -1991,6 +2108,7 @@
  {
   "api_symbol": "KBE",
   "company_name": "SPDR S&P Bank ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2008,6 +2126,7 @@
  {
   "api_symbol": "KRE",
   "company_name": "SPDR S&P Regional Banking ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2025,6 +2144,7 @@
  {
   "api_symbol": "VNQ",
   "company_name": "Vanguard Real Estate ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2042,6 +2162,7 @@
  {
   "api_symbol": "XLRE",
   "company_name": "Real Estate Select Sector SPDR Fund",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2059,6 +2180,7 @@
  {
   "api_symbol": "XPH",
   "company_name": "SPDR S&P Pharmaceuticals ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2076,6 +2198,7 @@
  {
   "api_symbol": "PPH",
   "company_name": "VanEck Pharmaceutical ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2093,6 +2216,7 @@
  {
   "api_symbol": "SMH",
   "company_name": "VanEck Semiconductor ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2110,6 +2234,7 @@
  {
   "api_symbol": "SOXX",
   "company_name": "iShares PHLX Semiconductor Sector Index Fund",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2127,6 +2252,7 @@
  {
   "api_symbol": "IBUY",
   "company_name": "Amplify Online Retail ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2144,6 +2270,7 @@
  {
   "api_symbol": "ONLN",
   "company_name": "ProShares Online Retail ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2161,6 +2288,7 @@
  {
   "api_symbol": "CARZ",
   "company_name": "First Trust NASDAQ Global Auto Index Fund",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2178,6 +2306,7 @@
  {
   "api_symbol": "DRIV",
   "company_name": "Global X Autonomous & Electric Vehicles ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2195,6 +2324,7 @@
  {
   "api_symbol": "GLD",
   "company_name": "SPDR Gold Shares",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2212,6 +2342,7 @@
  {
   "api_symbol": "USO",
   "company_name": "United States Oil Fund",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2229,6 +2360,7 @@
  {
   "api_symbol": "VGK",
   "company_name": "Vanguard FTSE Europe ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2246,6 +2378,7 @@
  {
   "api_symbol": "EZU",
   "company_name": "iShares MSCI Eurozone ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2263,6 +2396,7 @@
  {
   "api_symbol": "EWG",
   "company_name": "iShares MSCI Germany ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2280,6 +2414,7 @@
  {
   "api_symbol": "EWU",
   "company_name": "iShares MSCI United Kingdom ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2297,6 +2432,7 @@
  {
   "api_symbol": "EWQ",
   "company_name": "iShares MSCI France ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2314,6 +2450,7 @@
  {
   "api_symbol": "ISF.L",
   "company_name": "iShares FTSE 100 UCITS ETF",
+  "country": null,
   "currency": "GBP",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2331,6 +2468,7 @@
  {
   "api_symbol": "CSPX.L",
   "company_name": "iShares S&P 500 UCITS ETF (GBP)",
+  "country": null,
   "currency": "GBP",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2348,6 +2486,7 @@
  {
   "api_symbol": "VWRL.L",
   "company_name": "Vanguard FTSE All-World UCITS ETF",
+  "country": null,
   "currency": "GBP",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2365,6 +2504,7 @@
  {
   "api_symbol": "EWJ",
   "company_name": "iShares MSCI Japan ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2382,6 +2522,7 @@
  {
   "api_symbol": "MCHI",
   "company_name": "iShares MSCI China ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2399,6 +2540,7 @@
  {
   "api_symbol": "EWY",
   "company_name": "iShares MSCI South Korea ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2416,6 +2558,7 @@
  {
   "api_symbol": "INDA",
   "company_name": "iShares MSCI India ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2433,6 +2576,7 @@
  {
   "api_symbol": "EIDO",
   "company_name": "iShares MSCI Indonesia ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2450,6 +2594,7 @@
  {
   "api_symbol": "EZA",
   "company_name": "iShares MSCI South Africa ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2467,6 +2612,7 @@
  {
   "api_symbol": "AFK",
   "company_name": "VanEck Africa Index ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2484,6 +2630,7 @@
  {
   "api_symbol": "NGE",
   "company_name": "Global X MSCI Nigeria ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2501,6 +2648,7 @@
  {
   "api_symbol": "EGPT",
   "company_name": "VanEck Egypt Index ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2518,6 +2666,7 @@
  {
   "api_symbol": "STX500.JO",
   "company_name": "Satrix 500 ETF",
+  "country": null,
   "currency": "ZAR",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2535,6 +2684,7 @@
  {
   "api_symbol": "GOLD.JO",
   "company_name": "NewGold ETF",
+  "country": null,
   "currency": "ZAR",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2552,6 +2702,7 @@
  {
   "api_symbol": "GLD.NR",
   "company_name": "NewGold ETF (NSE)",
+  "country": null,
   "currency": "KES",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2569,6 +2720,7 @@
  {
   "api_symbol": "KSA",
   "company_name": "iShares MSCI Saudi Arabia ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2586,6 +2738,7 @@
  {
   "api_symbol": "UAE",
   "company_name": "iShares MSCI UAE ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2603,6 +2756,7 @@
  {
   "api_symbol": "ISDW",
   "company_name": "iShares MSCI Israel ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2620,6 +2774,7 @@
  {
   "api_symbol": "QAT",
   "company_name": "iShares MSCI Qatar ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2637,6 +2792,7 @@
  {
   "api_symbol": "VWO",
   "company_name": "Vanguard FTSE Emerging Markets ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",
@@ -2654,6 +2810,7 @@
  {
   "api_symbol": "FM",
   "company_name": "iShares MSCI Frontier and Select EM ETF",
+  "country": null,
   "currency": "USD",
   "docstatus": 0,
   "doctype": "Growe Stock",

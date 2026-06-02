@@ -15,6 +15,10 @@
   "sector",
   "currency",
   "is_active",
+  "country",
+  "industry",
+  "preferred_data_provider",
+  "source",
   "api_section",
   "api_symbol",
   "column_break_ogtr",
@@ -55,8 +59,8 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Instrument Type",
-   "options": "Stock\nETF"
+   "label": "Asset Categories",
+   "options": "Stock\nETF\nMoney Market Fund\nPrivate Company/Other\nBonds\nREITS\nIndices"
   },
   {
    "fieldname": "region",
@@ -121,12 +125,35 @@
   {
    "fieldname": "column_break_ogtr",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "country",
+   "fieldtype": "Link",
+   "label": "Country",
+   "options": "Country"
+  },
+  {
+   "fieldname": "industry",
+   "fieldtype": "Link",
+   "label": "Industry",
+   "options": "Growe Industry"
+  },
+  {
+   "fieldname": "preferred_data_provider",
+   "fieldtype": "Data",
+   "label": "Preferred Data Provider"
+  },
+  {
+   "fieldname": "source",
+   "fieldtype": "Link",
+   "label": "Source",
+   "options": "Growe Verification Note"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-24 23:52:52.766831",
+ "modified": "2026-06-03 01:26:56.646777",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Stock",
