@@ -49,6 +49,9 @@ fixtures = [
  },
  {
 	 "doctype":"News WebScrapping Sites"
+ },
+ {
+	"doctype":"Growe Industry"
  }
 ]
 

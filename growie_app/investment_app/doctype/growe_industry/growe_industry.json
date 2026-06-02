@@ -1,48 +1,30 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:platform_name",
- "creation": "2026-05-28 16:31:00",
+ "autoname": "field:industry",
+ "creation": "2026-06-03 01:01:25.712698",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "platform_name",
-  "exchange_code",
-  "column_break_ivxg",
-  "full_name"
+  "industry"
  ],
  "fields": [
   {
-   "fieldname": "platform_name",
+   "fieldname": "industry",
    "fieldtype": "Data",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Platform Name",
-   "reqd": 1,
+   "label": "Industry",
    "unique": 1
-  },
-  {
-   "fieldname": "full_name",
-   "fieldtype": "Data",
-   "label": "Full Name"
-  },
-  {
-   "fieldname": "column_break_ivxg",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "exchange_code",
-   "fieldtype": "Data",
-   "label": "Exchange Code"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-03 01:16:32.324142",
+ "modified": "2026-06-03 01:03:41.840224",
  "modified_by": "Administrator",
  "module": "Investment App",
- "name": "Growe Exchange Platform",
+ "name": "Growe Industry",
  "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
@@ -57,14 +39,6 @@
    "role": "System Manager",
    "share": 1,
    "write": 1
-  },
-  {
-   "read": 1,
-   "role": "Website User"
-  },
-  {
-   "read": 1,
-   "role": "Guest"
   }
  ],
  "row_format": "Dynamic",

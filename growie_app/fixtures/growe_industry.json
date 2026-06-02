@@ -1,0 +1,149 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Technology",
+  "modified": "2026-06-03 01:04:03.120305",
+  "name": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Financials",
+  "modified": "2026-06-03 01:04:03.127686",
+  "name": "Financials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Healthcare",
+  "modified": "2026-06-03 01:04:03.128769",
+  "name": "Healthcare"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Consumer Staples",
+  "modified": "2026-06-03 01:04:03.129879",
+  "name": "Consumer Staples"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Consumer Discretionary",
+  "modified": "2026-06-03 01:04:03.130902",
+  "name": "Consumer Discretionary"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Industrials",
+  "modified": "2026-06-03 01:04:03.131895",
+  "name": "Industrials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Energy",
+  "modified": "2026-06-03 01:04:03.132885",
+  "name": "Energy"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Materials",
+  "modified": "2026-06-03 01:04:03.133861",
+  "name": "Materials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Communication Services",
+  "modified": "2026-06-03 01:04:03.134819",
+  "name": "Communication Services"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Telecommunications",
+  "modified": "2026-06-03 01:04:03.135738",
+  "name": "Telecommunications"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Real Estate",
+  "modified": "2026-06-03 01:04:03.136849",
+  "name": "Real Estate"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "REIT",
+  "modified": "2026-06-03 01:04:03.138011",
+  "name": "REIT"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Investment Companies",
+  "modified": "2026-06-03 01:04:03.139160",
+  "name": "Investment Companies"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Exchange Traded Fund",
+  "modified": "2026-06-03 01:04:03.140271",
+  "name": "Exchange Traded Fund"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Multi-sector",
+  "modified": "2026-06-03 01:04:03.143621",
+  "name": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Cash & Money Markets",
+  "modified": "2026-06-03 01:04:03.144701",
+  "name": "Cash & Money Markets"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Money Market Fund",
+  "modified": "2026-06-03 01:04:03.145755",
+  "name": "Money Market Fund"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Commodities/Precious Metals",
+  "modified": "2026-06-03 01:04:03.146817",
+  "name": "Commodities/Precious Metals"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Alternative/Manual",
+  "modified": "2026-06-03 01:04:03.147880",
+  "name": "Alternative/Manual"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Private Company/Other",
+  "modified": "2026-06-03 01:04:03.148952",
+  "name": "Private Company/Other"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "To classify",
+  "modified": "2026-06-03 01:04:03.150010",
+  "name": "To classify"
+ }
+]
