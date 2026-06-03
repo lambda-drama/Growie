@@ -3,7 +3,13 @@ import type { StackBucketKind } from '@/lib/stack-bucket-icons'
 import type { StackTickerGroup } from '@/lib/stack-ticker-groups'
 import type { StackHolding } from '@/services/stack'
 
-export type StackGroupingMode = 'ticker' | 'region' | 'exchange' | 'etf'
+export type StackGroupingMode =
+  | 'ticker'
+  | 'region'
+  | 'exchange'
+  | 'sector'
+  | 'assetCategory'
+  | 'etf'
 
 /** Modes shown in the Group by control (order matters). Ticker is kept as `ticker` but labeled "All". */
 export type VisibleStackGroupingMode = Exclude<StackGroupingMode, 'ticker'>
@@ -15,6 +21,8 @@ export const GROUP_BY_OPTIONS: {
 }[] = [
   { mode: 'exchange', label: 'Exchange' },
   { mode: 'region', label: 'Region' },
+  { mode: 'sector', label: 'Sector' },
+  { mode: 'assetCategory', label: 'Asset category' },
   { mode: 'etf', label: 'ETFs' },
   { mode: 'ticker', label: 'All', hidden: true },
 ]
@@ -35,6 +43,8 @@ export function isEtfOnlyGroupingMode(mode: StackGroupingMode): boolean {
 
 export function bucketIconKind(mode: StackGroupingMode): StackBucketKind {
   if (mode === 'region') return 'region'
+  if (mode === 'sector') return 'sector'
+  if (mode === 'assetCategory') return 'security'
   if (mode === 'exchange' || mode === 'etf') return 'exchange'
   return 'security'
 }
@@ -63,6 +73,22 @@ function inferExchangeFromHolding(h: StackHolding): string {
   return h.marketTag || 'Global'
 }
 
+function sectorLabel(h: StackHolding): string {
+  const sector = (h.sector || '').trim()
+  return sector || 'Unclassified'
+}
+
+/** Growe Stock instrument_type (Asset Categories) with fallbacks from holding asset class. */
+function assetCategoryLabel(h: StackHolding): string {
+  const explicit = (h.assetCategory || '').trim()
+  if (explicit) return explicit
+  if (h.assetClass === 'mmf') return 'Money Market Fund'
+  if (h.assetClass === 'real-estate') return 'Real Estate'
+  if (h.assetClass === 'etf') return 'ETF'
+  if (h.assetClass === 'nse-stocks' || h.assetClass === 'global-stocks') return 'Stock'
+  return 'Other'
+}
+
 /** ETF fund name (ticker) for ETF-only group by buckets. */
 function etfFundLabel(h: StackHolding): string {
   const ticker = (h.ticker || '').trim().toUpperCase()
@@ -73,6 +99,8 @@ function etfFundLabel(h: StackHolding): string {
 export function bucketLabelForHolding(h: StackHolding, mode: StackGroupingMode): string {
   if (mode === 'region') return inferRegionFromHolding(h)
   if (mode === 'exchange') return inferExchangeFromHolding(h)
+  if (mode === 'sector') return sectorLabel(h)
+  if (mode === 'assetCategory') return assetCategoryLabel(h)
   if (mode === 'etf') return etfFundLabel(h)
   return ''
 }
@@ -86,6 +114,8 @@ export function bucketLabelForTickerGroup(group: StackTickerGroup, mode: StackGr
 export function groupingListTitle(mode: StackGroupingMode): string {
   if (mode === 'region') return 'region'
   if (mode === 'exchange') return 'exchange'
+  if (mode === 'sector') return 'sector'
+  if (mode === 'assetCategory') return 'asset category'
   if (mode === 'etf') return 'ETF'
   if (mode === 'ticker') return 'all asset classes'
   return ''
@@ -94,6 +124,8 @@ export function groupingListTitle(mode: StackGroupingMode): string {
 export function groupingBucketColumnLabel(mode: StackGroupingMode): string {
   if (mode === 'region') return 'Region'
   if (mode === 'exchange') return 'Exchange'
+  if (mode === 'sector') return 'Sector'
+  if (mode === 'assetCategory') return 'Asset category'
   if (mode === 'etf') return 'Fund'
   return ''
 }
@@ -101,13 +133,16 @@ export function groupingBucketColumnLabel(mode: StackGroupingMode): string {
 export function groupingBackLabel(mode: StackGroupingMode): string {
   if (mode === 'region') return 'regions'
   if (mode === 'exchange') return 'exchanges'
+  if (mode === 'sector') return 'sectors'
+  if (mode === 'assetCategory') return 'asset categories'
   if (mode === 'etf') return 'ETFs'
   return ''
 }
 
-/** Exchange/region = stocks (and other non-ETF). ETF group by = ETF holdings only. */
+/** Exchange/region = stocks (and other non-ETF). Sector/asset category = all holdings. ETF group by = ETF holdings only. */
 export function holdingMatchesGroupingMode(h: StackHolding, mode: StackGroupingMode): boolean {
   if (mode === 'etf') return isEtfHolding(h)
   if (mode === 'exchange' || mode === 'region') return !isEtfHolding(h)
+  if (mode === 'sector' || mode === 'assetCategory') return true
   return true
 }
