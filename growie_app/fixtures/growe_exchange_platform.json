@@ -1,58 +1,112 @@
 [
  {
+  "country": null,
   "docstatus": 0,
   "doctype": "Growe Exchange Platform",
+  "exchange_code": null,
+  "full_name": null,
   "modified": "2026-05-28 16:21:27.656353",
   "name": "NSE",
-  "platform_name": "NSE"
+  "platform_name": "NSE",
+  "region": null
  },
  {
+  "country": null,
   "docstatus": 0,
   "doctype": "Growe Exchange Platform",
+  "exchange_code": null,
+  "full_name": null,
   "modified": "2026-05-28 16:21:27.659260",
   "name": "NYSE",
-  "platform_name": "NYSE"
+  "platform_name": "NYSE",
+  "region": null
  },
  {
+  "country": null,
   "docstatus": 0,
   "doctype": "Growe Exchange Platform",
-  "modified": "2026-05-28 16:21:27.659703",
+  "exchange_code": "XNAS",
+  "full_name": "NASDAQ Stock Market",
+  "modified": "2026-06-03 01:18:46.849515",
   "name": "NASDAQ",
-  "platform_name": "NASDAQ"
+  "platform_name": "NASDAQ",
+  "region": null
  },
  {
+  "country": null,
   "docstatus": 0,
   "doctype": "Growe Exchange Platform",
-  "modified": "2026-05-28 16:21:27.660109",
+  "exchange_code": "XLON",
+  "full_name": "London Stock Exchange",
+  "modified": "2026-06-03 01:18:19.792546",
   "name": "LSE",
-  "platform_name": "LSE"
+  "platform_name": "LSE",
+  "region": null
  },
  {
+  "country": null,
   "docstatus": 0,
   "doctype": "Growe Exchange Platform",
-  "modified": "2026-05-28 16:21:27.660522",
+  "exchange_code": "XAMS/XPAR",
+  "full_name": null,
+  "modified": "2026-06-03 01:17:59.979367",
   "name": "Euronext",
-  "platform_name": "Euronext"
+  "platform_name": "Euronext",
+  "region": null
  },
  {
+  "country": null,
   "docstatus": 0,
   "doctype": "Growe Exchange Platform",
+  "exchange_code": null,
+  "full_name": null,
   "modified": "2026-05-28 16:21:27.660926",
   "name": "JPX",
-  "platform_name": "JPX"
+  "platform_name": "JPX",
+  "region": null
  },
  {
+  "country": null,
   "docstatus": 0,
   "doctype": "Growe Exchange Platform",
+  "exchange_code": null,
+  "full_name": null,
   "modified": "2026-05-28 16:21:27.661579",
   "name": "HKEX",
-  "platform_name": "HKEX"
+  "platform_name": "HKEX",
+  "region": null
  },
  {
+  "country": null,
   "docstatus": 0,
   "doctype": "Growe Exchange Platform",
-  "modified": "2026-05-28 16:21:27.662058",
+  "exchange_code": "XJSE",
+  "full_name": "Johhannesburg Stock Exchange",
+  "modified": "2026-06-03 01:19:34.569401",
   "name": "JSE",
-  "platform_name": "JSE"
+  "platform_name": "JSE",
+  "region": null
+ },
+ {
+  "country": null,
+  "docstatus": 0,
+  "doctype": "Growe Exchange Platform",
+  "exchange_code": "XTKS",
+  "full_name": "Tokyo Stock Exchange",
+  "modified": "2026-06-03 01:17:39.556404",
+  "name": "TSE",
+  "platform_name": "TSE",
+  "region": null
+ },
+ {
+  "country": null,
+  "docstatus": 0,
+  "doctype": "Growe Exchange Platform",
+  "exchange_code": "XNSE",
+  "full_name": "National Stock Exchange of India",
+  "modified": "2026-06-03 01:20:32.011648",
+  "name": "NSEI",
+  "platform_name": "NSEI",
+  "region": null
  }
 ]

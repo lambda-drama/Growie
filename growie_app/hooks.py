@@ -52,6 +52,9 @@ fixtures = [
  },
  {
 	"doctype":"Growe Industry"
+ },
+ {
+	 "doctype":"Growe Asset Category"
  }
 ]
 

@@ -44,10 +44,10 @@
   },
   {
    "fieldname": "asset_class",
-   "fieldtype": "Select",
+   "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Asset Class",
-   "options": "MMF\nReal Estate\nNSE\nGlobal\nETF"
+   "label": "Asset Category",
+   "options": "Growe Asset Category"
   },
   {
    "fieldname": "asset_name",
@@ -196,7 +196,7 @@
    "link_fieldname": "holding"
   }
  ],
- "modified": "2026-05-08 17:42:51.453054",
+ "modified": "2026-06-04 00:39:04.365215",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Holding",
