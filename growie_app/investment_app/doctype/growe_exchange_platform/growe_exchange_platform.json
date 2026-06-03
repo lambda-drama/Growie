@@ -8,8 +8,10 @@
  "field_order": [
   "platform_name",
   "exchange_code",
+  "country",
   "column_break_ivxg",
-  "full_name"
+  "full_name",
+  "region"
  ],
  "fields": [
   {
@@ -34,12 +36,24 @@
    "fieldname": "exchange_code",
    "fieldtype": "Data",
    "label": "Exchange Code"
+  },
+  {
+   "fieldname": "region",
+   "fieldtype": "Link",
+   "label": "Region",
+   "options": "Growe Region"
+  },
+  {
+   "fieldname": "country",
+   "fieldtype": "Link",
+   "label": "Country",
+   "options": "Country"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-03 01:16:32.324142",
+ "modified": "2026-06-03 23:01:33.109923",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Exchange Platform",
