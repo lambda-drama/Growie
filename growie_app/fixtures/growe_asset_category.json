@@ -1,0 +1,51 @@
+[
+ {
+  "asset_category": "Stock",
+  "docstatus": 0,
+  "doctype": "Growe Asset Category",
+  "modified": "2026-06-04 00:39:27.407116",
+  "name": "Stock"
+ },
+ {
+  "asset_category": "ETF",
+  "docstatus": 0,
+  "doctype": "Growe Asset Category",
+  "modified": "2026-06-04 00:39:40.290340",
+  "name": "ETF"
+ },
+ {
+  "asset_category": "Money Market Fund",
+  "docstatus": 0,
+  "doctype": "Growe Asset Category",
+  "modified": "2026-06-04 00:39:47.113239",
+  "name": "Money Market Fund"
+ },
+ {
+  "asset_category": "Private Company/Other",
+  "docstatus": 0,
+  "doctype": "Growe Asset Category",
+  "modified": "2026-06-04 00:39:53.893894",
+  "name": "Private Company/Other"
+ },
+ {
+  "asset_category": "Bonds",
+  "docstatus": 0,
+  "doctype": "Growe Asset Category",
+  "modified": "2026-06-04 00:40:02.933353",
+  "name": "Bonds"
+ },
+ {
+  "asset_category": "REITS",
+  "docstatus": 0,
+  "doctype": "Growe Asset Category",
+  "modified": "2026-06-04 00:40:10.956990",
+  "name": "REITS"
+ },
+ {
+  "asset_category": "Indices",
+  "docstatus": 0,
+  "doctype": "Growe Asset Category",
+  "modified": "2026-06-04 00:40:17.621397",
+  "name": "Indices"
+ }
+]
