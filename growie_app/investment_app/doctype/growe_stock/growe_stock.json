@@ -54,13 +54,12 @@
   },
   {
    "default": "Stock",
-   "description": "Individual stock vs exchange-traded fund (ETF). Used for Group by and analytics.",
    "fieldname": "instrument_type",
-   "fieldtype": "Select",
+   "fieldtype": "Link",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Asset Categories",
-   "options": "Stock\nETF\nMoney Market Fund\nPrivate Company/Other\nBonds\nREITS\nIndices"
+   "options": "Growe Asset Category"
   },
   {
    "fieldname": "region",
@@ -153,7 +152,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-03 01:26:56.646777",
+ "modified": "2026-06-04 00:40:40.012168",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Stock",
