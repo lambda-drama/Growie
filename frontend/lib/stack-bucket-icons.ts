@@ -1,4 +1,4 @@
-export type StackBucketKind = 'region' | 'exchange' | 'security'
+export type StackBucketKind = 'region' | 'exchange' | 'security' | 'sector'
 
 type BucketIconStyle = { tint: string; hex: string }
 
@@ -132,7 +132,7 @@ function hashLabel(label: string): number {
 
 function lookupStyle(label: string, kind: StackBucketKind): BucketIconStyle {
   const key = normalizeBucketKey(label)
-  if (kind === 'security') {
+  if (kind === 'security' || kind === 'sector') {
     return SECURITY_STYLES[key] ?? FALLBACK_PALETTE[hashLabel(key || label) % FALLBACK_PALETTE.length]
   }
   const map = kind === 'region' ? REGION_STYLES : EXCHANGE_STYLES

@@ -7,7 +7,14 @@ export type { StackGroupingMode }
 
 const STORAGE_KEY = 'growe_stack_grouping_mode'
 
-const VALID_MODES: StackGroupingMode[] = ['ticker', 'region', 'exchange', 'etf']
+const VALID_MODES: StackGroupingMode[] = [
+  'ticker',
+  'region',
+  'exchange',
+  'sector',
+  'assetCategory',
+  'etf',
+]
 
 export function readStoredStackGroupingMode(): StackGroupingMode {
   try {
