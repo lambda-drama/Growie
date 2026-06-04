@@ -71,6 +71,7 @@ def _load_growe_stock_meta(stock_name: str, ticker: str, asset_class_label: str 
 		"region",
 		"exchange_platform",
 		"sector",
+		"industry",
 		"instrument_type",
 	]
 	stock_name = (stock_name or "").strip()
@@ -292,6 +293,7 @@ def _holding_to_dict(h) -> dict:
 		"region": (stock.get("region") if stock else "") or "",
 		"exchangePlatform": (stock.get("exchange_platform") if stock else "") or "",
 		"sector": (stock.get("sector") if stock else "") or "",
+		"industry": (stock.get("industry") if stock else "") or "",
 		"assetCategory": (stock.get("instrument_type") if stock else "") or "",
 		"instrumentType": _instrument_type_slug(stock),
 		"broker": (h.get("broker") or "").strip(),

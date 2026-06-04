@@ -6,7 +6,8 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "industry"
+  "industry",
+  "sector"
  ],
  "fields": [
   {
@@ -16,12 +17,18 @@
    "in_standard_filter": 1,
    "label": "Industry",
    "unique": 1
+  },
+  {
+   "fieldname": "sector",
+   "fieldtype": "Link",
+   "label": "Sector",
+   "options": "Growe Sector"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-03 01:03:41.840224",
+ "modified": "2026-06-04 22:09:20.355909",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Industry",
