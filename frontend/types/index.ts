@@ -19,6 +19,8 @@ export interface Holding {
   industry?: string
   /** Growe Stock instrument_type link label (Stock, ETF, Money Market Fund, …). */
   assetCategory?: string
+  /** Growe Asset Category on the holding (Growe Holding.asset_class). */
+  holdingAssetCategory?: string
   /** From Growe Stock instrument_type: stock | etf */
   instrumentType?: 'stock' | 'etf'
   broker?: string

@@ -22,20 +22,14 @@ import {
 } from '@/components/ui/select'
 import { DisplayCurrencyPicker } from '@/components/currency/display-currency-picker'
 import { StackStockPicker } from '@/components/stack/stack-stock-picker'
-import { recordBuy, recordSell, createStock } from '@/services/stack'
+import { recordBuy, recordSell } from '@/services/stack'
+import { getAssetCategories } from '@/services/portfolio'
+import { categoryToPickerSlug } from '@/lib/asset-categories'
 import { STACK_BUY_BUTTON_CLASS, STACK_SELL_BUTTON_CLASS } from '@/lib/stack-ui'
 import { cn } from '@/lib/utils'
 import type { StackHolding } from '@/services/stack'
 import type { AssetClass } from '@/types'
 import type { GroweStock } from '@/services/portfolio'
-
-const ASSET_CLASSES: { value: AssetClass; label: string }[] = [
-  { value: 'nse-stocks', label: 'NSE Stocks' },
-  { value: 'global-stocks', label: 'Global Stocks' },
-  { value: 'etf', label: 'ETFs' },
-  { value: 'mmf', label: 'Money Market Funds' },
-  { value: 'real-estate', label: 'Real Estate' },
-]
 
 export type TradeMode = 'buy-new' | 'buy-more' | 'sell'
 
@@ -48,6 +42,18 @@ interface TradeDialogProps {
   onSuccess?: (result?: { fullySold?: boolean }) => void
 }
 
+const DEFAULT_CATEGORY = 'Stock'
+
+const FALLBACK_CATEGORIES = [
+  { name: 'Stock', label: 'Stock' },
+  { name: 'ETF', label: 'ETF' },
+  { name: 'Money Market Fund', label: 'Money Market Fund' },
+  { name: 'Private Company/Other', label: 'Private Company/Other' },
+  { name: 'Bonds', label: 'Bonds' },
+  { name: 'REITS', label: 'REITS' },
+  { name: 'Indices', label: 'Indices' },
+]
+
 export function TradeDialog({
   open,
   onOpenChange,
@@ -59,10 +65,10 @@ export function TradeDialog({
   const isSell = mode === 'sell'
   const isNew = mode === 'buy-new'
 
-  const [assetClass, setAssetClass] = useState<AssetClass>(defaultAssetClass ?? 'nse-stocks')
+  const [assetCategories, setAssetCategories] = useState(FALLBACK_CATEGORIES)
+  const [assetCategory, setAssetCategory] = useState(DEFAULT_CATEGORY)
   const [stockName, setStockName] = useState('')
   const [stockLabel, setStockLabel] = useState('')
-  const [mmfLabel, setMmfLabel] = useState('')
   const [quantity, setQuantity] = useState('')
   const [unitPrice, setUnitPrice] = useState('')
   const [currency, setCurrency] = useState('USD')
@@ -72,23 +78,41 @@ export function TradeDialog({
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const isFundClass = assetClass === 'mmf' || assetClass === 'real-estate'
+  const pickerSlug = categoryToPickerSlug(assetCategory)
+
+  useEffect(() => {
+    if (!open) return
+    getAssetCategories()
+      .then(setAssetCategories)
+      .catch(() => setAssetCategories(FALLBACK_CATEGORIES))
+  }, [open])
 
   useEffect(() => {
     if (!open) return
     setError('')
     if (holding) {
-      setAssetClass(holding.assetClass)
+      const cat =
+        (holding as StackHolding & { holdingAssetCategory?: string }).holdingAssetCategory ||
+        (holding.assetCategory || '').trim() ||
+        DEFAULT_CATEGORY
+      setAssetCategory(cat)
       setStockName(holding.stockName || '')
       setStockLabel(`${holding.ticker ? holding.ticker + ' — ' : ''}${holding.name}`)
       setCurrency(holding.currency || 'USD')
       setUnitPrice(String(holding.currentPrice || holding.avgBuyPrice || ''))
       setQuantity('')
     } else {
-      setAssetClass(defaultAssetClass ?? 'nse-stocks')
+      const initialCategory =
+        defaultAssetClass === 'etf'
+          ? 'ETF'
+          : defaultAssetClass === 'mmf'
+            ? 'Money Market Fund'
+            : defaultAssetClass === 'real-estate'
+              ? 'Private Company/Other'
+              : DEFAULT_CATEGORY
+      setAssetCategory(initialCategory)
       setStockName('')
       setStockLabel('')
-      setMmfLabel('')
       setQuantity('')
       setUnitPrice('')
       setCurrency(defaultAssetClass === 'nse-stocks' ? 'KES' : 'USD')
@@ -98,29 +122,11 @@ export function TradeDialog({
     setReference('')
   }, [open, holding, defaultAssetClass])
 
-  useEffect(() => {
-    if (assetClass === 'nse-stocks') setCurrency('KES')
-    if (assetClass === 'etf' || assetClass === 'global-stocks') setCurrency('USD')
-  }, [assetClass])
-
   const handleStockSelect = (stock: GroweStock, inferred?: AssetClass) => {
     setStockName(stock.name)
     setStockLabel(`${stock.ticker} — ${stock.company_name}`)
-    if (inferred && isNew) setAssetClass(inferred)
     if (stock.currency) setCurrency(stock.currency)
-  }
-
-  const resolveAssetName = async (): Promise<string> => {
-    if (stockName) return stockName
-    if (!isFundClass || !mmfLabel.trim()) return ''
-    const ticker = mmfLabel.trim().toUpperCase().replace(/\s+/g, '-').slice(0, 20)
-    const created = await createStock({
-      ticker,
-      companyName: mmfLabel.trim(),
-      market: 'Global',
-      currency,
-    })
-    return created.name
+    if (inferred === 'nse-stocks') setCurrency('KES')
   }
 
   const handleSubmit = async () => {
@@ -131,18 +137,13 @@ export function TradeDialog({
       return
     }
     const price = parseFloat(unitPrice)
-    if (isNew && isFundClass && !mmfLabel.trim() && !stockName) {
-      setError('Enter investment name')
-      return
-    }
-    if (isNew && !isFundClass && !stockName) {
-      setError('Select a stock')
+    if (isNew && !stockName) {
+      setError('Select an investment from Growe Stock')
       return
     }
 
     setSaving(true)
     try {
-      const assetName = await resolveAssetName()
       if (isSell && holding) {
         const sellResult = await recordSell({
           holdingId: holding.id,
@@ -159,8 +160,8 @@ export function TradeDialog({
       } else {
         await recordBuy({
           holdingId: holding?.id,
-          assetClass: isNew ? assetClass : undefined,
-          assetName: isNew ? assetName : undefined,
+          assetClass: isNew ? assetCategory : undefined,
+          assetName: isNew ? stockName : undefined,
           quantity: qty,
           unitPrice: price > 0 ? price : undefined,
           currency,
@@ -200,21 +201,14 @@ export function TradeDialog({
         <div className="grid gap-4 py-2">
           {isNew && (
             <div className="grid gap-2">
-              <Label>Asset class</Label>
-              <Select
-                value={assetClass}
-                onValueChange={(v) => {
-                  setAssetClass(v as AssetClass)
-                  setStockName('')
-                  setStockLabel('')
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
+              <Label>Asset category</Label>
+              <Select value={assetCategory} onValueChange={setAssetCategory}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {ASSET_CLASSES.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
+                  {assetCategories.map((o) => (
+                    <SelectItem key={o.name} value={o.name}>
                       {o.label}
                     </SelectItem>
                   ))}
@@ -223,20 +217,10 @@ export function TradeDialog({
             </div>
           )}
 
-          {isNew && isFundClass && (
-            <div className="grid gap-2">
-              <Label>Investment name</Label>
-              <Input
-                value={mmfLabel}
-                onChange={(e) => setMmfLabel(e.target.value)}
-                placeholder={assetClass === 'mmf' ? 'e.g. Cytonn MMF' : 'e.g. Apartment Westlands'}
-              />
-            </div>
-          )}
-
-          {isNew && !isFundClass && (
+          {isNew && (
             <StackStockPicker
-              assetClass={assetClass}
+              assetClass={pickerSlug}
+              assetCategory={assetCategory}
               value={stockName}
               displayLabel={stockLabel}
               onSelect={handleStockSelect}

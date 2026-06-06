@@ -36,9 +36,12 @@ import {
   deleteHolding as apiDeleteHolding,
   searchStocks,
   getCurrencies,
+  getAssetCategories,
   type AddHoldingData,
+  type AssetCategoryOption,
   type GroweStock,
 } from '@/services/portfolio'
+import { categoryToPickerSlug } from '@/lib/asset-categories'
 import { usePortfolio } from '@/hooks/use-portfolio'
 import { StackExcelBulkImport } from '@/components/stack/stack-excel-bulk-import'
 import type { AssetClass, Holding } from '@/types'
@@ -46,12 +49,14 @@ import { cn } from '@/lib/utils'
 
 const assetClasses: AssetClass[] = ['mmf', 'real-estate', 'nse-stocks', 'global-stocks', 'etf']
 
-const ASSET_CLASS_OPTIONS = [
-  { value: 'mmf',           label: 'Money Market Fund' },
-  { value: 'real-estate',   label: 'Real Estate'       },
-  { value: 'nse-stocks',    label: 'NSE Stocks'        },
-  { value: 'global-stocks', label: 'Global Stocks'     },
-  { value: 'etf', label: 'ETFs' },
+const FALLBACK_CATEGORIES: AssetCategoryOption[] = [
+  { name: 'Stock', label: 'Stock' },
+  { name: 'ETF', label: 'ETF' },
+  { name: 'Money Market Fund', label: 'Money Market Fund' },
+  { name: 'Private Company/Other', label: 'Private Company/Other' },
+  { name: 'Bonds', label: 'Bonds' },
+  { name: 'REITS', label: 'REITS' },
+  { name: 'Indices', label: 'Indices' },
 ]
 
 // market filter per asset class
@@ -67,31 +72,40 @@ interface StockComboboxProps {
   value: string                         // Growe Stock name
   displayLabel: string                  // shown on trigger button
   assetClass: string
+  market?: string
   onSelect: (stock: GroweStock) => void
   disabled?: boolean
 }
 
-function StockCombobox({ value, displayLabel, assetClass, onSelect, disabled }: StockComboboxProps) {
+function StockCombobox({
+  value,
+  displayLabel,
+  assetClass,
+  market: marketProp,
+  instrumentType,
+  onSelect,
+  disabled,
+}: StockComboboxProps & { instrumentType?: string }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [stocks, setStocks] = useState<GroweStock[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const market = CLASS_TO_MARKET[assetClass]
+  const market = marketProp !== undefined ? marketProp : CLASS_TO_MARKET[assetClass]
 
   // Load initial list on open, then search on query change
   const doSearch = useCallback(async (q: string) => {
     setIsLoading(true)
     try {
-      const results = await searchStocks(q, market)
+      const results = await searchStocks(q, market, instrumentType)
       setStocks(results)
     } catch {
       setStocks([])
     } finally {
       setIsLoading(false)
     }
-  }, [market])
+  }, [market, instrumentType])
 
   // Debounce typing
   const handleQueryChange = (q: string) => {
@@ -313,6 +327,7 @@ function AssetClassSection({
 
 interface DialogForm extends Omit<AddHoldingData, 'ticker'> {
   stockDisplayLabel: string   // "SCOM — Safaricom PLC" shown on button
+  assetCategory: string
 }
 
 interface HoldingDialogProps {
@@ -325,9 +340,11 @@ interface HoldingDialogProps {
 function HoldingDialog({ open, onClose, editing, onSaved }: HoldingDialogProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
+  const [assetCategories, setAssetCategories] = useState<AssetCategoryOption[]>(FALLBACK_CATEGORIES)
 
   const [form, setForm] = useState<DialogForm>({
     assetClass:       editing?.assetClass       ?? 'nse-stocks',
+    assetCategory:    editing?.assetCategory    ?? 'Stock',
     assetName:        (editing as (Holding & { stockName?: string }))?.stockName ?? '',
     currency:         editing?.currency          ?? 'USD',
     quantity:         editing?.quantity          ?? 0,
@@ -338,10 +355,16 @@ function HoldingDialog({ open, onClose, editing, onSaved }: HoldingDialogProps) 
       : '',
   })
 
+  useEffect(() => {
+    if (!open) return
+    getAssetCategories().then(setAssetCategories).catch(() => setAssetCategories(FALLBACK_CATEGORIES))
+  }, [open])
+
   const reset = (h?: Holding | null) => {
     const stockName = (h as (Holding & { stockName?: string }) | null)?.stockName ?? ''
     setForm({
       assetClass:        h?.assetClass    ?? 'nse-stocks',
+      assetCategory:     h?.assetCategory ?? 'Stock',
       assetName:         stockName,
       currency:          h?.currency      ?? 'USD',
       quantity:          h?.quantity      ?? 0,
@@ -393,7 +416,7 @@ function HoldingDialog({ open, onClose, editing, onSaved }: HoldingDialogProps) 
         })
       } else {
         await apiAddHolding({
-          assetClass:   form.assetClass,
+          assetClass:   form.assetCategory,
           assetName:    form.assetName,
           currency:     form.currency,
           dateAdded:    form.dateAdded,
@@ -410,7 +433,9 @@ function HoldingDialog({ open, onClose, editing, onSaved }: HoldingDialogProps) 
     }
   }
 
-  const market = CLASS_TO_MARKET[form.assetClass]
+  const pickerSlug = categoryToPickerSlug(form.assetCategory)
+  const instrumentType = form.assetCategory || undefined
+  const market = instrumentType ? undefined : CLASS_TO_MARKET[pickerSlug]
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose() }}>
@@ -424,15 +449,17 @@ function HoldingDialog({ open, onClose, editing, onSaved }: HoldingDialogProps) 
           {/* Asset Class */}
           {!editing && (
             <div className="space-y-1.5">
-              <Label>Asset Class</Label>
+              <Label>Asset category</Label>
               <Select
-                value={form.assetClass}
-                onValueChange={(v) => setForm({ ...form, assetClass: v, assetName: '', stockDisplayLabel: '' })}
+                value={form.assetCategory}
+                onValueChange={(v) => setForm({ ...form, assetCategory: v })}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
                 <SelectContent>
-                  {ASSET_CLASS_OPTIONS.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  {assetCategories.map((o) => (
+                    <SelectItem key={o.name} value={o.name}>{o.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -441,23 +468,13 @@ function HoldingDialog({ open, onClose, editing, onSaved }: HoldingDialogProps) 
 
           {/* Stock / Fund — searchable combobox */}
           <div className="space-y-1.5">
-            <Label>
-              {form.assetClass === 'nse-stocks' ? 'NSE Stock' :
-               form.assetClass === 'global-stocks' ? 'Global Stock' :
-               form.assetClass === 'etf' ? 'ETF' :
-               form.assetClass === 'mmf' ? 'Money Market Fund' :
-               'Asset'}
-              {' '}
-              {market && (
-                <Badge variant="secondary" className="ml-1 text-xs font-normal">
-                  {market}
-                </Badge>
-              )}
-            </Label>
+            <Label>Investment name</Label>
             <StockCombobox
               value={form.assetName}
               displayLabel={form.stockDisplayLabel}
-              assetClass={form.assetClass}
+              assetClass={pickerSlug}
+              market={market}
+              instrumentType={instrumentType}
               onSelect={handleStockSelect}
             />
             <p className="text-xs text-muted-foreground">

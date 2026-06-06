@@ -163,10 +163,11 @@ export async function inferAssetClass(assetName: string): Promise<{
 export async function createStock(payload: {
   ticker: string
   companyName: string
-  market: 'NSE' | 'Global'
+  market: 'NSE' | 'Global' | 'ETF'
   currency?: string
   region?: string
   exchangePlatform?: string
+  instrumentType?: string
 }): Promise<GroweStock & { assetClass: AssetClass; created: boolean }> {
   const res = await fetch('/api/method/growie_app.api.stack.create_stock', {
     method: 'POST',
@@ -179,6 +180,7 @@ export async function createStock(payload: {
       currency: payload.currency ?? 'USD',
       region: payload.region,
       exchange_platform: payload.exchangePlatform,
+      instrument_type: payload.instrumentType,
     }),
   })
   const data = await res.json()
@@ -239,7 +241,8 @@ export async function getExchangePlatforms(query = '', limit = 100): Promise<str
 export interface RecordTradePayload {
   quantity: number
   unitPrice?: number
-  assetClass?: AssetClass
+  /** Growe Asset Category name or legacy slug */
+  assetClass?: AssetClass | string
   assetName?: string
   holdingId?: string
   currency?: string

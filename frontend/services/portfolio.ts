@@ -32,6 +32,11 @@ export interface PortfolioSummary {
   monthlyGrowthSource?: 'snapshot' | 'estimated'
 }
 
+export interface AssetCategoryOption {
+  name: string
+  label: string
+}
+
 export interface AddHoldingData {
   assetClass: string
   assetName: string   // Growe Stock document name (Link field)
@@ -39,6 +44,16 @@ export interface AddHoldingData {
   quantity?: number
   notes?: string
   dateAdded?: string
+}
+
+export async function getAssetCategories(): Promise<AssetCategoryOption[]> {
+  const res = await fetch('/api/method/growie_app.api.portfolio.get_asset_categories', {
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  })
+  const data = await res.json()
+  if (Array.isArray(data?.message)) return data.message as AssetCategoryOption[]
+  throw new Error(extractError(data))
 }
 
 export interface UpdateHoldingData {
@@ -270,10 +285,15 @@ export async function deleteHolding(holdingId: string): Promise<void> {
 
 // ─── Stock search ─────────────────────────────────────────────────────────────
 
-export async function searchStocks(query: string = '', market?: string): Promise<GroweStock[]> {
+export async function searchStocks(
+  query: string = '',
+  market?: string,
+  instrumentType?: string
+): Promise<GroweStock[]> {
   const params = new URLSearchParams()
   if (query) params.append('query', query)
   if (market) params.append('market', market)
+  if (instrumentType) params.append('instrument_type', instrumentType)
 
   const response = await fetch(
     `/api/method/growie_app.api.portfolio.search_stocks?${params.toString()}`,
