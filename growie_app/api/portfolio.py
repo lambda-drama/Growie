@@ -27,11 +27,57 @@ _ASSET_CLASS_MAP = {
 	"MMF": "mmf",
 	"Real Estate": "real-estate",
 	"NSE": "nse-stocks",
+	"NSE Stocks": "nse-stocks",
 	"Global": "global-stocks",
+	"Global Stocks": "global-stocks",
 	"ETF": "etf",
 }
 
 _ASSET_CLASS_REVERSE = {v: k for k, v in _ASSET_CLASS_MAP.items()}
+
+# Frontend slug → Growe Asset Category (holding.asset_class Link)
+_SLUG_TO_ASSET_CATEGORY = {
+	"nse-stocks": "Stock",
+	"global-stocks": "Stock",
+	"etf": "ETF",
+	"mmf": "Money Market Fund",
+	"real-estate": "Private Company/Other",
+}
+
+
+def _resolve_asset_category_label(asset_class_param: str) -> str:
+	"""Normalize API input to a Growe Asset Category name."""
+	param = (asset_class_param or "").strip()
+	if not param:
+		frappe.throw(_("Asset category is required."))
+	if frappe.db.exists("Growe Asset Category", param):
+		return param
+	if param in _SLUG_TO_ASSET_CATEGORY:
+		return _SLUG_TO_ASSET_CATEGORY[param]
+	if param in _ASSET_CLASS_REVERSE:
+		return _ASSET_CLASS_REVERSE[param]
+	frappe.throw(_("Unknown asset category: {0}").format(param))
+
+
+def _holding_asset_class_slug(asset_class_label: str, stock: dict | None = None) -> str:
+	"""Map stored holding.asset_class (category or legacy label) to frontend slug."""
+	raw = (asset_class_label or "").strip()
+	if raw in _ASSET_CLASS_MAP:
+		return _ASSET_CLASS_MAP[raw]
+	if raw == "Stock":
+		market = ((stock or {}).get("market") or "").strip()
+		if market == "NSE":
+			return "nse-stocks"
+		if market == "ETF":
+			return "etf"
+		return "global-stocks"
+	if raw == "ETF":
+		return "etf"
+	if raw == "Money Market Fund":
+		return "mmf"
+	if raw in ("Private Company/Other", "Real Estate"):
+		return "real-estate"
+	return "global-stocks"
 
 
 def open_holding_db_filters(investor: str, asset_class_label: str | None = None) -> list:
@@ -85,9 +131,9 @@ def _load_growe_stock_meta(stock_name: str, ticker: str, asset_class_label: str 
 
 	if not stock and ticker:
 		filters = {"ticker": ticker, "is_active": 1}
-		if asset_class_label == "NSE Stocks":
+		if asset_class_label in ("NSE Stocks", "NSE", "Stock"):
 			filters["market"] = "NSE"
-		elif asset_class_label == "Global Stocks":
+		elif asset_class_label in ("Global Stocks", "Global"):
 			filters["market"] = "Global"
 		elif asset_class_label == "ETF":
 			filters["market"] = "ETF"
@@ -282,7 +328,8 @@ def _holding_to_dict(h) -> dict:
 		"id": h.get("name"),
 		"name": display_name,
 		"stockName": stock_name,           # the Link value (Growe Stock name)
-		"assetClass": _ASSET_CLASS_MAP.get(h.get("asset_class"), "mmf"),
+		"assetClass": _holding_asset_class_slug(h.get("asset_class"), stock),
+		"holdingAssetCategory": (h.get("asset_class") or "").strip(),
 		"valueKES": float(h.get("value_kes") or 0),
 		"value": float(h.get("value_kes") or 0),  # forward-compatible alias
 		"costBasisKES": float(h.get("cost_basis_kes") or 0),
@@ -294,7 +341,8 @@ def _holding_to_dict(h) -> dict:
 		"exchangePlatform": (stock.get("exchange_platform") if stock else "") or "",
 		"sector": (stock.get("sector") if stock else "") or "",
 		"industry": (stock.get("industry") if stock else "") or "",
-		"assetCategory": (stock.get("instrument_type") if stock else "") or "",
+		"assetCategory": (h.get("asset_class") or "").strip()
+		or ((stock.get("instrument_type") if stock else "") or ""),
 		"instrumentType": _instrument_type_slug(stock),
 		"broker": (h.get("broker") or "").strip(),
 		"dateAdded": str(h.get("date_added") or today()),
@@ -492,43 +540,79 @@ def _to_kes(amount: float, from_currency: str, on_date: str = None, strict: bool
 	return val * rate
 
 
+# ── Asset categories ─────────────────────────────────────────────────────────
+
+@frappe.whitelist()
+def get_asset_categories():
+	"""All Growe Asset Category rows for Add position dropdowns."""
+	_member_name()
+	rows = frappe.get_all(
+		"Growe Asset Category",
+		fields=["name", "asset_category"],
+		order_by="asset_category asc",
+	)
+	return [
+		{"name": r.name, "label": r.asset_category or r.name}
+		for r in rows
+	]
+
+
 # ── Stock search ──────────────────────────────────────────────────────────────
 
 @frappe.whitelist()
-def search_stocks(query: str = "", market: str = None, limit: int = 20):
+def search_stocks(query: str = "", market: str = None, instrument_type: str = None, limit: int = 20):
 	"""
 	Search Growe Stock by ticker or company name.
 	Used by the frontend searchable combobox on the Add Holding dialog.
 	"""
+	category = (instrument_type or "").strip()
 	filters = {"is_active": 1}
 	if market:
 		filters["market"] = market
+	if category:
+		filters["instrument_type"] = category
 
-	# Build OR conditions for ticker + company_name search
 	if query:
+		clauses = []
+		if market:
+			clauses.append("AND market = %(market)s")
+		if category:
+			clauses.append("AND instrument_type = %(instrument_type)s")
 		results = frappe.db.sql(
 			"""
-			SELECT name, ticker, company_name, market, currency, region, exchange_platform
+			SELECT name, ticker, company_name, market, currency, region, exchange_platform, instrument_type
 			FROM `tabGrowe Stock`
 			WHERE is_active = 1
 			  AND (
 			        ticker       LIKE %(q)s
 			     OR company_name LIKE %(q)s
 			  )
-			  {market_clause}
+			  {extra_clauses}
 			ORDER BY ticker ASC
 			LIMIT %(limit)s
-			""".format(
-				market_clause=f"AND market = %(market)s" if market else ""
-			),
-			{"q": f"%{query}%", "market": market, "limit": int(limit)},
+			""".format(extra_clauses=" ".join(clauses)),
+			{
+				"q": f"%{query}%",
+				"market": market,
+				"instrument_type": category,
+				"limit": int(limit),
+			},
 			as_dict=True,
 		)
 	else:
 		results = frappe.get_all(
 			"Growe Stock",
 			filters=filters,
-			fields=["name", "ticker", "company_name", "market", "currency", "region", "exchange_platform"],
+			fields=[
+				"name",
+				"ticker",
+				"company_name",
+				"market",
+				"currency",
+				"region",
+				"exchange_platform",
+				"instrument_type",
+			],
 			order_by="ticker asc",
 			limit=int(limit),
 		)
@@ -724,7 +808,7 @@ def add_holding(
 		frappe.throw(_(f"Stock '{asset_name}' not found. Please select a valid stock."))
 
 	ticker = frappe.db.get_value("Growe Stock", asset_name, "ticker") or ""
-	ac_label = _ASSET_CLASS_REVERSE.get(asset_class, asset_class)
+	ac_label = _resolve_asset_category_label(asset_class)
 	use_date = date_added or today()
 	qty = float(quantity or 0)
 

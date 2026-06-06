@@ -18,7 +18,6 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command'
-import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -34,6 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { categoryDefaultMarket, categoryToPickerSlug } from '@/lib/asset-categories'
 import {
   searchStocks,
   createStock,
@@ -52,6 +52,8 @@ const CLASS_TO_MARKET: Record<string, string | undefined> = {
 
 interface StackStockPickerProps {
   assetClass: AssetClass
+  /** Growe Asset Category — filters Growe Stock search and new listings. */
+  assetCategory?: string
   value: string
   displayLabel: string
   onSelect: (stock: GroweStock, inferredClass?: AssetClass) => void
@@ -60,6 +62,7 @@ interface StackStockPickerProps {
 
 export function StackStockPicker({
   assetClass,
+  assetCategory,
   value,
   displayLabel,
   onSelect,
@@ -80,31 +83,32 @@ export function StackStockPicker({
   const [adding, setAdding] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const market = CLASS_TO_MARKET[assetClass]
-  const showStockSearch =
-    assetClass === 'nse-stocks' || assetClass === 'global-stocks' || assetClass === 'etf'
+  const instrumentType = (assetCategory || '').trim() || undefined
+  const market = instrumentType ? undefined : CLASS_TO_MARKET[assetClass]
+  const pickerSlug = assetCategory ? categoryToPickerSlug(assetCategory) : assetClass
 
   const doSearch = useCallback(
     async (q: string) => {
-      if (!showStockSearch) return
       setLoading(true)
       try {
-        setStocks(await searchStocks(q, market))
+        setStocks(await searchStocks(q, market, instrumentType))
       } catch {
         setStocks([])
       } finally {
         setLoading(false)
       }
     },
-    [market, showStockSearch]
+    [market, instrumentType]
   )
 
   useEffect(() => {
-    if (open && showStockSearch) doSearch(query)
-  }, [open, showStockSearch]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (open) doSearch(query)
+  }, [open, instrumentType, market]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!addOpen) return
+    const defaultMkt = assetCategory ? categoryDefaultMarket(assetCategory) : 'Global'
+    setNewMarket(defaultMkt)
     void (async () => {
       try {
         const [regionList, exchangeList] = await Promise.all([
@@ -118,7 +122,7 @@ export function StackStockPicker({
         setExchanges([])
       }
     })()
-  }, [addOpen])
+  }, [addOpen, assetCategory])
 
   const handlePick = async (stock: GroweStock) => {
     try {
@@ -136,7 +140,7 @@ export function StackStockPicker({
     setAdding(true)
     try {
       const m =
-        assetClass === 'nse-stocks' ? 'NSE' : assetClass === 'etf' ? 'ETF' : newMarket
+        pickerSlug === 'nse-stocks' ? 'NSE' : pickerSlug === 'etf' ? 'ETF' : newMarket
       const defaultRegion = m === 'NSE' ? 'Kenya' : m === 'ETF' ? 'USA' : 'Global'
       const created = await createStock({
         ticker: newTicker.trim(),
@@ -144,6 +148,7 @@ export function StackStockPicker({
         market: m,
         region: newRegion === 'auto' ? defaultRegion : newRegion,
         exchangePlatform: newExchange === 'auto' ? m : newExchange,
+        instrumentType: instrumentType,
       })
       const stock: GroweStock = {
         name: created.name,
@@ -163,125 +168,132 @@ export function StackStockPicker({
     }
   }
 
-  if (!showStockSearch) {
-    return null
-  }
-
   return (
     <div className="space-y-2">
-      <Label>
-        {assetClass === 'nse-stocks' ? 'NSE stock' : 'Global stock'}
-        {market && (
-          <Badge variant="secondary" className="ml-2 text-xs font-normal">
-            {market}
-          </Badge>
-        )}
-      </Label>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            disabled={disabled}
-            className={cn('w-full justify-between font-normal', !value && 'text-muted-foreground')}
-          >
-            <span className="truncate">{displayLabel || 'Search ticker or company…'}</span>
-            <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-          <Command shouldFilter={false}>
-            <div className="flex items-center border-b px-3">
-              <Search className="mr-2 h-4 w-4 opacity-50" />
-              <CommandInput
-                placeholder="e.g. NVDA, SCOM…"
-                value={query}
-                onValueChange={(q) => {
-                  setQuery(q)
-                  if (debounceRef.current) clearTimeout(debounceRef.current)
-                  debounceRef.current = setTimeout(() => doSearch(q), 250)
-                }}
-              />
-            </div>
-            <CommandList className="max-h-52">
-              {loading && (
-                <div className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Searching…
-                </div>
+      <Label>Investment name</Label>
+      <div className="flex gap-2">
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              disabled={disabled}
+              className={cn(
+                'min-w-0 flex-1 justify-between font-normal',
+                !value && 'text-muted-foreground'
               )}
-              {!loading && stocks.length === 0 && <CommandEmpty>No stocks found.</CommandEmpty>}
-              {!loading && stocks.length > 0 && (
-                <CommandGroup>
-                  {stocks.map((s) => (
-                    <CommandItem key={s.name} value={s.name} onSelect={() => handlePick(s)}>
-                      <Check className={cn('mr-2 h-4 w-4', value === s.name ? 'opacity-100' : 'opacity-0')} />
-                      <span className="font-medium">{s.ticker}</span>
-                      <span className="ml-2 truncate text-muted-foreground">{s.company_name}</span>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              )}
-            </CommandList>
-            <div className="border-t p-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start gap-2"
-                onClick={() => setAddOpen(true)}
-              >
-                <Plus className="h-4 w-4" />
-                Add new stock
-              </Button>
-            </div>
-          </Command>
-        </PopoverContent>
-      </Popover>
+            >
+              <span className="truncate">
+                {displayLabel || 'Search ticker or investment name…'}
+              </span>
+              <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
+            <Command shouldFilter={false}>
+              <div className="flex items-center border-b px-3">
+                <Search className="mr-2 h-4 w-4 opacity-50" />
+                <CommandInput
+                  placeholder="e.g. NVDA, SCOM, Cytonn…"
+                  value={query}
+                  onValueChange={(q) => {
+                    setQuery(q)
+                    if (debounceRef.current) clearTimeout(debounceRef.current)
+                    debounceRef.current = setTimeout(() => doSearch(q), 250)
+                  }}
+                />
+              </div>
+              <CommandList className="max-h-52">
+                {loading && (
+                  <div className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Searching…
+                  </div>
+                )}
+                {!loading && stocks.length === 0 && (
+                  <CommandEmpty>No investments found. Use + to add one.</CommandEmpty>
+                )}
+                {!loading && stocks.length > 0 && (
+                  <CommandGroup>
+                    {stocks.map((s) => (
+                      <CommandItem key={s.name} value={s.name} onSelect={() => handlePick(s)}>
+                        <Check
+                          className={cn(
+                            'mr-2 h-4 w-4',
+                            value === s.name ? 'opacity-100' : 'opacity-0'
+                          )}
+                        />
+                        <span className="font-medium">{s.ticker}</span>
+                        <span className="ml-2 truncate text-muted-foreground">{s.company_name}</span>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                )}
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="shrink-0"
+          disabled={disabled}
+          aria-label="Add investment"
+          onClick={() => setAddOpen(true)}
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+      </div>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Add new stock</DialogTitle>
+            <DialogTitle>Add investment</DialogTitle>
           </DialogHeader>
           <div className="grid gap-3 py-2">
             <div className="grid gap-2">
               <Label>Ticker</Label>
-              <Input value={newTicker} onChange={(e) => setNewTicker(e.target.value.toUpperCase())} placeholder="NVDA" />
+              <Input
+                value={newTicker}
+                onChange={(e) => setNewTicker(e.target.value.toUpperCase())}
+                placeholder="e.g. CYTONN-MMF"
+              />
             </div>
             <div className="grid gap-2">
-              <Label>Company name</Label>
-              <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="NVIDIA Corporation" />
+              <Label>Investment name</Label>
+              <Input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="e.g. Cytonn Money Market Fund"
+              />
             </div>
-            {(assetClass === 'global-stocks' || assetClass === 'etf') && (
+            {pickerSlug !== 'nse-stocks' && pickerSlug !== 'etf' && (
               <div className="grid gap-2">
                 <Label>Market</Label>
-                {assetClass === 'etf' ? (
-                  <p className="text-sm text-muted-foreground">ETF (exchange-traded fund)</p>
-                ) : (
-                  <Select value={newMarket} onValueChange={(v) => setNewMarket(v as 'NSE' | 'Global' | 'ETF')}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Global">Global</SelectItem>
-                      <SelectItem value="NSE">NSE</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
+                <Select
+                  value={newMarket}
+                  onValueChange={(v) => setNewMarket(v as 'NSE' | 'Global' | 'ETF')}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Global">Global</SelectItem>
+                    <SelectItem value="NSE">NSE</SelectItem>
+                    <SelectItem value="ETF">ETF</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             )}
             <div className="grid gap-2">
               <Label>Region</Label>
               <Select value={newRegion} onValueChange={setNewRegion}>
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="auto">
-                    Auto (
-                    {assetClass === 'nse-stocks' ? 'Kenya' : assetClass === 'etf' ? 'USA' : 'Global'})
-                  </SelectItem>
+                  <SelectItem value="auto">Auto</SelectItem>
                   {regions.map((r) => (
                     <SelectItem key={r} value={r}>
                       {r}
@@ -293,13 +305,11 @@ export function StackStockPicker({
             <div className="grid gap-2">
               <Label>Exchange platform</Label>
               <Select value={newExchange} onValueChange={setNewExchange}>
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="auto">
-                    Auto ({assetClass === 'nse-stocks' ? 'NSE' : newMarket})
-                  </SelectItem>
+                  <SelectItem value="auto">Auto</SelectItem>
                   {exchanges.map((e) => (
                     <SelectItem key={e} value={e}>
                       {e}

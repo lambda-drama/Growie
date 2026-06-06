@@ -10,6 +10,9 @@ from frappe.utils import flt, getdate, now_datetime, today
 from growie_app.api.portfolio import (
 	_ASSET_CLASS_MAP,
 	_ASSET_CLASS_REVERSE,
+	_holding_asset_class_slug,
+	_load_growe_stock_meta,
+	_resolve_asset_category_label,
 	_cost_at_avg_kes,
 	_holding_to_dict,
 	is_open_holding,
@@ -38,13 +41,7 @@ def _member_holding_tickers_by_market(
 	Split the member's open holdings into NSE vs Global ticker lists for live price fetch.
 	Optional asset_class (frontend slug) or holding_name scopes the set.
 	"""
-	ac_label = None
-	if asset_class:
-		ac_label = _ASSET_CLASS_REVERSE.get(asset_class, asset_class)
-		if ac_label not in _ASSET_CLASS_MAP:
-			ac_label = None
-
-	filters = open_holding_db_filters(member, ac_label)
+	filters = open_holding_db_filters(member)
 	if holding_name:
 		filters.append(["name", "=", holding_name])
 
@@ -59,6 +56,13 @@ def _member_holding_tickers_by_market(
 	seen_global: set = set()
 
 	for r in rows:
+		if asset_class:
+			row_ac = _holding_asset_class_slug(
+				r.asset_class,
+				_load_growe_stock_meta(r.asset_name or "", r.ticker or "", r.asset_class),
+			)
+			if row_ac != asset_class:
+				continue
 		t = (r.ticker or "").upper().strip()
 		if not t:
 			continue
@@ -353,13 +357,12 @@ def get_stack_overview():
 def get_stack_class(asset_class: str):
 	"""Holdings for one asset class with summary."""
 	member = _member_name()
-	ac_label = _ASSET_CLASS_REVERSE.get(asset_class, asset_class)
-	if ac_label not in _ASSET_CLASS_MAP:
+	if asset_class not in _ASSET_CLASS_REVERSE:
 		frappe.throw(_("Unknown asset class."))
 
 	rows = frappe.get_all(
 		"Growe Holding",
-		filters=open_holding_db_filters(member, ac_label),
+		filters=open_holding_db_filters(member),
 		fields=[
 			"name",
 			"asset_class",
@@ -378,7 +381,11 @@ def get_stack_class(asset_class: str):
 		order_by="date_added desc",
 	)
 
-	holdings = [_stack_holding_row(r) for r in rows]
+	holdings = [
+		h
+		for r in rows
+		if (h := _stack_holding_row(r)).get("assetClass") == asset_class
+	]
 	total_value = sum(h.get("valueInKES") or h["valueKES"] for h in holdings)
 	total_cost = sum(h.get("costAtAvgKES") or h["costBasisKES"] for h in holdings)
 	gain = total_value - total_cost
@@ -466,6 +473,7 @@ def create_stock(
 	currency: str = "USD",
 	region: str = None,
 	exchange_platform: str = None,
+	instrument_type: str = None,
 ):
 	"""Create a Growe Stock (e.g. when user adds a new listing)."""
 	_member_name()
@@ -482,7 +490,9 @@ def create_stock(
 	else:
 		region_val = (region or "Global").strip()
 	exchange_val = (exchange_platform or mkt).strip()
-	instrument_val = _instrument_type_for_market(mkt)
+	instrument_val = (instrument_type or "").strip() or _instrument_type_for_market(mkt)
+	if instrument_val and not frappe.db.exists("Growe Asset Category", instrument_val):
+		instrument_val = _instrument_type_for_market(mkt)
 
 	existing = frappe.db.get_value("Growe Stock", {"ticker": clean, "market": mkt}, "name")
 	if existing:
@@ -861,12 +871,11 @@ def record_buy(
 			frappe.throw(_("Select a stock or fund for this buy."))
 		if not asset_class:
 			asset_class, _m = _infer_asset_class_from_stock(asset_name)
-		if asset_class not in _ASSET_CLASS_REVERSE:
-			frappe.throw(_("Please select an asset class for this investment."))
+		ac_label = _resolve_asset_category_label(asset_class)
 
 		if unit <= 0:
 			created = add_holding(
-				asset_class=asset_class,
+				asset_class=ac_label,
 				asset_name=asset_name,
 				currency=ccy,
 				quantity=qty,
@@ -877,7 +886,6 @@ def record_buy(
 			doc = frappe.get_doc("Growe Holding", holding_name)
 		else:
 			cost_kes = _to_kes(qty * unit, ccy, date_str)
-			ac_label = _ASSET_CLASS_REVERSE.get(asset_class, asset_class)
 			ticker = frappe.db.get_value("Growe Stock", asset_name, "ticker") or ""
 			doc = frappe.get_doc(
 				{
