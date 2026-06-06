@@ -24,8 +24,11 @@ import { StackBucketIcon } from '@/components/stack/stack-bucket-icon'
 import {
   bucketIconKind,
   bucketLabelForTickerGroup,
+  filterHoldingsByCountry,
   groupingBackLabel,
   groupingBucketColumnLabel,
+  regionGroupingUsesCountryTier,
+  summarizeHoldingsByCountry,
   type StackGroupingMode,
 } from '@/lib/stack-grouping'
 import { groupHoldingsByTicker, type StackTickerGroup } from '@/lib/stack-ticker-groups'
@@ -48,6 +51,9 @@ interface StackClassHoldingsTableProps {
   selectedGroupKey: string | null
   onSelectGroup: (groupKey: string) => void
   onBackToGroups: () => void
+  selectedCountryKey?: string | null
+  onSelectCountry?: (country: string) => void
+  onBackToCountries?: () => void
 }
 
 function HoldingTableRow({
@@ -255,8 +261,20 @@ export function StackClassHoldingsTable({
   selectedGroupKey,
   onSelectGroup,
   onBackToGroups,
+  selectedCountryKey = null,
+  onSelectCountry,
+  onBackToCountries,
 }: StackClassHoldingsTableProps) {
-  const groups = useMemo(() => groupHoldingsByTicker(holdings), [holdings])
+  const usesCountryTier = regionGroupingUsesCountryTier(groupingMode)
+  const scopedHoldings = useMemo(() => {
+    if (!usesCountryTier || !selectedBucketKey || !selectedCountryKey) return holdings
+    return filterHoldingsByCountry(holdings, selectedCountryKey)
+  }, [holdings, usesCountryTier, selectedBucketKey, selectedCountryKey])
+  const groups = useMemo(() => groupHoldingsByTicker(scopedHoldings), [scopedHoldings])
+  const countrySummaries = useMemo(
+    () => (usesCountryTier && selectedBucketKey ? summarizeHoldingsByCountry(holdings) : []),
+    [holdings, usesCountryTier, selectedBucketKey]
+  )
   const bucketedGroups = useMemo(() => {
     const map = new Map<string, StackTickerGroup[]>()
     for (const group of groups) {
@@ -409,9 +427,9 @@ export function StackClassHoldingsTable({
     )
   }
 
-  if (groupingMode !== 'ticker' && selectedBucketKey) {
+  if (usesCountryTier && selectedBucketKey && !selectedCountryKey) {
     return (
-      <div className="hidden rounded-xl border md:block">
+      <div className="hidden overflow-hidden rounded-xl border md:block">
         <div className="border-b px-3 py-2">
           <Button variant="ghost" size="sm" className="gap-1 px-1" onClick={onBackToBuckets}>
             <ChevronLeft className="h-4 w-4" />
@@ -421,9 +439,85 @@ export function StackClassHoldingsTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead colSpan={6}>
+              <TableHead colSpan={5}>
                 <div className="flex items-center gap-2 py-1">
                   <span className="font-semibold">{selectedBucketKey}</span>
+                </div>
+              </TableHead>
+            </TableRow>
+            <TableRow>
+              <TableHead>Country</TableHead>
+              <TableHead className="text-right">Tickers</TableHead>
+              <TableHead className="text-right">Lots</TableHead>
+              <TableHead className="text-right">Value</TableHead>
+              <TableHead className="text-right">Delta %</TableHead>
+              <TableHead className="w-[32px]" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {countrySummaries.map((c) => (
+              <TableRow
+                key={c.country}
+                className="cursor-pointer hover:bg-muted/40"
+                onClick={() => onSelectCountry?.(c.country)}
+              >
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    <StackBucketIcon label={c.country} kind="region" className="h-9 w-9 sm:h-10 sm:w-10" />
+                    <span className="font-semibold">{c.country}</span>
+                  </div>
+                </TableCell>
+                <TableCell className="text-right tabular-nums">{c.tickerCount}</TableCell>
+                <TableCell className="text-right tabular-nums">{c.lotCount}</TableCell>
+                <TableCell className="text-right tabular-nums font-semibold">
+                  {formatCurrency(c.totalValue, displayCurrency as 'USD', {
+                    kesToDisplayMultiplier,
+                    compact: true,
+                  })}
+                </TableCell>
+                <TableCell
+                  className={cn(
+                    'text-right tabular-nums',
+                    c.gainPercent >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                  )}
+                >
+                  {formatPercentage(c.gainPercent)}
+                </TableCell>
+                <TableCell className="text-right">
+                  <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    )
+  }
+
+  if (groupingMode !== 'ticker' && selectedBucketKey) {
+    return (
+      <div className="hidden rounded-xl border md:block">
+        <div className="border-b px-3 py-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1 px-1"
+            onClick={usesCountryTier && selectedCountryKey ? onBackToCountries : onBackToBuckets}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Back to {usesCountryTier && selectedCountryKey ? 'countries' : groupingBackLabel(groupingMode)}
+          </Button>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead colSpan={6}>
+                <div className="flex items-center gap-2 py-1">
+                  <span className="font-semibold">
+                    {usesCountryTier && selectedCountryKey
+                      ? `${selectedBucketKey} · ${selectedCountryKey}`
+                      : selectedBucketKey}
+                  </span>
                 </div>
               </TableHead>
             </TableRow>
@@ -437,7 +531,7 @@ export function StackClassHoldingsTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {selectedBucketGroups.map((group) => (
+            {(usesCountryTier && selectedCountryKey ? groups : selectedBucketGroups).map((group) => (
               <GroupSummaryRow
                 key={group.key}
                 group={group}

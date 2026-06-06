@@ -14,6 +14,7 @@ export interface Holding {
   currency?: string
   marketTag?: string
   region?: string
+  country?: string
   exchangePlatform?: string
   sector?: string
   industry?: string
