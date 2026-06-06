@@ -209,23 +209,30 @@ def _fetch_spreadsheet_rows(spreadsheet_url: str) -> list[tuple]:
 	return _rows_from_csv_bytes(content)
 
 
+def _asset_category_from_stock_row(row: dict) -> str:
+	"""Map Growe Stock fields to a Growe Asset Category name (holding.asset_class Link)."""
+	instrument = (row.get("instrument_type") or "").strip()
+	if instrument and frappe.db.exists("Growe Asset Category", instrument):
+		return instrument
+	market = (row.get("market") or "Global").strip()
+	return {
+		"ETF": "ETF",
+		"MMF": "Money Market Fund",
+		"Real Estate": "Private Company/Other",
+	}.get(market, "Stock")
+
+
 def _holding_meta_from_stock(stock_name: str) -> tuple[str, str]:
-	"""Return (Growe Holding asset_class, currency) from the linked Growe Stock."""
+	"""Return (Growe Asset Category name, currency) from the linked Growe Stock."""
 	row = frappe.db.get_value(
 		"Growe Stock",
 		stock_name,
-		["market", "currency"],
+		["market", "currency", "instrument_type"],
 		as_dict=True,
 	) or {}
 	market = (row.get("market") or "Global").strip()
 	currency = (row.get("currency") or "").strip().upper()
-	asset_class = {
-		"NSE": "NSE",
-		"Global": "Global",
-		"ETF": "ETF",
-		"MMF": "MMF",
-		"Real Estate": "Real Estate",
-	}.get(market, "Global")
+	asset_class = _asset_category_from_stock_row(row)
 	if not currency:
 		currency = "KES" if market == "NSE" else "USD"
 	return asset_class, currency
@@ -370,12 +377,14 @@ def _get_or_create_stock(raw_ticker: str, investment_hint: str, currency_hint: s
 		n += 1
 		name = f"{base}-{n}"
 
+	instrument_type = "ETF" if market == "ETF" else "Stock"
 	doc = frappe.get_doc(
 		{
 			"doctype": "Growe Stock",
 			"ticker": clean,
 			"company_name": company[:240],
 			"market": market,
+			"instrument_type": instrument_type,
 			"currency": ccy,
 			"api_symbol": api_raw or clean,
 			"is_active": 1,

@@ -44,6 +44,17 @@ _SLUG_TO_ASSET_CATEGORY = {
 	"real-estate": "Private Company/Other",
 }
 
+# Legacy holding / import labels → Growe Asset Category
+_LEGACY_TO_ASSET_CATEGORY = {
+	"Global": "Stock",
+	"Global Stocks": "Stock",
+	"NSE": "Stock",
+	"NSE Stocks": "Stock",
+	"ETF": "ETF",
+	"MMF": "Money Market Fund",
+	"Real Estate": "Private Company/Other",
+}
+
 
 def _resolve_asset_category_label(asset_class_param: str) -> str:
 	"""Normalize API input to a Growe Asset Category name."""
@@ -54,8 +65,8 @@ def _resolve_asset_category_label(asset_class_param: str) -> str:
 		return param
 	if param in _SLUG_TO_ASSET_CATEGORY:
 		return _SLUG_TO_ASSET_CATEGORY[param]
-	if param in _ASSET_CLASS_REVERSE:
-		return _ASSET_CLASS_REVERSE[param]
+	if param in _LEGACY_TO_ASSET_CATEGORY:
+		return _LEGACY_TO_ASSET_CATEGORY[param]
 	frappe.throw(_("Unknown asset category: {0}").format(param))
 
 
