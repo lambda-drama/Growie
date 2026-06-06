@@ -10,7 +10,10 @@ import { formatCurrency, formatHoldingMoney, formatPercentage } from '@/lib/form
 import {
   bucketIconKind,
   bucketLabelForTickerGroup,
+  filterHoldingsByCountry,
   groupingBackLabel,
+  regionGroupingUsesCountryTier,
+  summarizeHoldingsByCountry,
   type StackGroupingMode,
 } from '@/lib/stack-grouping'
 import { groupHoldingsByTicker, type StackTickerGroup } from '@/lib/stack-ticker-groups'
@@ -32,6 +35,9 @@ interface StackTickerGroupsProps {
   selectedGroupKey: string | null
   onSelectGroup: (groupKey: string) => void
   onBackToGroups: () => void
+  selectedCountryKey?: string | null
+  onSelectCountry?: (country: string) => void
+  onBackToCountries?: () => void
   emptyMessage?: string
   emptyActions?: ReactNode
 }
@@ -115,10 +121,22 @@ export function StackTickerGroups({
   selectedGroupKey,
   onSelectGroup,
   onBackToGroups,
+  selectedCountryKey = null,
+  onSelectCountry,
+  onBackToCountries,
   emptyMessage,
   emptyActions,
 }: StackTickerGroupsProps) {
-  const groups = useMemo(() => groupHoldingsByTicker(holdings), [holdings])
+  const usesCountryTier = regionGroupingUsesCountryTier(groupingMode)
+  const scopedHoldings = useMemo(() => {
+    if (!usesCountryTier || !selectedBucketKey || !selectedCountryKey) return holdings
+    return filterHoldingsByCountry(holdings, selectedCountryKey)
+  }, [holdings, usesCountryTier, selectedBucketKey, selectedCountryKey])
+  const groups = useMemo(() => groupHoldingsByTicker(scopedHoldings), [scopedHoldings])
+  const countrySummaries = useMemo(
+    () => (usesCountryTier && selectedBucketKey ? summarizeHoldingsByCountry(holdings) : []),
+    [holdings, usesCountryTier, selectedBucketKey]
+  )
   const bucketedGroups = useMemo(() => {
     const map = new Map<string, StackTickerGroup[]>()
     for (const group of groups) {
@@ -252,7 +270,7 @@ export function StackTickerGroups({
     )
   }
 
-  if (groupingMode !== 'ticker' && selectedBucketKey) {
+  if (usesCountryTier && selectedBucketKey && !selectedCountryKey) {
     return (
       <div className="space-y-3">
         <Button variant="ghost" size="sm" className="gap-1 px-1" onClick={onBackToBuckets}>
@@ -263,7 +281,71 @@ export function StackTickerGroups({
           {selectedBucketKey}
         </div>
         <ul className="space-y-3">
-          {selectedBucketGroups.map((group) => (
+          {countrySummaries.map((c) => (
+            <li key={c.country}>
+              <button
+                type="button"
+                className="w-full rounded-xl border border-border bg-card px-4 py-3 text-left shadow-sm transition-colors hover:bg-muted/20"
+                onClick={() => onSelectCountry?.(c.country)}
+              >
+                <div className="flex items-center gap-3">
+                  <StackBucketIcon label={c.country} kind="region" />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold">{c.country}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {c.tickerCount} ticker{c.tickerCount === 1 ? '' : 's'} • {c.lotCount} lot
+                      {c.lotCount === 1 ? '' : 's'}
+                    </p>
+                  </div>
+                  <div className="ml-auto flex shrink-0 items-center gap-2">
+                    <div className="text-right">
+                      <p className="font-semibold tabular-nums">
+                        {formatCurrency(c.totalValue, displayCurrency as 'USD', {
+                          kesToDisplayMultiplier,
+                          compact: true,
+                        })}
+                      </p>
+                      <p
+                        className={cn(
+                          'text-xs font-medium tabular-nums',
+                          c.gainPercent >= 0
+                            ? 'text-green-600 dark:text-green-400'
+                            : 'text-red-600 dark:text-red-400'
+                        )}
+                      >
+                        {formatPercentage(c.gainPercent)}
+                      </p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  </div>
+                </div>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
+
+  if (groupingMode !== 'ticker' && selectedBucketKey) {
+    return (
+      <div className="space-y-3">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1 px-1"
+          onClick={usesCountryTier && selectedCountryKey ? onBackToCountries : onBackToBuckets}
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Back to {usesCountryTier && selectedCountryKey ? 'countries' : groupingBackLabel(groupingMode)}
+        </Button>
+        <div className="rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold">
+          {usesCountryTier && selectedCountryKey
+            ? `${selectedBucketKey} · ${selectedCountryKey}`
+            : selectedBucketKey}
+        </div>
+        <ul className="space-y-3">
+          {(usesCountryTier && selectedCountryKey ? groups : selectedBucketGroups).map((group) => (
             <li key={group.key}>
               <button
                 type="button"

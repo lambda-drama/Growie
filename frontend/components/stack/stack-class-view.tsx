@@ -47,6 +47,7 @@ export function StackClassView({ assetClass, onBack }: StackClassViewProps) {
   const [detailOpen, setDetailOpen] = useState(false)
   const [selectedTickerGroup, setSelectedTickerGroup] = useState<string | null>(null)
   const [selectedBucket, setSelectedBucket] = useState<string | null>(null)
+  const [selectedCountry, setSelectedCountry] = useState<string | null>(null)
 
   const showPositionSearch =
     assetClass === 'nse-stocks' || assetClass === 'global-stocks' || assetClass === 'etf'
@@ -55,11 +56,13 @@ export function StackClassView({ assetClass, onBack }: StackClassViewProps) {
     setPositionSearch('')
     setSelectedTickerGroup(null)
     setSelectedBucket(null)
+    setSelectedCountry(null)
   }, [assetClass])
 
   useEffect(() => {
     setSelectedTickerGroup(null)
     setSelectedBucket(null)
+    setSelectedCountry(null)
   }, [positionSearch, stackGroupingMode])
 
   const allHoldings = detail?.holdings ?? []
@@ -190,11 +193,22 @@ export function StackClassView({ assetClass, onBack }: StackClassViewProps) {
               selectedBucketKey={selectedBucket}
               onSelectBucket={(bucket) => {
                 setSelectedTickerGroup(null)
+                setSelectedCountry(null)
                 setSelectedBucket(bucket)
               }}
               onBackToBuckets={() => {
                 setSelectedTickerGroup(null)
+                setSelectedCountry(null)
                 setSelectedBucket(null)
+              }}
+              selectedCountryKey={selectedCountry}
+              onSelectCountry={(country) => {
+                setSelectedTickerGroup(null)
+                setSelectedCountry(country)
+              }}
+              onBackToCountries={() => {
+                setSelectedTickerGroup(null)
+                setSelectedCountry(null)
               }}
               selectedGroupKey={selectedTickerGroup}
               onSelectGroup={(group) => setSelectedTickerGroup(group)}
@@ -242,11 +256,22 @@ export function StackClassView({ assetClass, onBack }: StackClassViewProps) {
               selectedBucketKey={selectedBucket}
               onSelectBucket={(bucket) => {
                 setSelectedTickerGroup(null)
+                setSelectedCountry(null)
                 setSelectedBucket(bucket)
               }}
               onBackToBuckets={() => {
                 setSelectedTickerGroup(null)
+                setSelectedCountry(null)
                 setSelectedBucket(null)
+              }}
+              selectedCountryKey={selectedCountry}
+              onSelectCountry={(country) => {
+                setSelectedTickerGroup(null)
+                setSelectedCountry(country)
+              }}
+              onBackToCountries={() => {
+                setSelectedTickerGroup(null)
+                setSelectedCountry(null)
               }}
               selectedGroupKey={selectedTickerGroup}
               onSelectGroup={setSelectedTickerGroup}

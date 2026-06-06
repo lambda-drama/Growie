@@ -1,5 +1,6 @@
 import { isEtfHolding } from '@/lib/stack-holding-classify'
 import type { StackBucketKind } from '@/lib/stack-bucket-icons'
+import { groupHoldingsByTicker } from '@/lib/stack-ticker-groups'
 import type { StackTickerGroup } from '@/lib/stack-ticker-groups'
 import type { StackHolding } from '@/services/stack'
 
@@ -131,6 +132,58 @@ export function groupingBackLabel(mode: StackGroupingMode): string {
   if (mode === 'industry') return 'industries'
   if (mode === 'assetCategory') return 'asset categories'
   return ''
+}
+
+/** Region drill-down inserts a country tier before tickers. */
+export function regionGroupingUsesCountryTier(mode: StackGroupingMode): boolean {
+  return mode === 'region'
+}
+
+export function countryLabelForHolding(h: StackHolding): string {
+  const explicit = (h.country || '').trim()
+  if (explicit) return explicit
+  const tag = (h.marketTag || '').toLowerCase()
+  const assetClass = (h.assetClass || '').toLowerCase()
+  if (assetClass === 'nse-stocks' || tag.includes('nse') || tag.includes('kenya')) return 'Kenya'
+  if ((h.currency || '').toUpperCase() === 'KES') return 'Kenya'
+  return 'Unknown'
+}
+
+export interface StackCountrySummary {
+  country: string
+  tickerCount: number
+  lotCount: number
+  totalValue: number
+  gainPercent: number
+}
+
+export function summarizeHoldingsByCountry(holdings: StackHolding[]): StackCountrySummary[] {
+  const map = new Map<string, StackHolding[]>()
+  for (const h of holdings) {
+    const country = countryLabelForHolding(h)
+    const list = map.get(country) ?? []
+    list.push(h)
+    map.set(country, list)
+  }
+
+  return [...map.entries()]
+    .map(([country, lots]) => {
+      const tickerGroups = groupHoldingsByTicker(lots)
+      const totalValue = lots.reduce((s, h) => s + (h.valueInKES ?? h.valueKES ?? 0), 0)
+      const totalCost = lots.reduce((s, h) => s + (h.costAtAvgKES ?? h.costBasisKES ?? 0), 0)
+      return {
+        country,
+        tickerCount: tickerGroups.length,
+        lotCount: lots.length,
+        totalValue,
+        gainPercent: totalCost > 0 ? ((totalValue - totalCost) / totalCost) * 100 : 0,
+      }
+    })
+    .sort((a, b) => a.country.localeCompare(b.country))
+}
+
+export function filterHoldingsByCountry(holdings: StackHolding[], country: string): StackHolding[] {
+  return holdings.filter((h) => countryLabelForHolding(h) === country)
 }
 
 /** Exchange/region = non-ETF holdings. Sector/industry/asset category = all holdings. */

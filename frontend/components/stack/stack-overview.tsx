@@ -51,6 +51,7 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
   const [detailOpen, setDetailOpen] = useState(false)
   const { stackGroupingMode, setStackGroupingMode } = useAppStore()
   const [selectedOverviewBucket, setSelectedOverviewBucket] = useState<string | null>(null)
+  const [selectedOverviewCountry, setSelectedOverviewCountry] = useState<string | null>(null)
   const [selectedOverviewGroupKey, setSelectedOverviewGroupKey] = useState<string | null>(null)
 
   const openTrade = (mode: TradeMode, holding?: StackHolding) => {
@@ -225,6 +226,7 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
                 onClick={() => {
                   setStackGroupingMode(mode)
                   setSelectedOverviewBucket(null)
+                  setSelectedOverviewCountry(null)
                   setSelectedOverviewGroupKey(null)
                 }}
               >
@@ -240,6 +242,7 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
                 onClick={() => {
                   setStackGroupingMode(mode)
                   setSelectedOverviewBucket(null)
+                  setSelectedOverviewCountry(null)
                   setSelectedOverviewGroupKey(null)
                 }}
               >
@@ -271,6 +274,7 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
                         className="flex w-full items-center gap-3 px-3 py-3.5 text-left transition-colors hover:bg-muted/50 sm:gap-4 sm:px-4 sm:py-4"
                         onClick={() => {
                           setSelectedOverviewBucket(row.label)
+                          setSelectedOverviewCountry(null)
                           setSelectedOverviewGroupKey(null)
                         }}
                       >
@@ -317,6 +321,7 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
                     className="px-1"
                     onClick={() => {
                       setSelectedOverviewBucket(null)
+                      setSelectedOverviewCountry(null)
                       setSelectedOverviewGroupKey(null)
                     }}
                   >
@@ -334,10 +339,23 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
                       onOpenHolding={openHoldingDetail}
                       onBuy={(h) => openTrade('buy-more', h)}
                       onSell={(h) => openTrade('sell', h)}
-                      groupingMode="ticker"
-                      selectedBucketKey={null}
-                      onSelectBucket={() => {}}
-                      onBackToBuckets={() => {}}
+                      groupingMode={stackGroupingMode}
+                      selectedBucketKey={selectedOverviewBucket}
+                      onSelectBucket={setSelectedOverviewBucket}
+                      onBackToBuckets={() => {
+                        setSelectedOverviewBucket(null)
+                        setSelectedOverviewCountry(null)
+                        setSelectedOverviewGroupKey(null)
+                      }}
+                      selectedCountryKey={selectedOverviewCountry}
+                      onSelectCountry={(country) => {
+                        setSelectedOverviewCountry(country)
+                        setSelectedOverviewGroupKey(null)
+                      }}
+                      onBackToCountries={() => {
+                        setSelectedOverviewCountry(null)
+                        setSelectedOverviewGroupKey(null)
+                      }}
                       selectedGroupKey={selectedOverviewGroupKey}
                       onSelectGroup={setSelectedOverviewGroupKey}
                       onBackToGroups={() => setSelectedOverviewGroupKey(null)}
@@ -351,10 +369,23 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
                     onOpenHolding={openHoldingDetail}
                     onBuy={(h) => openTrade('buy-more', h)}
                     onSell={(h) => openTrade('sell', h)}
-                    groupingMode="ticker"
-                    selectedBucketKey={null}
-                    onSelectBucket={() => {}}
-                    onBackToBuckets={() => {}}
+                    groupingMode={stackGroupingMode}
+                    selectedBucketKey={selectedOverviewBucket}
+                    onSelectBucket={setSelectedOverviewBucket}
+                    onBackToBuckets={() => {
+                      setSelectedOverviewBucket(null)
+                      setSelectedOverviewCountry(null)
+                      setSelectedOverviewGroupKey(null)
+                    }}
+                    selectedCountryKey={selectedOverviewCountry}
+                    onSelectCountry={(country) => {
+                      setSelectedOverviewCountry(country)
+                      setSelectedOverviewGroupKey(null)
+                    }}
+                    onBackToCountries={() => {
+                      setSelectedOverviewCountry(null)
+                      setSelectedOverviewGroupKey(null)
+                    }}
                     selectedGroupKey={selectedOverviewGroupKey}
                     onSelectGroup={setSelectedOverviewGroupKey}
                     onBackToGroups={() => setSelectedOverviewGroupKey(null)}
