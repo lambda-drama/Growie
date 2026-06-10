@@ -29,9 +29,19 @@ export interface PriceCacheRow {
 }
 
 export interface RefreshResult {
-  nse_updated: number
-  global_updated: number
-  prices: Record<string, number>
+  queued?: boolean
+  message?: string
+  nse_updated?: number
+  global_updated?: number
+  prices?: Record<string, number>
+}
+
+export interface StockPriceRefreshResult {
+  queued?: boolean
+  message?: string
+  nse_updated?: number
+  global_updated?: number
+  total?: number
 }
 
 export interface StockPickRaw {
@@ -142,7 +152,7 @@ export async function getStocksWithPrices(
   return []
 }
 
-export async function refreshStockPrices(): Promise<{ nse_updated: number; global_updated: number; total: number }> {
+export async function refreshStockPrices(): Promise<StockPriceRefreshResult> {
   const csrf = (window as unknown as Record<string, string>).csrf_token ?? ''
   const response = await fetch(
     '/api/method/growie_app.api.price.refresh_stock_prices',
@@ -158,7 +168,7 @@ export async function refreshStockPrices(): Promise<{ nse_updated: number; globa
     }
   )
   const resData = await response.json()
-  if (resData?.message) return resData.message
+  if (resData?.message) return resData.message as StockPriceRefreshResult
   throw new Error(resData?.exc ?? 'Failed to refresh stock prices')
 }
 

@@ -88,18 +88,22 @@ frappe.ui.form.on("Growe Price API", {
 					frappe.call({
 						method: "growie_app.api.price.refresh_prices",
 						args: { provider_name: frm.doc.name },
-						freeze: true,
-						freeze_message: __("Fetching prices using {0}…", [frm.doc.provider_name || frm.doc.name]),
 						callback: function (r) {
-							if (r.message) {
-								frappe.msgprint({
-									title: __("✅ Prices Refreshed"),
-									indicator: "green",
-									message:
-										`<b>NSE</b>: ${r.message.nse_updated} ticker(s) updated<br>` +
-										`<b>Global</b>: ${r.message.global_updated} ticker(s) updated`,
-								});
+							if (!r.message) return;
+							if (r.message.queued) {
+								frappe.show_alert({
+									message: r.message.message || __("Price refresh queued."),
+									indicator: "blue",
+								}, 8);
+								return;
 							}
+							frappe.msgprint({
+								title: __("✅ Prices Refreshed"),
+								indicator: "green",
+								message:
+									`<b>NSE</b>: ${r.message.nse_updated} ticker(s) updated<br>` +
+									`<b>Global</b>: ${r.message.global_updated} ticker(s) updated`,
+							});
 						},
 					});
 				}
@@ -145,9 +149,10 @@ frappe.ui.form.on("Growe Price API", {
 
 		if (api_prov.includes("finnhub")) {
 			frm.dashboard.add_comment(
-				__("<b>Global stocks only.</b> Set <b>Market Type</b> to <b>Global</b> (not Both) — " +
-				   "NSE tickers use RapidAPI / Mansa. Test with <code>AAPL</code>. " +
-				   "<a href=\"https://finnhub.io/docs/api\" target=\"_blank\">Docs</a>"),
+				__("<b>Non-NSE exchanges only.</b> Finnhub refreshes Growe Stock where "
+				   + "<b>Exchange platform</b> is not NSE (NYSE, NASDAQ, …). "
+				   + "NSE tickers use RapidAPI / Mansa. Test with <code>AAPL</code>. "
+				   + "<a href=\"https://finnhub.io/docs/api\" target=\"_blank\">Docs</a>"),
 				"blue",
 				true
 			);

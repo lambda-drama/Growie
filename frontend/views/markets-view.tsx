@@ -171,7 +171,11 @@ export function MarketsView() {
     setRefreshMsg('')
     try {
       const result = await refreshStockPrices()
-      setRefreshMsg(`Updated: NSE ${result.nse_updated} · Global ${result.global_updated}`)
+      if (result.queued) {
+        setRefreshMsg(result.message ?? 'Price refresh started in the background.')
+      } else {
+        setRefreshMsg(`Updated: NSE ${result.nse_updated ?? 0} · Global ${result.global_updated ?? 0}`)
+      }
       await loadData()
     } catch (err) {
       setRefreshMsg(err instanceof Error ? err.message : 'Refresh failed')

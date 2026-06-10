@@ -43,6 +43,7 @@ export function StackHoldingRowCard({
 }: StackHoldingRowCardProps) {
   const positive = (holding.gainPercent ?? 0) >= 0
   const ccy = (holding.currency || 'USD') as 'USD'
+  const initialInvestmentNative = effectiveAvgBuyNative(holding) * (holding.quantity ?? 0)
 
   return (
     <div
@@ -96,7 +97,12 @@ export function StackHoldingRowCard({
             </p>
           </div>
         </div>
-        <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
+        <dl
+          className={cn(
+            'mt-3 grid gap-2 text-xs',
+            lotMode ? 'grid-cols-3' : 'grid-cols-2'
+          )}
+        >
           <div>
             <dt className="text-muted-foreground">Shares</dt>
             <dd className="font-medium tabular-nums">{holding.quantity.toLocaleString()}</dd>
@@ -111,6 +117,51 @@ export function StackHoldingRowCard({
               })}
             </dd>
           </div>
+          {lotMode ? (
+            <>
+              <div>
+                <dt className="text-muted-foreground">Initial inv.</dt>
+                <dd className="font-medium tabular-nums">
+                  {formatHoldingMoney(initialInvestmentNative, ccy, displayCurrency as 'USD', {
+                    kesToDisplayMultiplier,
+                    kesPerUsd,
+                    compact: true,
+                  })}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Current price</dt>
+                <dd className="font-medium tabular-nums">
+                  {formatHoldingMoney(holding.currentPrice, ccy, displayCurrency as 'USD', {
+                    kesToDisplayMultiplier,
+                    kesPerUsd,
+                    compact: true,
+                  })}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Current val.</dt>
+                <dd className="font-semibold tabular-nums">
+                  {formatHoldingPositionValue(holding, displayCurrency as 'USD', {
+                    kesToDisplayMultiplier,
+                    kesPerUsd,
+                    compact: true,
+                  })}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Delta %</dt>
+                <dd
+                  className={cn(
+                    'font-medium tabular-nums',
+                    positive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                  )}
+                >
+                  {formatPercentage(holding.gainPercent)}
+                </dd>
+              </div>
+            </>
+          ) : null}
         </dl>
       </button>
       {showTradeButtons ? (

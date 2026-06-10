@@ -85,11 +85,13 @@ export interface StackPositionDetail {
 }
 
 export interface RefreshStackPricesResult {
-  nse_updated: number
-  global_updated: number
-  tickers_requested: number
-  nse_tickers: string[]
-  global_tickers: string[]
+  queued?: boolean
+  message?: string
+  nse_updated?: number
+  global_updated?: number
+  tickers_requested?: number
+  nse_tickers?: string[]
+  global_tickers?: string[]
 }
 
 /** Fetch live prices for the member's stack holdings and update Growe Price Cache. */

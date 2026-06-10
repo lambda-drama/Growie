@@ -63,6 +63,9 @@ interface AppState {
   ) => void
   stackGroupingMode: StackGroupingMode
   setStackGroupingMode: (mode: StackGroupingMode) => void
+  /** One-shot drill-down from dashboard → My Stack overview bucket. */
+  stackDrilldown: { groupingMode: StackGroupingMode; bucket: string } | null
+  setStackDrilldown: (drilldown: { groupingMode: StackGroupingMode; bucket: string } | null) => void
   /** Restore grouping from localStorage after client mount (avoids SSR mismatch). */
   hydrateStackGroupingMode: () => void
 }
@@ -144,6 +147,8 @@ export const useAppStore = create<AppState>((set) => ({
     persistStackGroupingMode(mode)
     set({ stackGroupingMode: mode })
   },
+  stackDrilldown: null,
+  setStackDrilldown: (drilldown) => set({ stackDrilldown: drilldown }),
   hydrateStackGroupingMode: () => {
     const stored = readStoredStackGroupingMode()
     set({ stackGroupingMode: stored })

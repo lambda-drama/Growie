@@ -5,18 +5,20 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { StackBucketIcon } from '@/components/stack/stack-bucket-icon'
+import { StackDrilldownMetricsGrid } from '@/components/stack/stack-drilldown-metrics'
 import { StackHoldingRowCard } from '@/components/stack/stack-holding-row-card'
-import { formatCurrency, formatHoldingMoney, formatPercentage } from '@/lib/format'
+import { formatCurrency, formatPercentage } from '@/lib/format'
 import {
   bucketIconKind,
   bucketLabelForTickerGroup,
   filterHoldingsByCountry,
   groupingBackLabel,
+  metricsFromCountrySummary,
   regionGroupingUsesCountryTier,
   summarizeHoldingsByCountry,
   type StackGroupingMode,
 } from '@/lib/stack-grouping'
-import { groupHoldingsByTicker, type StackTickerGroup } from '@/lib/stack-ticker-groups'
+import { groupHoldingsByTicker, metricsFromTickerGroup, type StackTickerGroup } from '@/lib/stack-ticker-groups'
 import type { StackHolding } from '@/services/stack'
 import { cn } from '@/lib/utils'
 
@@ -53,54 +55,24 @@ function TickerSummaryCard({
   kesToDisplayMultiplier: number
   kesPerUsd: number
 }) {
-  const ccy = (group.currency || 'USD') as 'USD'
-  const avgBuy = formatHoldingMoney(group.weightedAvgBuyNative, ccy, displayCurrency as 'USD', {
-    kesToDisplayMultiplier,
-    kesPerUsd,
-    compact: true,
-  })
-  const current = formatHoldingMoney(group.weightedCurrentNative, ccy, displayCurrency as 'USD', {
-    kesToDisplayMultiplier,
-    kesPerUsd,
-    compact: true,
-  })
-  const value = formatCurrency(group.totalValueInKES, displayCurrency as 'USD', {
-    kesToDisplayMultiplier,
-    compact: true,
-  })
-
   return (
     <div className="flex items-start gap-2 p-4">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-semibold">{group.ticker}</span>
-          {group.marketTag ? (
-            <Badge variant="secondary" className="text-[10px]">
-              {group.marketTag}
-            </Badge>
-          ) : null}
           <Badge variant="outline" className="text-[10px] font-normal">
             {group.lotCount} lot{group.lotCount === 1 ? '' : 's'}
           </Badge>
         </div>
         <p className="mt-0.5 truncate text-xs text-muted-foreground">{group.displayName}</p>
-        <dl className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
-          <div>
-            <dt className="text-muted-foreground">Avg buy</dt>
-            <dd className="font-medium tabular-nums">{avgBuy}</dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Current</dt>
-            <dd className="font-medium tabular-nums">{current}</dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Value</dt>
-            <dd className="font-semibold tabular-nums">{value}</dd>
-          </div>
-        </dl>
-        <p className="mt-1 text-[11px] text-muted-foreground">
-          {group.totalQuantity.toLocaleString()} shares · {formatPercentage(group.gainPercent)}
-        </p>
+        <StackDrilldownMetricsGrid
+          className="mt-2"
+          metrics={metricsFromTickerGroup(group)}
+          displayCurrency={displayCurrency}
+          kesToDisplayMultiplier={kesToDisplayMultiplier}
+          kesPerUsd={kesPerUsd}
+          currency={group.currency}
+        />
       </div>
     </div>
   )
@@ -194,11 +166,6 @@ export function StackTickerGroups({
           <div className="border-b border-border/70 px-4 py-3">
             <div className="flex flex-wrap items-center gap-2">
               <p className="font-semibold">{selectedGroup.ticker}</p>
-              {selectedGroup.marketTag ? (
-                <Badge variant="secondary" className="text-[10px]">
-                  {selectedGroup.marketTag}
-                </Badge>
-              ) : null}
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">{selectedGroup.displayName}</p>
           </div>
@@ -288,36 +255,23 @@ export function StackTickerGroups({
                 className="w-full rounded-xl border border-border bg-card px-4 py-3 text-left shadow-sm transition-colors hover:bg-muted/20"
                 onClick={() => onSelectCountry?.(c.country)}
               >
-                <div className="flex items-center gap-3">
-                  <StackBucketIcon label={c.country} kind="region" />
+                <div className="flex items-start gap-3">
+                  <StackBucketIcon label={c.country} kind="region" className="mt-0.5" />
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold">{c.country}</p>
                     <p className="text-xs text-muted-foreground">
                       {c.tickerCount} ticker{c.tickerCount === 1 ? '' : 's'} • {c.lotCount} lot
                       {c.lotCount === 1 ? '' : 's'}
                     </p>
+                    <StackDrilldownMetricsGrid
+                      className="mt-2"
+                      metrics={metricsFromCountrySummary(c)}
+                      displayCurrency={displayCurrency}
+                      kesToDisplayMultiplier={kesToDisplayMultiplier}
+                      kesPerUsd={kesPerUsd}
+                    />
                   </div>
-                  <div className="ml-auto flex shrink-0 items-center gap-2">
-                    <div className="text-right">
-                      <p className="font-semibold tabular-nums">
-                        {formatCurrency(c.totalValue, displayCurrency as 'USD', {
-                          kesToDisplayMultiplier,
-                          compact: true,
-                        })}
-                      </p>
-                      <p
-                        className={cn(
-                          'text-xs font-medium tabular-nums',
-                          c.gainPercent >= 0
-                            ? 'text-green-600 dark:text-green-400'
-                            : 'text-red-600 dark:text-red-400'
-                        )}
-                      >
-                        {formatPercentage(c.gainPercent)}
-                      </p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  </div>
+                  <ChevronRight className="mt-2 h-4 w-4 shrink-0 text-muted-foreground" />
                 </div>
               </button>
             </li>

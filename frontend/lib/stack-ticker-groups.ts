@@ -1,4 +1,5 @@
-import { effectiveAvgBuyNative } from '@/lib/format'
+import type { HoldingsSummaryMetrics } from '@/lib/stack-holdings-summary'
+import { summarizeHoldingsMetrics } from '@/lib/stack-holdings-summary'
 import type { StackHolding } from '@/services/stack'
 
 export interface StackTickerGroup {
@@ -12,6 +13,8 @@ export interface StackTickerGroup {
   totalQuantity: number
   totalValueInKES: number
   totalCostInKES: number
+  totalInitialInvestmentNative: number
+  deltaKES: number
   gainPercent: number
   weightedAvgBuyNative: number
   weightedCurrentNative: number
@@ -23,28 +26,18 @@ function groupKey(h: StackHolding): string {
   return `${ticker}|${ccy}`
 }
 
-function weightedAvgBuyNative(lots: StackHolding[]): number {
-  let cost = 0
-  let qty = 0
-  for (const h of lots) {
-    const q = h.quantity ?? 0
-    if (q <= 0) continue
-    cost += effectiveAvgBuyNative(h) * q
-    qty += q
+export function metricsFromTickerGroup(group: StackTickerGroup): HoldingsSummaryMetrics {
+  return {
+    totalQuantity: group.totalQuantity,
+    totalValueInKES: group.totalValueInKES,
+    totalCostInKES: group.totalCostInKES,
+    deltaKES: group.deltaKES,
+    gainPercent: group.gainPercent,
+    weightedAvgBuyNative: group.weightedAvgBuyNative,
+    weightedCurrentNative: group.weightedCurrentNative,
+    totalInitialInvestmentNative: group.totalInitialInvestmentNative,
+    currency: (group.currency || 'USD').toUpperCase(),
   }
-  return qty > 0 ? cost / qty : 0
-}
-
-function weightedCurrentNative(lots: StackHolding[]): number {
-  let value = 0
-  let qty = 0
-  for (const h of lots) {
-    const q = h.quantity ?? 0
-    if (q <= 0) continue
-    value += (h.currentPrice ?? 0) * q
-    qty += q
-  }
-  return qty > 0 ? value / qty : 0
 }
 
 /** Tier 2: combine open holdings in a class by ticker (+ currency). */
@@ -69,8 +62,7 @@ export function groupHoldingsByTicker(holdings: StackHolding[]): StackTickerGrou
       totalCostInKES += h.costAtAvgKES ?? h.costBasisKES ?? 0
       totalQuantity += h.quantity ?? 0
     }
-    const gainPercent =
-      totalCostInKES > 0 ? ((totalValueInKES - totalCostInKES) / totalCostInKES) * 100 : 0
+    const summary = summarizeHoldingsMetrics(sorted)
 
     groups.push({
       key,
@@ -80,12 +72,14 @@ export function groupHoldingsByTicker(holdings: StackHolding[]): StackTickerGrou
       currency: first.currency || 'USD',
       holdings: sorted,
       lotCount: sorted.length,
-      totalQuantity,
-      totalValueInKES,
-      totalCostInKES,
-      gainPercent,
-      weightedAvgBuyNative: weightedAvgBuyNative(sorted),
-      weightedCurrentNative: weightedCurrentNative(sorted),
+      totalQuantity: summary.totalQuantity,
+      totalValueInKES: summary.totalValueInKES,
+      totalCostInKES: summary.totalCostInKES,
+      totalInitialInvestmentNative: summary.totalInitialInvestmentNative,
+      deltaKES: summary.deltaKES,
+      gainPercent: summary.gainPercent,
+      weightedAvgBuyNative: summary.weightedAvgBuyNative,
+      weightedCurrentNative: summary.weightedCurrentNative,
     })
   }
 

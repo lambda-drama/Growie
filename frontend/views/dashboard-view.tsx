@@ -61,7 +61,7 @@ export function DashboardView() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
           <p className="text-muted-foreground">
-            Aggregated view of your stack — expand each asset class for individual holdings.
+            Aggregated view of your stack — expand each asset category for individual holdings.
           </p>
         </div>
         <Button variant="outline" size="sm" className="gap-2" onClick={refresh} disabled={isLoading}>
