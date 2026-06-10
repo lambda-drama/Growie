@@ -167,7 +167,7 @@ def _is_rapidapi_nse_provider(provider: dict) -> bool:
 	return "nairobi-stock-exchange-nse" in base or "rapidapi.com" in base
 
 
-# Which markets each provider may call (Growe Stock.market / holding asset class).
+# Which price-fetch buckets each provider may call (NSE = exchange_platform NSE only).
 _PROVIDER_MARKETS: dict[str, frozenset] = {
 	"rapidapi": frozenset({"NSE"}),
 	"mansa markets": frozenset({"NSE"}),
@@ -240,7 +240,7 @@ def _get_provider_by_name(provider_name: str) -> dict | None:
 def _eligible_tickers_for_provider(
 	provider: dict, nse_tickers: list, global_tickers: list
 ) -> list:
-	"""Tickers this provider is allowed to refresh (by Growe Stock / holding market)."""
+	"""Tickers this provider is allowed to refresh (NSE vs all other exchanges)."""
 	out: list = []
 	if _provider_supports_market(provider, "NSE"):
 		out.extend(nse_tickers or [])
@@ -731,9 +731,13 @@ def _fetch_finnhub(
 		if not sym_u:
 			continue
 
-		# NSE api_symbol values (e.g. SCOM.NR for Alpha Vantage) are not Finnhub symbols.
+		# Only use api_symbol when it looks like a Finnhub symbol (not NSE .NR suffixes).
 		if sym_u in symbol_override_map and _normalize_market_label(market) == "GLOBAL":
-			fh_symbol = symbol_override_map[sym_u].strip()
+			override = (symbol_override_map[sym_u] or "").strip()
+			if override and not override.upper().endswith(".NR"):
+				fh_symbol = override
+			else:
+				fh_symbol = sym_u
 		else:
 			fh_symbol = sym_u
 
@@ -780,10 +784,7 @@ def _fetch_finnhub(
 			}
 
 		except Exception as e:
-			frappe.log_error(
-				title=f"Finnhub fetch error ({fh_symbol})",
-				message=str(e),
-			)
+			_log_price_fetch_error("Finnhub", fh_symbol, e)
 
 	return results
 
@@ -965,12 +966,12 @@ def _api_symbol_maps_for_tickers(nse: list, global_: list) -> tuple[dict, dict]:
 	for s in frappe.get_all(
 		"Growe Stock",
 		filters={"ticker": ["in", list(uniq)]},
-		fields=["ticker", "api_symbol", "market"],
+		fields=["ticker", "api_symbol", "exchange_platform"],
 	):
 		t = (s.ticker or "").upper()
 		if not s.api_symbol:
 			continue
-		m = _normalize_market_label(s.market or "NSE")
+		m = _price_fetch_bucket(s.exchange_platform)
 		if m == "GLOBAL":
 			gmap[t] = s.api_symbol
 		else:
@@ -1066,10 +1067,35 @@ def _fetch_and_store(
 	return prices
 
 
-# ── Public API endpoints ──────────────────────────────────────────────────────
+# ── Background price refresh ──────────────────────────────────────────────────
 
-@frappe.whitelist()
-def refresh_prices(provider_name: str = None):
+PRICE_REFRESH_QUEUE = "long"
+PRICE_REFRESH_TIMEOUT = 3600
+
+
+def _log_price_fetch_error(provider_label: str, symbol: str, exc: Exception) -> None:
+	msg = str(exc)
+	if "timed out" in msg.lower() or "timeout" in msg.lower():
+		frappe.logger("growie.price").warning(
+			"%s fetch timeout (%s): %s", provider_label, symbol, msg
+		)
+		return
+	frappe.log_error(title=f"{provider_label} fetch error ({symbol})", message=msg)
+
+
+def _enqueue_price_refresh(method: str, job_id: str, **kwargs) -> None:
+	frappe.enqueue(
+		method=method,
+		queue=PRICE_REFRESH_QUEUE,
+		timeout=PRICE_REFRESH_TIMEOUT,
+		job_id=job_id,
+		deduplicate=True,
+		enqueue_after_commit=True,
+		**kwargs,
+	)
+
+
+def _execute_refresh_prices(provider_name: str = None, show_user_messages: bool = False) -> dict:
 	"""
 	Fetch fresh prices for every active Growe Stock ticker (and any held ticker not in
 	the stock master), same universe as refresh_stock_prices. Holdings tickers are
@@ -1108,24 +1134,38 @@ def refresh_prices(provider_name: str = None):
 			all_prices.update(_prices_from_cache_for_tickers(global_tickers))
 
 		if not eligible and (nse_tickers or global_tickers):
-			frappe.msgprint(
-				_(
-					"{0} cannot refresh your tickers: you have {1} NSE and {2} Global symbol(s), "
-					"but this provider only supports {3}. Use RapidAPI or Mansa for NSE, "
-					"Finnhub or Alpha Vantage for Global, or run Refresh without picking one provider."
-				).format(
-					provider.get("provider_name") or provider_name,
-					len(nse_tickers),
-					len(global_tickers),
-					"NSE"
-					if _is_rapidapi_nse_provider(p) or _provider_key(p) == "mansa markets"
-					else "Global"
-					if _provider_key(p) in ("finnhub", "alpha vantage")
-					else "NSE and Global (FCS)",
-				),
-				alert=True,
-				indicator="orange",
+			warning = _(
+				"{0} cannot refresh your tickers: you have {1} NSE and {2} Global symbol(s), "
+				"but this provider only supports {3}. Use RapidAPI or Mansa for NSE, "
+				"Finnhub or Alpha Vantage for Global, or run Refresh without picking one provider."
+			).format(
+				p.get("provider_name") or provider_name,
+				len(nse_tickers),
+				len(global_tickers),
+				"NSE"
+				if _is_rapidapi_nse_provider(p) or _provider_key(p) == "mansa markets"
+				else "Global"
+				if _provider_key(p) in ("finnhub", "alpha vantage")
+				else "NSE and Global (FCS)",
 			)
+			if show_user_messages:
+				frappe.msgprint(warning, alert=True, indicator="orange")
+			else:
+				frappe.logger("growie.price").warning(warning)
+		elif (
+			_provider_key(p) == "finnhub"
+			and not global_tickers
+			and nse_tickers
+		):
+			warning = _(
+				"Finnhub only refreshes tickers whose Exchange platform is not NSE "
+				"({0} symbol(s) are on NSE — use RapidAPI/Mansa for those). "
+				"Set exchange on US/global Growe Stock rows (e.g. NYSE, NASDAQ), then refresh again."
+			).format(len(nse_tickers))
+			if show_user_messages:
+				frappe.msgprint(warning, alert=True, indicator="orange")
+			else:
+				frappe.logger("growie.price").warning(warning)
 	else:
 		nse_updated_count = _fetch_market_for_refresh("NSE", nse_tickers, nse_map)
 		global_updated_count = _fetch_market_for_refresh("Global", global_tickers, global_map)
@@ -1157,12 +1197,122 @@ def refresh_prices(provider_name: str = None):
 					"Global tickers ({0}) are skipped for this provider — use Finnhub/Mansa for those. "
 					"NSE tickers requested: {1}."
 				).format(len(global_tickers), len(nse_tickers))
-		frappe.msgprint(hint, alert=True, indicator="orange")
+		if show_user_messages:
+			frappe.msgprint(hint, alert=True, indicator="orange")
+		else:
+			frappe.logger("growie.price").warning(hint)
 
 	return {
 		"nse_updated": nse_updated_count,
 		"global_updated": global_updated_count,
 		"prices": all_prices,
+	}
+
+
+def _run_refresh_prices(provider_name: str = None, notify_user: str = None) -> dict:
+	"""Background worker for refresh_prices."""
+	if notify_user:
+		frappe.set_user(notify_user)
+	try:
+		result = _execute_refresh_prices(provider_name=provider_name)
+		frappe.logger("growie.price").info(
+			"Price refresh complete (provider=%s): NSE=%s Global=%s",
+			provider_name or "all",
+			result.get("nse_updated"),
+			result.get("global_updated"),
+		)
+		if notify_user:
+			frappe.publish_realtime(
+				"growie_price_refresh_done",
+				result,
+				user=notify_user,
+			)
+		return result
+	except Exception:
+		frappe.log_error(
+			title=f"Price refresh job failed ({provider_name or 'all'})",
+			message=frappe.get_traceback(),
+		)
+		raise
+
+
+def _execute_refresh_stock_prices() -> dict:
+	nse_tickers, global_tickers, nse_map, gmap = _collect_tickers_for_live_prices()
+	nse_tickers = _sort_tickers_holdings_first(nse_tickers)
+	global_tickers = _sort_tickers_holdings_first(global_tickers)
+
+	nse_updated = _fetch_market_for_refresh("NSE", nse_tickers, nse_map)
+	global_updated = _fetch_market_for_refresh("Global", global_tickers, gmap)
+	for t in set(nse_tickers) | set(global_tickers):
+		cache = frappe.db.get_value("Growe Price Cache", t, "price_kes")
+		if cache:
+			_update_holdings_for_ticker(t, float(cache))
+
+	frappe.db.commit()
+
+	return {
+		"nse_updated": nse_updated,
+		"global_updated": global_updated,
+		"total": nse_updated + global_updated,
+	}
+
+
+def _run_refresh_stock_prices(notify_user: str = None) -> dict:
+	"""Background worker for refresh_stock_prices."""
+	if notify_user:
+		frappe.set_user(notify_user)
+	try:
+		result = _execute_refresh_stock_prices()
+		frappe.logger("growie.price").info(
+			"Stock price refresh complete: NSE=%s Global=%s",
+			result.get("nse_updated"),
+			result.get("global_updated"),
+		)
+		if notify_user:
+			frappe.publish_realtime(
+				"growie_price_refresh_done",
+				result,
+				user=notify_user,
+			)
+		return result
+	except Exception:
+		frappe.log_error(
+			title="Stock price refresh job failed",
+			message=frappe.get_traceback(),
+		)
+		raise
+
+
+# ── Public API endpoints ──────────────────────────────────────────────────────
+
+@frappe.whitelist()
+def refresh_prices(provider_name: str = None, sync: int = 0):
+	"""
+	Enqueue a background job to fetch fresh prices for all active tickers.
+
+	Pass sync=1 to run inline (tests / debugging only).
+	"""
+	if provider_name:
+		p = _get_provider_by_name(provider_name)
+		if not p:
+			frappe.throw(_(f"Provider '{provider_name}' not found."))
+		if not int(p.get("is_active") or 0):
+			frappe.throw(_(f"Provider '{provider_name}' is not active."))
+
+	if int(sync or 0):
+		return _execute_refresh_prices(provider_name=provider_name, show_user_messages=True)
+
+	_enqueue_price_refresh(
+		"growie_app.api.price._run_refresh_prices",
+		f"growie_refresh_prices:{provider_name or 'all'}",
+		provider_name=provider_name,
+		notify_user=frappe.session.user,
+	)
+	return {
+		"queued": True,
+		"message": _(
+			"Price refresh started in the background. Updated prices will appear shortly."
+		),
 	}
 
 
@@ -1204,9 +1354,10 @@ def test_provider(provider_name: str, test_ticker: str = "SCOM", market: str = N
 		as_dict=True,
 	)
 
-	# Auto-detect market from provider if not given
+	# Auto-detect NSE vs global from Growe Stock exchange_platform when not given.
 	if not market:
-		market = "NSE" if provider.market_type in ("NSE", "Both") else "Global"
+		exchange = frappe.db.get_value("Growe Stock", {"ticker": ticker}, "exchange_platform")
+		market = "NSE" if _is_nse_exchange(exchange) else "Global"
 
 	ticker = test_ticker.strip().upper()
 
@@ -1335,12 +1486,25 @@ def get_stocks_with_prices(market: str = None, sector: str = None, limit: int = 
 	return result
 
 
+def _is_nse_exchange(exchange_platform: str | None) -> bool:
+	"""True when Growe Stock exchange_platform is Nairobi Securities Exchange."""
+	return (exchange_platform or "").strip().upper() == "NSE"
+
+
+def _price_fetch_bucket(exchange_platform: str | None) -> str:
+	"""
+	NSE price APIs (RapidAPI, Mansa) only for exchange_platform = NSE.
+	All other exchanges (NYSE, NASDAQ, LSE, …) use global providers (Finnhub, AV, …).
+	"""
+	return "NSE" if _is_nse_exchange(exchange_platform) else "GLOBAL"
+
+
 def _collect_tickers_for_live_prices() -> tuple[list, list, dict, dict]:
 	"""
-	Build NSE / Global ticker lists from:
-	1) Active Growe Stock (with api_symbol map for AV)
-	2) Growe Holding — any ticker in a portfolio that is not already covered by
-	   the stock master, so "Refresh all prices" still works without a row in Growe Stock.
+	Build NSE / Global ticker lists from Growe Stock exchange_platform:
+	- exchange_platform = NSE → Mansa / RapidAPI
+	- any other exchange (or unset) → Finnhub / Alpha Vantage / FCS
+	Also includes portfolio tickers not in the active stock master.
 	"""
 	
 	nse: set = set()
@@ -1351,15 +1515,13 @@ def _collect_tickers_for_live_prices() -> tuple[list, list, dict, dict]:
 	for s in frappe.get_all(
 		"Growe Stock",
 		filters={"is_active": 1},
-		fields=["ticker", "api_symbol", "market"],
+		fields=["ticker", "api_symbol", "exchange_platform"],
 	):
 		t = (s.ticker or "").upper()
 		if not t:
 			continue
-		raw = (s.market or "NSE").strip().upper()
-		if raw not in ("NSE", "GLOBAL"):
-			raw = "NSE"
-		if raw == "NSE":
+		bucket = _price_fetch_bucket(s.exchange_platform)
+		if bucket == "NSE":
 			nse.add(t)
 			if s.api_symbol:
 				nse_map[t] = s.api_symbol
@@ -1371,15 +1533,25 @@ def _collect_tickers_for_live_prices() -> tuple[list, list, dict, dict]:
 	for h in frappe.get_all(
 		"Growe Holding",
 		filters=[["ticker", "!=", ""]],
-		fields=["ticker", "asset_class"],
+		fields=["ticker", "currency"],
 	):
 		t = (h.ticker or "").upper()
 		if not t:
 			continue
 		if t in nse or t in global_:
 			continue
-		ac = (h.asset_class or "").lower()
-		if "nse" in ac:
+		# Prefer Growe Stock exchange even when the stock row is inactive.
+		stock = frappe.db.get_value(
+			"Growe Stock",
+			{"ticker": t},
+			["exchange_platform"],
+			as_dict=True,
+		)
+		if stock:
+			bucket = _price_fetch_bucket(stock.exchange_platform)
+		else:
+			bucket = "NSE" if (h.currency or "USD").upper() == "KES" else "GLOBAL"
+		if bucket == "NSE":
 			nse.add(t)
 		else:
 			global_.add(t)
@@ -1392,8 +1564,9 @@ def _run_fetch_providers_round(
 	remaining: list,
 	sym_map: dict,
 	providers: list,
-) -> None:
-	"""Mutates `remaining`: batch fetch per provider, then per-symbol stragglers."""
+) -> set[str]:
+	"""Mutates `remaining`; returns tickers upserted this round."""
+	updated: set[str] = set()
 	for provider in providers:
 		if not remaining:
 			break
@@ -1413,6 +1586,7 @@ def _run_fetch_providers_round(
 			if tu not in remaining:
 				continue
 			_upsert_cache(tu, market, data, _usd, provider["provider_name"])
+			updated.add(tu)
 			remaining.remove(tu)
 
 	if remaining:
@@ -1435,7 +1609,9 @@ def _run_fetch_providers_round(
 					tu = (tk or "").upper()
 					if tu in remaining:
 						_upsert_cache(tu, market, data, _usd, provider["provider_name"])
+						updated.add(tu)
 						remaining.remove(tu)
+	return updated
 
 
 def _fetch_market_for_refresh(
@@ -1448,7 +1624,7 @@ def _fetch_market_for_refresh(
 
 	providers: optional fixed list (Desk refresh using one Growe Price API row).
 
-	Returns how many tickers gained a complete quote (price + change %) vs before this run.
+	Returns how many tickers received a fresh price upsert this run.
 	"""
 	if not tickers:
 		return 0
@@ -1464,45 +1640,38 @@ def _fetch_market_for_refresh(
 		)
 		return 0
 
-	before_complete = sum(1 for t in original if not _ticker_cache_incomplete(t))
-
 	remaining = list(original)
-	_run_fetch_providers_round(market, remaining, sym_map, providers)
+	updated = _run_fetch_providers_round(market, remaining, sym_map, providers)
 
 	still_incomplete = [t for t in original if _ticker_cache_incomplete(t)]
 	if still_incomplete:
 		remaining = list(still_incomplete)
-		_run_fetch_providers_round(market, remaining, sym_map, providers)
+		updated |= _run_fetch_providers_round(market, remaining, sym_map, providers)
 
-	after_complete = sum(1 for t in original if not _ticker_cache_incomplete(t))
-	return max(0, after_complete - before_complete)
+	return len(updated)
 
 
 @frappe.whitelist()
-def refresh_stock_prices():
+def refresh_stock_prices(sync: int = 0):
 	"""
-	Fetch live prices for every active Growe Stock ticker **and** any ticker held in
-		Growe Holding that is not in the stock master, so the cache is populated even
-		if you only have portfolio positions. Uses `api_symbol` for Alpha Vantage.
+	Enqueue a background job to fetch live prices for every active Growe Stock ticker
+	and any held ticker not in the stock master.
+
+	Pass sync=1 to run inline (tests / debugging only).
 	"""
-	nse_tickers, global_tickers, nse_map, gmap = _collect_tickers_for_live_prices()
-	nse_tickers = _sort_tickers_holdings_first(nse_tickers)
-	global_tickers = _sort_tickers_holdings_first(global_tickers)
+	if int(sync or 0):
+		return _execute_refresh_stock_prices()
 
-	nse_updated = _fetch_market_for_refresh("NSE", nse_tickers, nse_map)
-	global_updated = _fetch_market_for_refresh("Global", global_tickers, gmap)
-	# Recompute holding values for any price we have for these tickers
-	for t in set(nse_tickers) | set(global_tickers):
-		cache = frappe.db.get_value("Growe Price Cache", t, "price_kes")
-		if cache:
-			_update_holdings_for_ticker(t, float(cache))
-
-	frappe.db.commit()
-
+	_enqueue_price_refresh(
+		"growie_app.api.price._run_refresh_stock_prices",
+		"growie_refresh_stock_prices",
+		notify_user=frappe.session.user,
+	)
 	return {
-		"nse_updated": nse_updated,
-		"global_updated": global_updated,
-		"total": nse_updated + global_updated,
+		"queued": True,
+		"message": _(
+			"Price refresh started in the background. Updated prices will appear shortly."
+		),
 	}
 
 

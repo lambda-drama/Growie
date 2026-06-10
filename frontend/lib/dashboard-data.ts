@@ -1,6 +1,6 @@
 import type { Holding, AssetClass } from '@/types'
 import type { PortfolioSummary } from '@/services/portfolio'
-import { bucketLabelForHolding } from '@/lib/stack-grouping'
+import { assetCategoryLabelForHolding, bucketLabelForHolding } from '@/lib/stack-grouping'
 import type { StackHolding } from '@/services/stack'
 import {
   buildTimelineBuckets,
@@ -19,6 +19,28 @@ export const ASSET_CLASS_ORDER: AssetClass[] = [
 
 export interface AssetClassGroup {
   assetClass: AssetClass
+  name: string
+  totalValueKES: number
+  totalCostKES: number
+  gainPercent: number
+  holdings: Holding[]
+  tickersPreview: string
+}
+
+/** Preferred display order for Growe Asset Category summaries. */
+export const ASSET_CATEGORY_ORDER = [
+  'Stock',
+  'ETF',
+  'Money Market Fund',
+  'Bonds',
+  'REITS',
+  'Indices',
+  'Private Company/Other',
+  'Other',
+] as const
+
+export interface AssetCategoryGroup {
+  category: string
   name: string
   totalValueKES: number
   totalCostKES: number
@@ -79,6 +101,48 @@ export function groupByAssetClass(holdings: Holding[]): AssetClassGroup[] {
       tickersPreview,
     }
   }).filter((g) => g.holdings.length > 0)
+}
+
+function tickersPreviewFromHoldings(list: Holding[]): string {
+  const tickers = [...new Set(list.map((h) => h.ticker || h.name).filter(Boolean))]
+  if (tickers.length === 0) return '—'
+  if (tickers.length <= 3) return tickers.join(' · ')
+  return `${tickers.slice(0, 3).join(' · ')} · +${tickers.length - 3}`
+}
+
+export function groupByAssetCategory(holdings: Holding[]): AssetCategoryGroup[] {
+  const map = new Map<string, Holding[]>()
+  for (const h of holdings) {
+    const category = assetCategoryLabelForHolding(h as StackHolding)
+    const list = map.get(category) ?? []
+    list.push(h)
+    map.set(category, list)
+  }
+
+  const ordered = [...map.entries()].sort(([a], [b]) => {
+    const ai = ASSET_CATEGORY_ORDER.indexOf(a as (typeof ASSET_CATEGORY_ORDER)[number])
+    const bi = ASSET_CATEGORY_ORDER.indexOf(b as (typeof ASSET_CATEGORY_ORDER)[number])
+    const ar = ai >= 0 ? ai : ASSET_CATEGORY_ORDER.length
+    const br = bi >= 0 ? bi : ASSET_CATEGORY_ORDER.length
+    if (ar !== br) return ar - br
+    return a.localeCompare(b)
+  })
+
+  return ordered.map(([category, list]) => {
+    const totalValueKES = list.reduce((s, h) => s + (h.valueInKES ?? h.valueKES), 0)
+    const totalCostKES = list.reduce((s, h) => s + (h.costAtAvgKES ?? h.costBasisKES), 0)
+    const gainPercent =
+      totalCostKES > 0 ? ((totalValueKES - totalCostKES) / totalCostKES) * 100 : 0
+    return {
+      category,
+      name: category,
+      totalValueKES,
+      totalCostKES,
+      gainPercent,
+      holdings: list,
+      tickersPreview: tickersPreviewFromHoldings(list),
+    }
+  })
 }
 
 /**

@@ -20,6 +20,10 @@ import {
   formatHoldingPositionValue,
   formatPercentage,
 } from '@/lib/format'
+import {
+  STACK_DRILLDOWN_TABLE_COLUMNS,
+  StackDrilldownMetricsCells,
+} from '@/components/stack/stack-drilldown-metrics'
 import { StackBucketIcon } from '@/components/stack/stack-bucket-icon'
 import {
   bucketIconKind,
@@ -27,11 +31,12 @@ import {
   filterHoldingsByCountry,
   groupingBackLabel,
   groupingBucketColumnLabel,
+  metricsFromCountrySummary,
   regionGroupingUsesCountryTier,
   summarizeHoldingsByCountry,
   type StackGroupingMode,
 } from '@/lib/stack-grouping'
-import { groupHoldingsByTicker, type StackTickerGroup } from '@/lib/stack-ticker-groups'
+import { groupHoldingsByTicker, metricsFromTickerGroup, type StackTickerGroup } from '@/lib/stack-ticker-groups'
 import type { StackHolding } from '@/services/stack'
 import { STACK_BUY_BUTTON_CLASS, STACK_SELL_BUTTON_CLASS } from '@/lib/stack-ui'
 import { cn } from '@/lib/utils'
@@ -86,12 +91,7 @@ function HoldingTableRow({
         onClick={() => onOpenHolding(holding)}
       >
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium">{holding.marketTag || '—'}</span>
-          {holding.ticker ? (
-            <Badge variant="secondary" className="text-[10px] font-normal">
-              {holding.ticker}
-            </Badge>
-          ) : null}
+          <span className="font-medium">{holding.broker || holding.ticker || holding.name || '—'}</span>
         </div>
         {lotMode ? (
           <p className="text-xs text-muted-foreground">Lot · {formatDate(holding.dateAdded)}</p>
@@ -117,7 +117,7 @@ function HoldingTableRow({
         className="cursor-pointer text-right tabular-nums hover:bg-muted/40"
         onClick={() => onOpenHolding(holding)}
       >
-        {formatHoldingMoney(holding.currentPrice, ccy, displayCurrency as 'USD', {
+        {formatHoldingMoney(initialInvestmentNative, ccy, displayCurrency as 'USD', {
           kesToDisplayMultiplier,
           kesPerUsd,
           compact: true,
@@ -127,7 +127,7 @@ function HoldingTableRow({
         className="cursor-pointer text-right tabular-nums hover:bg-muted/40"
         onClick={() => onOpenHolding(holding)}
       >
-        {formatHoldingMoney(initialInvestmentNative, ccy, displayCurrency as 'USD', {
+        {formatHoldingMoney(holding.currentPrice, ccy, displayCurrency as 'USD', {
           kesToDisplayMultiplier,
           kesPerUsd,
           compact: true,
@@ -180,6 +180,20 @@ function HoldingTableRow({
   )
 }
 
+function DrilldownMetricsHeaderRow({ nameLabel }: { nameLabel: string }) {
+  return (
+    <TableRow>
+      <TableHead>{nameLabel}</TableHead>
+      {STACK_DRILLDOWN_TABLE_COLUMNS.map((label) => (
+        <TableHead key={label} className="text-right">
+          {label}
+        </TableHead>
+      ))}
+      <TableHead className="w-[32px]" />
+    </TableRow>
+  )
+}
+
 function GroupSummaryRow({
   group,
   displayCurrency,
@@ -193,52 +207,24 @@ function GroupSummaryRow({
   kesPerUsd: number
   onSelect?: () => void
 }) {
-  const ccy = (group.currency || 'USD') as 'USD'
-  const avgBuy = formatHoldingMoney(group.weightedAvgBuyNative, ccy, displayCurrency as 'USD', {
-    kesToDisplayMultiplier,
-    kesPerUsd,
-    compact: true,
-  })
-  const current = formatHoldingMoney(group.weightedCurrentNative, ccy, displayCurrency as 'USD', {
-    kesToDisplayMultiplier,
-    kesPerUsd,
-    compact: true,
-  })
-  const value = formatCurrency(group.totalValueInKES, displayCurrency as 'USD', {
-    kesToDisplayMultiplier,
-    compact: true,
-  })
-
   return (
     <TableRow className={cn(onSelect && 'cursor-pointer hover:bg-muted/40')} onClick={onSelect}>
-      <TableCell className="w-[320px]">
-        <div className="flex items-center gap-2">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">{group.ticker}</span>
-              {group.marketTag ? (
-                <Badge variant="secondary" className="text-[10px] font-normal">
-                  {group.marketTag}
-                </Badge>
-              ) : null}
-              <Badge variant="outline" className="text-[10px] font-normal">
-                {group.lotCount} lot{group.lotCount === 1 ? '' : 's'}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground truncate max-w-[180px]">{group.displayName}</p>
+      <StackDrilldownMetricsCells
+        metrics={metricsFromTickerGroup(group)}
+        displayCurrency={displayCurrency}
+        kesToDisplayMultiplier={kesToDisplayMultiplier}
+        kesPerUsd={kesPerUsd}
+        currency={group.currency}
+        name={
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold">{group.ticker}</span>
+            <Badge variant="outline" className="text-[10px] font-normal">
+              {group.lotCount} lot{group.lotCount === 1 ? '' : 's'}
+            </Badge>
           </div>
-        </div>
-      </TableCell>
-      <TableCell className="text-right tabular-nums font-medium">
-        {avgBuy}
-      </TableCell>
-      <TableCell className="text-right tabular-nums hidden sm:table-cell">
-        {current}
-      </TableCell>
-      <TableCell className="text-right tabular-nums font-semibold">{value}</TableCell>
-      <TableCell className="text-right text-xs text-muted-foreground">
-        {group.totalQuantity.toLocaleString()} shares
-      </TableCell>
+        }
+        nameSubtitle={group.displayName}
+      />
       <TableCell className="text-right">
         {onSelect ? <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" /> : null}
       </TableCell>
@@ -327,11 +313,6 @@ export function StackClassHoldingsTable({
               <TableHead colSpan={8}>
                 <div className="flex flex-wrap items-center gap-2 py-1">
                   <span className="font-semibold">{selectedGroup.ticker}</span>
-                  {selectedGroup.marketTag ? (
-                    <Badge variant="secondary" className="text-[10px] font-normal">
-                      {selectedGroup.marketTag}
-                    </Badge>
-                  ) : null}
                   <span className="text-xs font-normal text-muted-foreground">
                     {selectedGroup.displayName}
                   </span>
@@ -342,8 +323,8 @@ export function StackClassHoldingsTable({
               <TableHead>Broker</TableHead>
               <TableHead className="text-right">Shares</TableHead>
               <TableHead className="text-right">Avg buy</TableHead>
-              <TableHead className="text-right">Current price</TableHead>
               <TableHead className="text-right">Initial inv.</TableHead>
+              <TableHead className="text-right">Current price</TableHead>
               <TableHead className="text-right">Current val.</TableHead>
               <TableHead className="text-right">Delta %</TableHead>
               <TableHead className="text-right">Action</TableHead>
@@ -439,20 +420,13 @@ export function StackClassHoldingsTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead colSpan={5}>
+              <TableHead colSpan={STACK_DRILLDOWN_TABLE_COLUMNS.length + 2}>
                 <div className="flex items-center gap-2 py-1">
                   <span className="font-semibold">{selectedBucketKey}</span>
                 </div>
               </TableHead>
             </TableRow>
-            <TableRow>
-              <TableHead>Country</TableHead>
-              <TableHead className="text-right">Tickers</TableHead>
-              <TableHead className="text-right">Lots</TableHead>
-              <TableHead className="text-right">Value</TableHead>
-              <TableHead className="text-right">Delta %</TableHead>
-              <TableHead className="w-[32px]" />
-            </TableRow>
+            <DrilldownMetricsHeaderRow nameLabel="Country" />
           </TableHeader>
           <TableBody>
             {countrySummaries.map((c) => (
@@ -461,28 +435,23 @@ export function StackClassHoldingsTable({
                 className="cursor-pointer hover:bg-muted/40"
                 onClick={() => onSelectCountry?.(c.country)}
               >
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <StackBucketIcon label={c.country} kind="region" className="h-9 w-9 sm:h-10 sm:w-10" />
-                    <span className="font-semibold">{c.country}</span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right tabular-nums">{c.tickerCount}</TableCell>
-                <TableCell className="text-right tabular-nums">{c.lotCount}</TableCell>
-                <TableCell className="text-right tabular-nums font-semibold">
-                  {formatCurrency(c.totalValue, displayCurrency as 'USD', {
-                    kesToDisplayMultiplier,
-                    compact: true,
-                  })}
-                </TableCell>
-                <TableCell
-                  className={cn(
-                    'text-right tabular-nums',
-                    c.gainPercent >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                  )}
-                >
-                  {formatPercentage(c.gainPercent)}
-                </TableCell>
+                <StackDrilldownMetricsCells
+                  metrics={metricsFromCountrySummary(c)}
+                  displayCurrency={displayCurrency}
+                  kesToDisplayMultiplier={kesToDisplayMultiplier}
+                  kesPerUsd={kesPerUsd}
+                  name={
+                    <div className="flex items-center gap-3">
+                      <StackBucketIcon
+                        label={c.country}
+                        kind="region"
+                        className="h-9 w-9 sm:h-10 sm:w-10"
+                      />
+                      <span className="font-semibold">{c.country}</span>
+                    </div>
+                  }
+                  nameSubtitle={`${c.tickerCount} ticker${c.tickerCount === 1 ? '' : 's'} · ${c.lotCount} lot${c.lotCount === 1 ? '' : 's'}`}
+                />
                 <TableCell className="text-right">
                   <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
                 </TableCell>
@@ -511,7 +480,7 @@ export function StackClassHoldingsTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead colSpan={6}>
+              <TableHead colSpan={STACK_DRILLDOWN_TABLE_COLUMNS.length + 2}>
                 <div className="flex items-center gap-2 py-1">
                   <span className="font-semibold">
                     {usesCountryTier && selectedCountryKey
@@ -521,14 +490,7 @@ export function StackClassHoldingsTable({
                 </div>
               </TableHead>
             </TableRow>
-            <TableRow>
-              <TableHead>Broker</TableHead>
-              <TableHead className="text-right">Avg buy</TableHead>
-              <TableHead className="text-right hidden sm:table-cell">Current</TableHead>
-              <TableHead className="text-right">Value</TableHead>
-              <TableHead className="text-right">Lots</TableHead>
-              <TableHead className="w-[32px]" />
-            </TableRow>
+            <DrilldownMetricsHeaderRow nameLabel="Ticker" />
           </TableHeader>
           <TableBody>
             {(usesCountryTier && selectedCountryKey ? groups : selectedBucketGroups).map((group) => (
@@ -551,16 +513,7 @@ export function StackClassHoldingsTable({
     <div className="hidden overflow-hidden rounded-xl border md:block">
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead>Broker</TableHead>
-            <TableHead className="text-right">Shares</TableHead>
-            <TableHead className="text-right">Avg buy</TableHead>
-            <TableHead className="text-right">Current price</TableHead>
-            <TableHead className="text-right">Initial inv.</TableHead>
-            <TableHead className="text-right">Current val.</TableHead>
-            <TableHead className="text-right">Delta %</TableHead>
-            <TableHead className="text-right">Action</TableHead>
-          </TableRow>
+          <DrilldownMetricsHeaderRow nameLabel="Ticker" />
         </TableHeader>
         <TableBody>
           {groups.map((group) => (

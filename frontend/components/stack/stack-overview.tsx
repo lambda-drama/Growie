@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChevronRight, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -49,10 +49,19 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
   const [activeHolding, setActiveHolding] = useState<StackHolding | null>(null)
   const [detailHolding, setDetailHolding] = useState<StackHolding | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
-  const { stackGroupingMode, setStackGroupingMode } = useAppStore()
+  const { stackGroupingMode, setStackGroupingMode, stackDrilldown, setStackDrilldown } = useAppStore()
   const [selectedOverviewBucket, setSelectedOverviewBucket] = useState<string | null>(null)
   const [selectedOverviewCountry, setSelectedOverviewCountry] = useState<string | null>(null)
   const [selectedOverviewGroupKey, setSelectedOverviewGroupKey] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!stackDrilldown) return
+    setStackGroupingMode(stackDrilldown.groupingMode)
+    setSelectedOverviewBucket(stackDrilldown.bucket)
+    setSelectedOverviewCountry(null)
+    setSelectedOverviewGroupKey(null)
+    setStackDrilldown(null)
+  }, [stackDrilldown, setStackDrilldown, setStackGroupingMode])
 
   const openTrade = (mode: TradeMode, holding?: StackHolding) => {
     setTradeMode(mode)

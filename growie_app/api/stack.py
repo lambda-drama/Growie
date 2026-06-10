@@ -27,6 +27,7 @@ from growie_app.api.portfolio import (
 from growie_app.investment_app.holding_ledger import create_holding_transaction
 from growie_app.api.price import (
 	_api_symbol_maps_for_tickers,
+	_enqueue_price_refresh,
 	_fetch_market_for_refresh,
 	_update_holdings_for_ticker,
 )
@@ -262,7 +263,7 @@ def _revalue_holding(doc, on_date: str = None):
 
 
 @frappe.whitelist()
-def refresh_stack_prices(asset_class: str = None, holding_name: str = None):
+def refresh_stack_prices(asset_class: str = None, holding_name: str = None, sync: int = 0):
 	"""
 	Fetch live prices for the current member's stack holdings (not the full stock master).
 
@@ -271,12 +272,42 @@ def refresh_stack_prices(asset_class: str = None, holding_name: str = None):
 	Upserts Growe Price Cache and recomputes Growe Holding.value_kes for those tickers.
 
 	asset_class: optional frontend slug (nse-stocks, global-stocks, …).
-	holding_name: optional single holding — refresh only that position's ticker.
+	holding_name: optional single holding — refresh only that position's ticker (runs inline).
 	"""
 	member = _member_name()
 	if holding_name:
 		_assert_holding_owner(holding_name, member)
+		return _execute_refresh_stack_prices(
+			member, asset_class=asset_class, holding_name=holding_name
+		)
 
+	if int(sync or 0):
+		return _execute_refresh_stack_prices(
+			member, asset_class=asset_class, holding_name=holding_name
+		)
+
+	job_key = f"{member}:{asset_class or 'all'}"
+	_enqueue_price_refresh(
+		"growie_app.api.stack._run_refresh_stack_prices",
+		f"growie_refresh_stack_prices:{job_key}",
+		member=member,
+		asset_class=asset_class,
+		holding_name=holding_name,
+		notify_user=frappe.session.user,
+	)
+	return {
+		"queued": True,
+		"message": _(
+			"Price refresh started in the background. Updated prices will appear shortly."
+		),
+	}
+
+
+def _execute_refresh_stack_prices(
+	member: str,
+	asset_class: str = None,
+	holding_name: str = None,
+) -> dict:
 	nse_tickers, global_tickers = _member_holding_tickers_by_market(
 		member, asset_class=asset_class, holding_name=holding_name
 	)
@@ -301,6 +332,39 @@ def refresh_stack_prices(asset_class: str = None, holding_name: str = None):
 		"nse_tickers": nse_tickers,
 		"global_tickers": global_tickers,
 	}
+
+
+def _run_refresh_stack_prices(
+	member: str,
+	asset_class: str = None,
+	holding_name: str = None,
+	notify_user: str = None,
+) -> dict:
+	if notify_user:
+		frappe.set_user(notify_user)
+	try:
+		result = _execute_refresh_stack_prices(
+			member, asset_class=asset_class, holding_name=holding_name
+		)
+		frappe.logger("growie.price").info(
+			"Stack price refresh complete (member=%s): NSE=%s Global=%s",
+			member,
+			result.get("nse_updated"),
+			result.get("global_updated"),
+		)
+		if notify_user:
+			frappe.publish_realtime(
+				"growie_price_refresh_done",
+				result,
+				user=notify_user,
+			)
+		return result
+	except Exception:
+		frappe.log_error(
+			title=f"Stack price refresh job failed ({member})",
+			message=frappe.get_traceback(),
+		)
+		raise
 
 
 @frappe.whitelist()

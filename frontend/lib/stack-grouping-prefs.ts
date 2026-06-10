@@ -23,8 +23,12 @@ export function readStoredStackGroupingMode(): StackGroupingMode {
   try {
     if (typeof window === 'undefined') return DEFAULT_STACK_GROUPING_MODE
     const value = window.localStorage.getItem(STORAGE_KEY)
-    // Legacy default was ticker (asset-class list); new default is exchange.
-    if (value === 'ticker' || (value && LEGACY_MODES.has(value))) {
+    // Legacy defaults (ticker / etf / exchange) → current default asset category.
+    if (
+      value === 'ticker' ||
+      value === 'exchange' ||
+      (value && LEGACY_MODES.has(value))
+    ) {
       return DEFAULT_STACK_GROUPING_MODE
     }
     if (VALID_MODES.includes(value as StackGroupingMode)) return value as StackGroupingMode

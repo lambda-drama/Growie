@@ -56,17 +56,28 @@ _LEGACY_TO_ASSET_CATEGORY = {
 }
 
 
+def _normalize_asset_category_display(label: str) -> str:
+	"""Map stored holding.asset_class / stock instrument_type to a Growe Asset Category name."""
+	param = (label or "").strip()
+	if not param:
+		return ""
+	if frappe.db.exists("Growe Asset Category", param):
+		return param
+	if param in _LEGACY_TO_ASSET_CATEGORY:
+		return _LEGACY_TO_ASSET_CATEGORY[param]
+	if param in _SLUG_TO_ASSET_CATEGORY:
+		return _SLUG_TO_ASSET_CATEGORY[param]
+	return param
+
+
 def _resolve_asset_category_label(asset_class_param: str) -> str:
 	"""Normalize API input to a Growe Asset Category name."""
 	param = (asset_class_param or "").strip()
 	if not param:
 		frappe.throw(_("Asset category is required."))
-	if frappe.db.exists("Growe Asset Category", param):
-		return param
-	if param in _SLUG_TO_ASSET_CATEGORY:
-		return _SLUG_TO_ASSET_CATEGORY[param]
-	if param in _LEGACY_TO_ASSET_CATEGORY:
-		return _LEGACY_TO_ASSET_CATEGORY[param]
+	normalized = _normalize_asset_category_display(param)
+	if normalized and frappe.db.exists("Growe Asset Category", normalized):
+		return normalized
 	frappe.throw(_("Unknown asset category: {0}").format(param))
 
 
@@ -341,7 +352,10 @@ def _holding_to_dict(h) -> dict:
 		"name": display_name,
 		"stockName": stock_name,           # the Link value (Growe Stock name)
 		"assetClass": _holding_asset_class_slug(h.get("asset_class"), stock),
-		"holdingAssetCategory": (h.get("asset_class") or "").strip(),
+		"holdingAssetCategory": _normalize_asset_category_display(
+			(h.get("asset_class") or "").strip()
+			or ((stock.get("instrument_type") if stock else "") or "")
+		),
 		"valueKES": float(h.get("value_kes") or 0),
 		"value": float(h.get("value_kes") or 0),  # forward-compatible alias
 		"costBasisKES": float(h.get("cost_basis_kes") or 0),
@@ -354,8 +368,10 @@ def _holding_to_dict(h) -> dict:
 		"exchangePlatform": (stock.get("exchange_platform") if stock else "") or "",
 		"sector": (stock.get("sector") if stock else "") or "",
 		"industry": (stock.get("industry") if stock else "") or "",
-		"assetCategory": (h.get("asset_class") or "").strip()
-		or ((stock.get("instrument_type") if stock else "") or ""),
+		"assetCategory": _normalize_asset_category_display(
+			(h.get("asset_class") or "").strip()
+			or ((stock.get("instrument_type") if stock else "") or "")
+		),
 		"instrumentType": _instrument_type_slug(stock),
 		"broker": (h.get("broker") or "").strip(),
 		"dateAdded": str(h.get("date_added") or today()),

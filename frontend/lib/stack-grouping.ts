@@ -1,5 +1,8 @@
+import { normalizeAssetCategoryLabel } from '@/lib/asset-categories'
 import { isEtfHolding } from '@/lib/stack-holding-classify'
 import type { StackBucketKind } from '@/lib/stack-bucket-icons'
+import type { HoldingsSummaryMetrics } from '@/lib/stack-holdings-summary'
+import { summarizeHoldingsMetrics } from '@/lib/stack-holdings-summary'
 import { groupHoldingsByTicker } from '@/lib/stack-ticker-groups'
 import type { StackTickerGroup } from '@/lib/stack-ticker-groups'
 import type { StackHolding } from '@/services/stack'
@@ -20,15 +23,15 @@ export const GROUP_BY_OPTIONS: {
   label: string
   hidden?: boolean
 }[] = [
+  { mode: 'assetCategory', label: 'Asset Category' },
   { mode: 'exchange', label: 'Exchange' },
   { mode: 'region', label: 'Region' },
   { mode: 'sector', label: 'Sector' },
   { mode: 'industry', label: 'Industry' },
-  { mode: 'assetCategory', label: 'Asset category' },
   { mode: 'ticker', label: 'All', hidden: true },
 ]
 
-export const DEFAULT_STACK_GROUPING_MODE: StackGroupingMode = 'exchange'
+export const DEFAULT_STACK_GROUPING_MODE: StackGroupingMode = 'assetCategory'
 
 export function isAssetClassOverviewMode(mode: StackGroupingMode): boolean {
   return mode === 'ticker'
@@ -80,12 +83,12 @@ function industryLabel(h: StackHolding): string {
   return industry || 'Unclassified'
 }
 
-/** Growe Stock instrument_type (Asset Categories) with fallbacks from holding asset class. */
-function assetCategoryLabel(h: StackHolding): string {
-  const explicit = (h.assetCategory || '').trim()
+/** Growe Asset Category label with fallbacks from holding / legacy asset class. */
+export function assetCategoryLabelForHolding(h: StackHolding): string {
+  const explicit = normalizeAssetCategoryLabel(h.holdingAssetCategory || h.assetCategory || '')
   if (explicit) return explicit
   if (h.assetClass === 'mmf') return 'Money Market Fund'
-  if (h.assetClass === 'real-estate') return 'Real Estate'
+  if (h.assetClass === 'real-estate') return 'Private Company/Other'
   if (h.assetClass === 'etf') return 'ETF'
   if (h.assetClass === 'nse-stocks' || h.assetClass === 'global-stocks') return 'Stock'
   return 'Other'
@@ -96,7 +99,7 @@ export function bucketLabelForHolding(h: StackHolding, mode: StackGroupingMode):
   if (mode === 'exchange') return inferExchangeFromHolding(h)
   if (mode === 'sector') return sectorLabel(h)
   if (mode === 'industry') return industryLabel(h)
-  if (mode === 'assetCategory') return assetCategoryLabel(h)
+  if (mode === 'assetCategory') return assetCategoryLabelForHolding(h)
   return ''
 }
 
@@ -121,7 +124,7 @@ export function groupingBucketColumnLabel(mode: StackGroupingMode): string {
   if (mode === 'exchange') return 'Exchange'
   if (mode === 'sector') return 'Sector'
   if (mode === 'industry') return 'Industry'
-  if (mode === 'assetCategory') return 'Asset category'
+  if (mode === 'assetCategory') return 'Asset Category'
   return ''
 }
 
@@ -153,8 +156,17 @@ export interface StackCountrySummary {
   country: string
   tickerCount: number
   lotCount: number
-  totalValue: number
+  totalQuantity: number
+  totalValueInKES: number
+  totalCostInKES: number
+  totalInitialInvestmentNative: number
+  deltaKES: number
   gainPercent: number
+  weightedAvgBuyNative: number
+  weightedCurrentNative: number
+  currency: string
+  /** @deprecated use totalValueInKES */
+  totalValue: number
 }
 
 export function summarizeHoldingsByCountry(holdings: StackHolding[]): StackCountrySummary[] {
@@ -169,14 +181,21 @@ export function summarizeHoldingsByCountry(holdings: StackHolding[]): StackCount
   return [...map.entries()]
     .map(([country, lots]) => {
       const tickerGroups = groupHoldingsByTicker(lots)
-      const totalValue = lots.reduce((s, h) => s + (h.valueInKES ?? h.valueKES ?? 0), 0)
-      const totalCost = lots.reduce((s, h) => s + (h.costAtAvgKES ?? h.costBasisKES ?? 0), 0)
+      const summary = summarizeHoldingsMetrics(lots)
       return {
         country,
         tickerCount: tickerGroups.length,
         lotCount: lots.length,
-        totalValue,
-        gainPercent: totalCost > 0 ? ((totalValue - totalCost) / totalCost) * 100 : 0,
+        totalQuantity: summary.totalQuantity,
+        totalValueInKES: summary.totalValueInKES,
+        totalCostInKES: summary.totalCostInKES,
+        totalInitialInvestmentNative: summary.totalInitialInvestmentNative,
+        deltaKES: summary.deltaKES,
+        gainPercent: summary.gainPercent,
+        weightedAvgBuyNative: summary.weightedAvgBuyNative,
+        weightedCurrentNative: summary.weightedCurrentNative,
+        currency: summary.currency,
+        totalValue: summary.totalValueInKES,
       }
     })
     .sort((a, b) => a.country.localeCompare(b.country))
@@ -184,6 +203,20 @@ export function summarizeHoldingsByCountry(holdings: StackHolding[]): StackCount
 
 export function filterHoldingsByCountry(holdings: StackHolding[], country: string): StackHolding[] {
   return holdings.filter((h) => countryLabelForHolding(h) === country)
+}
+
+export function metricsFromCountrySummary(c: StackCountrySummary): HoldingsSummaryMetrics {
+  return {
+    totalQuantity: c.totalQuantity,
+    totalValueInKES: c.totalValueInKES,
+    totalCostInKES: c.totalCostInKES,
+    totalInitialInvestmentNative: c.totalInitialInvestmentNative,
+    deltaKES: c.deltaKES,
+    gainPercent: c.gainPercent,
+    weightedAvgBuyNative: c.weightedAvgBuyNative,
+    weightedCurrentNative: c.weightedCurrentNative,
+    currency: c.currency,
+  }
 }
 
 /** Exchange/region = non-ETF holdings. Sector/industry/asset category = all holdings. */

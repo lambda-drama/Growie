@@ -10,8 +10,9 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import { useAppStore, useDisplayMoney } from '@/lib/store'
-import { formatCurrency, formatHoldingMoney, formatHoldingPositionValue, formatPercentage, getAssetClassColorHex } from '@/lib/format'
-import { groupByAssetClass, type AssetClassGroup } from '@/lib/dashboard-data'
+import { formatCurrency, formatHoldingPositionValue, formatPercentage } from '@/lib/format'
+import { groupByAssetCategory, type AssetCategoryGroup } from '@/lib/dashboard-data'
+import { getBucketIconColorHex } from '@/lib/stack-bucket-icons'
 import type { Holding } from '@/types'
 import { cn } from '@/lib/utils'
 
@@ -19,28 +20,29 @@ interface MyStackPanelProps {
   holdings: Holding[]
 }
 
-function AssetClassRow({
+function CategoryRow({
   group,
-  onOpenClass,
+  onOpenCategory,
 }: {
-  group: AssetClassGroup
-  onOpenClass: (assetClass: AssetClassGroup['assetClass']) => void
+  group: AssetCategoryGroup
+  onOpenCategory: (category: string) => void
 }) {
   const [open, setOpen] = useState(false)
   const { currency, kesToDisplayMultiplier, kesPerUsd } = useDisplayMoney()
   const positive = group.gainPercent >= 0
+  const color = getBucketIconColorHex(group.category, 'security')
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger asChild>
         <button
           type="button"
-          onClick={() => onOpenClass(group.assetClass)}
+          onClick={() => onOpenCategory(group.category)}
           className="flex w-full items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-left transition-colors hover:bg-muted/50"
         >
           <span
             className="h-2.5 w-2.5 shrink-0 rounded-full"
-            style={{ backgroundColor: getAssetClassColorHex(group.assetClass) }}
+            style={{ backgroundColor: color }}
           />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-foreground">{group.name}</p>
@@ -67,10 +69,9 @@ function AssetClassRow({
       <CollapsibleContent>
         <ul className="mt-1 space-y-1 border-l-2 border-border ml-4 pl-3 py-1">
           {group.holdings.map((h) => {
-            const hGain =
-              h.costBasisKES > 0
-                ? ((h.valueKES - h.costBasisKES) / h.costBasisKES) * 100
-                : 0
+            const cost = h.costAtAvgKES ?? h.costBasisKES ?? 0
+            const value = h.valueInKES ?? h.valueKES ?? 0
+            const hGain = cost > 0 ? ((value - cost) / cost) * 100 : 0
             const hPos = hGain >= 0
             return (
               <li
@@ -112,8 +113,15 @@ function AssetClassRow({
 }
 
 export function MyStackPanel({ holdings }: MyStackPanelProps) {
-  const { setActiveTab, setStackNav } = useAppStore()
-  const groups = groupByAssetClass(holdings)
+  const { setActiveTab, setStackNav, setStackGroupingMode, setStackDrilldown } = useAppStore()
+  const groups = groupByAssetCategory(holdings)
+
+  const openCategoryInStack = (category: string) => {
+    setStackGroupingMode('assetCategory')
+    setStackDrilldown({ groupingMode: 'assetCategory', bucket: category })
+    setStackNav({ screen: 'overview' })
+    setActiveTab('stack')
+  }
 
   return (
     <Card className="h-full">
@@ -135,17 +143,14 @@ export function MyStackPanel({ holdings }: MyStackPanelProps) {
       <CardContent className="space-y-2">
         {groups.length === 0 ? (
           <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-            No holdings yet. Add positions from My Stack to see them grouped by class here.
+            No holdings yet. Add positions from My Stack to see them grouped by asset category here.
           </p>
         ) : (
           groups.map((g) => (
-            <AssetClassRow
-              key={g.assetClass}
+            <CategoryRow
+              key={g.category}
               group={g}
-              onOpenClass={(assetClass) => {
-                setStackNav({ screen: 'class', assetClass })
-                setActiveTab('stack')
-              }}
+              onOpenCategory={openCategoryInStack}
             />
           ))
         )}
