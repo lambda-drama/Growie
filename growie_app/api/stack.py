@@ -539,8 +539,30 @@ def create_stock(
 	exchange_platform: str = None,
 	instrument_type: str = None,
 ):
-	"""Create a Growe Stock (e.g. when user adds a new listing)."""
-	_member_name()
+	"""
+	Create a Growe Stock. Portal users cannot self-create listings — use bulk upload instead.
+	System Managers may create verified master records from Desk.
+	"""
+	from growie_app.utils.stock_verification import member_is_subscribed
+
+	member = _member_name()
+	is_admin = "System Manager" in frappe.get_roles(frappe.session.user)
+
+	if not is_admin:
+		if not member_is_subscribed(member):
+			frappe.throw(
+				_(
+					"This asset is not supported yet. Upgrade to Pro or Coached to request "
+					"missing assets via bulk upload."
+				)
+			)
+		frappe.throw(
+			_(
+				"This asset is not in the Growe master yet. Use bulk upload to import your "
+				"positions — we will verify new tickers and notify you when they are available."
+			)
+		)
+
 	clean = (ticker or "").strip().upper()
 	if not clean:
 		frappe.throw(_("Ticker is required."))
@@ -584,6 +606,7 @@ def create_stock(
 			"region": region_val,
 			"exchange_platform": exchange_val,
 			"is_active": 1,
+			"verified": 1,
 		}
 	)
 	doc.flags.ignore_permissions = True

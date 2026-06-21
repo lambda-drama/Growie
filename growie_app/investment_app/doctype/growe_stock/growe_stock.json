@@ -11,6 +11,8 @@
   "instrument_type",
   "region",
   "exchange_platform",
+  "verified",
+  "by_unsubscribed_member",
   "column_break_enxt",
   "sector",
   "currency",
@@ -147,12 +149,26 @@
    "fieldtype": "Link",
    "label": "Source",
    "options": "Growe Verification Note"
+  },
+  {
+   "default": "1",
+   "fieldname": "verified",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Verified"
+  },
+  {
+   "default": "0",
+   "fieldname": "by_unsubscribed_member",
+   "fieldtype": "Check",
+   "label": "By Unsubscribed Member"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-04 00:40:40.012168",
+ "modified": "2026-06-21 20:30:39.895716",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Stock",

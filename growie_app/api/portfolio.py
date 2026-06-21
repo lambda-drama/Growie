@@ -595,7 +595,7 @@ def search_stocks(query: str = "", market: str = None, instrument_type: str = No
 	Used by the frontend searchable combobox on the Add Holding dialog.
 	"""
 	category = (instrument_type or "").strip()
-	filters = {"is_active": 1}
+	filters = {"is_active": 1, "verified": 1}
 	if market:
 		filters["market"] = market
 	if category:
@@ -612,6 +612,7 @@ def search_stocks(query: str = "", market: str = None, instrument_type: str = No
 			SELECT name, ticker, company_name, market, currency, region, exchange_platform, instrument_type
 			FROM `tabGrowe Stock`
 			WHERE is_active = 1
+			  AND verified = 1
 			  AND (
 			        ticker       LIKE %(q)s
 			     OR company_name LIKE %(q)s

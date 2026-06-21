@@ -187,6 +187,13 @@ export async function updateHolding(holdingId: string, data: UpdateHoldingData):
   throw new Error(extractError(resData))
 }
 
+export interface PendingVerificationTicker {
+  stock_name: string
+  ticker: string
+  company_name: string
+  by_unsubscribed_member?: boolean
+}
+
 export interface HoldingsBulkImportResult {
   created: number
   skipped: number
@@ -194,6 +201,10 @@ export interface HoldingsBulkImportResult {
   sold_rows: number
   errors: string[]
   source?: string
+  unsupported_tickers?: string[]
+  pending_verification?: PendingVerificationTicker[]
+  pending_verification_count?: number
+  is_subscribed?: boolean
 }
 
 /** @deprecated Use HoldingsBulkImportResult */

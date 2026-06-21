@@ -345,29 +345,32 @@ def _find_header_row_and_map(rows: list[tuple], end: int) -> tuple[int | None, d
 	return None, _legacy_active_column_map()
 
 
-def _get_or_create_stock(raw_ticker: str, investment_hint: str, currency_hint: str = "") -> str:
-	clean, api_raw = _normalize_ticker(raw_ticker)
+def _insert_background_stock(
+	raw_ticker: str,
+	investment_hint: str,
+	currency_hint: str,
+	api_raw: str,
+	*,
+	by_unsubscribed_member: bool,
+) -> str | None:
+	"""Create an unverified Growe Stock row if none exists for this ticker. Returns doc name or None."""
+	clean = (raw_ticker or "").strip().upper()
 	if not clean:
-		frappe.throw(_("Missing ticker in row."))
+		return None
 
-	matches = frappe.get_all(
+	existing = frappe.get_all(
 		"Growe Stock",
 		filters={"ticker": clean},
-		fields=["name", "market"],
-		order_by="modified desc",
+		pluck="name",
+		limit=1,
 	)
-	if len(matches) == 1:
-		return matches[0].name
-	if len(matches) > 1:
-		for m in matches:
-			if (m.market or "").strip() == "NSE":
-				return m.name
-		return matches[0].name
+	if existing:
+		return existing[0]
 
 	company = (investment_hint or "").strip() or clean
 	ccy = _parse_currency_cell(currency_hint) or "USD"
 	market = "NSE" if ccy == "KES" else "Global"
-	if ccy != "KES" and ccy != "USD":
+	if ccy not in ("KES", "USD"):
 		market = "Global"
 
 	base = clean
@@ -388,11 +391,115 @@ def _get_or_create_stock(raw_ticker: str, investment_hint: str, currency_hint: s
 			"currency": ccy,
 			"api_symbol": api_raw or clean,
 			"is_active": 1,
+			"verified": 0,
+			"by_unsubscribed_member": 1 if by_unsubscribed_member else 0,
 		}
 	)
 	doc.flags.ignore_permissions = True
 	doc.insert(set_name=name)
 	return doc.name
+
+
+def _get_or_create_stock(
+	raw_ticker: str,
+	investment_hint: str,
+	currency_hint: str = "",
+	investor: str | None = None,
+) -> dict:
+	"""
+	Resolve or create Growe Stock for an import row.
+
+	Free members: holdings only for verified master tickers. Missing tickers are still
+	recorded on Growe Stock (unverified, by_unsubscribed_member) then skipped for holdings.
+	Subscribed members: may create unverified listings and holdings (System Manager ToDos).
+	Returns {name, created, ticker, company_name}.
+	"""
+	from growie_app.utils.stock_verification import (
+		UnsupportedImportTicker,
+		create_stock_verification_todos,
+		member_is_subscribed,
+		pick_best_stock_for_ticker,
+	)
+
+	clean, api_raw = _normalize_ticker(raw_ticker)
+	if not clean:
+		frappe.throw(_("Missing ticker in row."))
+
+	subscribed = member_is_subscribed(investor) if investor else False
+	existing_name = pick_best_stock_for_ticker(clean, currency_hint)
+	if existing_name:
+		is_verified = int(frappe.db.get_value("Growe Stock", existing_name, "verified") or 0)
+		if is_verified:
+			return {
+				"name": existing_name,
+				"created": False,
+				"ticker": clean,
+				"company_name": frappe.db.get_value("Growe Stock", existing_name, "company_name") or "",
+			}
+		if not subscribed:
+			raise UnsupportedImportTicker(clean)
+		return {
+			"name": existing_name,
+			"created": False,
+			"ticker": clean,
+			"company_name": frappe.db.get_value("Growe Stock", existing_name, "company_name") or "",
+		}
+
+	company = (investment_hint or "").strip() or clean
+	if not subscribed:
+		_insert_background_stock(
+			clean,
+			company,
+			currency_hint,
+			api_raw,
+			by_unsubscribed_member=True,
+		)
+		raise UnsupportedImportTicker(clean)
+
+	ccy = _parse_currency_cell(currency_hint) or "USD"
+	market = "NSE" if ccy == "KES" else "Global"
+	if ccy not in ("KES", "USD"):
+		market = "Global"
+
+	base = clean
+	name = base
+	n = 0
+	while frappe.db.exists("Growe Stock", name):
+		n += 1
+		name = f"{base}-{n}"
+
+	instrument_type = "ETF" if market == "ETF" else "Stock"
+	doc = frappe.get_doc(
+		{
+			"doctype": "Growe Stock",
+			"ticker": clean,
+			"company_name": company[:240],
+			"market": market,
+			"instrument_type": instrument_type,
+			"currency": ccy,
+			"api_symbol": api_raw or clean,
+			"is_active": 1,
+			"verified": 0,
+			"by_unsubscribed_member": 0,
+		}
+	)
+	doc.flags.ignore_permissions = True
+	doc.insert(set_name=name)
+
+	create_stock_verification_todos(
+		doc.name,
+		clean,
+		company,
+		investor,
+		from_unsubscribed=False,
+	)
+
+	return {
+		"name": doc.name,
+		"created": True,
+		"ticker": clean,
+		"company_name": company[:240],
+	}
 
 
 def _split_active_and_sold(rows: list[tuple]) -> tuple[list[tuple], list[tuple], dict[str, int], dict[str, int]]:
@@ -573,11 +680,41 @@ def _assert_can_import_for_investor(investor: str) -> None:
 
 def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: str) -> dict:
 	"""Shared import for Excel, CSV, and Google Sheets (same Scope template columns)."""
+	from growie_app.utils.stock_verification import (
+		UnsupportedImportTicker,
+		member_is_subscribed,
+		pending_verification_row,
+	)
+
 	_assert_can_import_for_investor(investor)
 
 	active_rows, sold_rows, active_col_map, sold_col_map = _split_active_and_sold(rows)
 	created = 0
+	skipped = 0
 	errors: list[str] = []
+	unsupported_tickers: list[str] = []
+	pending_map: dict[str, dict] = {}
+	is_subscribed = member_is_subscribed(investor)
+
+	def _track_pending(stock_name: str) -> None:
+		row = pending_verification_row(stock_name)
+		if row:
+			pending_map[row["stock_name"]] = row
+
+	def _handle_row_error(label: str, err: Exception) -> None:
+		nonlocal skipped
+		if isinstance(err, UnsupportedImportTicker):
+			skipped += 1
+			if err.ticker and err.ticker not in unsupported_tickers:
+				unsupported_tickers.append(err.ticker)
+			errors.append(f"{label}: {err.ticker} is not supported on your plan.")
+			return
+		errors.append(f"{label}: {err!s}")
+		frappe.log_error(
+			title="Holding import row",
+			message=f"{source_label}\n{err!s}",
+		)
+
 	for i, row in enumerate(active_rows):
 		try:
 			investment = _norm_cell(_row_val_by_map(row, active_col_map, "investment")) or _norm_cell(
@@ -587,7 +724,10 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 			use_date = _parse_date_cell(_row_val_by_map(row, active_col_map, "date"))
 			sheet_ccy = _parse_currency_cell(_row_val_by_map(row, active_col_map, "currency"))
 
-			stock_doc = _get_or_create_stock(raw_tk, investment, sheet_ccy)
+			stock_info = _get_or_create_stock(raw_tk, investment, sheet_ccy, investor=investor)
+			stock_doc = stock_info["name"]
+			if stock_info.get("created"):
+				_track_pending(stock_doc)
 			ticker_sym = frappe.db.get_value("Growe Stock", stock_doc, "ticker") or raw_tk
 			asset_class, currency = _holding_meta_from_stock(stock_doc)
 			if sheet_ccy:
@@ -607,11 +747,7 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 			)
 			created += 1
 		except Exception as e:
-			errors.append(f"Active row {i + 1}: {e!s}")
-			frappe.log_error(
-				title="Holding import active row",
-				message=f"{source_label}\n{e!s}\n{row}",
-			)
+			_handle_row_error(f"Active row {i + 1}", e)
 
 	for j, row in enumerate(sold_rows):
 		try:
@@ -626,7 +762,10 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 				s = _norm_cell(sell_raw)
 				sold_date = str(getdate(s)) if s else None
 
-			stock_doc = _get_or_create_stock(raw_tk, "", "")
+			stock_info = _get_or_create_stock(raw_tk, "", "", investor=investor)
+			stock_doc = stock_info["name"]
+			if stock_info.get("created"):
+				_track_pending(stock_doc)
 			ticker_sym = frappe.db.get_value("Growe Stock", stock_doc, "ticker") or raw_tk
 			asset_class, currency = _holding_meta_from_stock(stock_doc)
 
@@ -644,20 +783,24 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 			)
 			created += 1
 		except Exception as e:
-			errors.append(f"Sold row {j + 1}: {e!s}")
-			frappe.log_error(
-				title="Holding import sold row",
-				message=f"{source_label}\n{e!s}\n{row}",
-			)
+			_handle_row_error(f"Sold row {j + 1}", e)
 
 	frappe.db.commit()
+	pending_verification = sorted(
+		pending_map.values(),
+		key=lambda r: (r.get("ticker") or "").upper(),
+	) if is_subscribed else []
 	return {
 		"created": created,
-		"skipped": 0,
+		"skipped": skipped,
 		"active_rows": len(active_rows),
 		"sold_rows": len(sold_rows),
 		"errors": errors,
 		"source": source_label,
+		"unsupported_tickers": unsupported_tickers,
+		"pending_verification": pending_verification,
+		"pending_verification_count": len(pending_verification),
+		"is_subscribed": is_subscribed,
 	}
 
 

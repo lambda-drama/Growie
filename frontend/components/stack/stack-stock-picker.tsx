@@ -1,9 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, ChevronsUpDown, Loader2, Plus, Search } from 'lucide-react'
+import { Check, ChevronsUpDown, Info, Loader2, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   Popover,
@@ -25,22 +24,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import { categoryDefaultMarket, categoryToPickerSlug } from '@/lib/asset-categories'
-import {
-  searchStocks,
-  createStock,
-  inferAssetClass,
-  getRegions,
-  getExchangePlatforms,
-} from '@/services/stack'
+import { useAppStore } from '@/lib/store'
+import { searchStocks, inferAssetClass } from '@/services/stack'
 import type { GroweStock } from '@/services/portfolio'
 import type { AssetClass } from '@/types'
 
@@ -52,7 +38,7 @@ const CLASS_TO_MARKET: Record<string, string | undefined> = {
 
 interface StackStockPickerProps {
   assetClass: AssetClass
-  /** Growe Asset Category — filters Growe Stock search and new listings. */
+  /** Growe Asset Category — filters Growe Stock search. */
   assetCategory?: string
   value: string
   displayLabel: string
@@ -68,24 +54,18 @@ export function StackStockPicker({
   onSelect,
   disabled,
 }: StackStockPickerProps) {
+  const subscriptionTier = useAppStore((s) => s.subscriptionTier)
+  const isSubscribed = subscriptionTier === 'pro' || subscriptionTier === 'coached'
+
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [stocks, setStocks] = useState<GroweStock[]>([])
   const [loading, setLoading] = useState(false)
-  const [addOpen, setAddOpen] = useState(false)
-  const [newTicker, setNewTicker] = useState('')
-  const [newName, setNewName] = useState('')
-  const [newMarket, setNewMarket] = useState<'NSE' | 'Global' | 'ETF'>('Global')
-  const [newRegion, setNewRegion] = useState('auto')
-  const [newExchange, setNewExchange] = useState('auto')
-  const [regions, setRegions] = useState<string[]>([])
-  const [exchanges, setExchanges] = useState<string[]>([])
-  const [adding, setAdding] = useState(false)
+  const [unsupportedOpen, setUnsupportedOpen] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const instrumentType = (assetCategory || '').trim() || undefined
   const market = instrumentType ? undefined : CLASS_TO_MARKET[assetClass]
-  const pickerSlug = assetCategory ? categoryToPickerSlug(assetCategory) : assetClass
 
   const doSearch = useCallback(
     async (q: string) => {
@@ -105,25 +85,6 @@ export function StackStockPicker({
     if (open) doSearch(query)
   }, [open, instrumentType, market]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (!addOpen) return
-    const defaultMkt = assetCategory ? categoryDefaultMarket(assetCategory) : 'Global'
-    setNewMarket(defaultMkt)
-    void (async () => {
-      try {
-        const [regionList, exchangeList] = await Promise.all([
-          getRegions('', 200),
-          getExchangePlatforms('', 200),
-        ])
-        setRegions(regionList)
-        setExchanges(exchangeList)
-      } catch {
-        setRegions([])
-        setExchanges([])
-      }
-    })()
-  }, [addOpen, assetCategory])
-
   const handlePick = async (stock: GroweStock) => {
     try {
       const inferred = await inferAssetClass(stock.name)
@@ -135,38 +96,10 @@ export function StackStockPicker({
     setQuery('')
   }
 
-  const handleAddStock = async () => {
-    if (!newTicker.trim()) return
-    setAdding(true)
-    try {
-      const m =
-        pickerSlug === 'nse-stocks' ? 'NSE' : pickerSlug === 'etf' ? 'ETF' : newMarket
-      const defaultRegion = m === 'NSE' ? 'Kenya' : m === 'ETF' ? 'USA' : 'Global'
-      const created = await createStock({
-        ticker: newTicker.trim(),
-        companyName: newName.trim() || newTicker.trim(),
-        market: m,
-        region: newRegion === 'auto' ? defaultRegion : newRegion,
-        exchangePlatform: newExchange === 'auto' ? m : newExchange,
-        instrumentType: instrumentType,
-      })
-      const stock: GroweStock = {
-        name: created.name,
-        ticker: created.ticker,
-        company_name: created.company_name,
-        market: created.market,
-        currency: created.currency,
-      }
-      await handlePick(stock)
-      setAddOpen(false)
-      setNewTicker('')
-      setNewName('')
-      setNewRegion('auto')
-      setNewExchange('auto')
-    } finally {
-      setAdding(false)
-    }
-  }
+  const emptyHint =
+    query.trim().length > 0
+      ? 'No verified investments match your search.'
+      : 'Search the Growe stock master.'
 
   return (
     <div className="space-y-2">
@@ -211,7 +144,23 @@ export function StackStockPicker({
                   </div>
                 )}
                 {!loading && stocks.length === 0 && (
-                  <CommandEmpty>No investments found. Use + to add one.</CommandEmpty>
+                  <div className="space-y-2 px-3 py-4 text-center text-sm text-muted-foreground">
+                    <p>{emptyHint}</p>
+                    {query.trim().length > 0 ? (
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 text-xs"
+                        onClick={() => {
+                          setOpen(false)
+                          setUnsupportedOpen(true)
+                        }}
+                      >
+                        Ticker not listed?
+                      </Button>
+                    ) : null}
+                  </div>
                 )}
                 {!loading && stocks.length > 0 && (
                   <CommandGroup>
@@ -239,92 +188,50 @@ export function StackStockPicker({
           size="icon"
           className="shrink-0"
           disabled={disabled}
-          aria-label="Add investment"
-          onClick={() => setAddOpen(true)}
+          aria-label="Missing ticker help"
+          onClick={() => setUnsupportedOpen(true)}
         >
-          <Plus className="h-4 w-4" />
+          <Info className="h-4 w-4" />
         </Button>
       </div>
 
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+      <Dialog open={unsupportedOpen} onOpenChange={setUnsupportedOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Add investment</DialogTitle>
+            <DialogTitle>This asset is not supported yet</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3 py-2">
-            <div className="grid gap-2">
-              <Label>Ticker</Label>
-              <Input
-                value={newTicker}
-                onChange={(e) => setNewTicker(e.target.value.toUpperCase())}
-                placeholder="e.g. CYTONN-MMF"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Investment name</Label>
-              <Input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="e.g. Cytonn Money Market Fund"
-              />
-            </div>
-            {pickerSlug !== 'nse-stocks' && pickerSlug !== 'etf' && (
-              <div className="grid gap-2">
-                <Label>Market</Label>
-                <Select
-                  value={newMarket}
-                  onValueChange={(v) => setNewMarket(v as 'NSE' | 'Global' | 'ETF')}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Global">Global</SelectItem>
-                    <SelectItem value="NSE">NSE</SelectItem>
-                    <SelectItem value="ETF">ETF</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            {isSubscribed ? (
+              <>
+                <p>
+                  <strong className="text-foreground">{query.trim() || 'This ticker'}</strong> is
+                  not in the verified Growe stock master yet.
+                </p>
+                <p>
+                  Use <strong className="text-foreground">Bulk upload</strong> to import your
+                  positions from Excel or CSV. New tickers are added as unverified listings — our
+                  team reviews them, completes exchange, sector, and API mapping, then notifies you
+                  when the asset is available to search here.
+                </p>
+                <p>Your imported holdings are saved immediately; search picks up tickers once verified.</p>
+              </>
+            ) : (
+              <>
+                <p>
+                  Only verified assets from the Growe stock master can be added manually. Free
+                  accounts cannot request new listings.
+                </p>
+                <p>
+                  Upgrade to <strong className="text-foreground">Pro</strong> or{' '}
+                  <strong className="text-foreground">Coached</strong> to request missing assets via
+                  bulk upload — we verify and add them to the master for you.
+                </p>
+              </>
             )}
-            <div className="grid gap-2">
-              <Label>Region</Label>
-              <Select value={newRegion} onValueChange={setNewRegion}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="auto">Auto</SelectItem>
-                  {regions.map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {r}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label>Exchange platform</Label>
-              <Select value={newExchange} onValueChange={setNewExchange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="auto">Auto</SelectItem>
-                  {exchanges.map((e) => (
-                    <SelectItem key={e} value={e}>
-                      {e}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddStock} disabled={adding || !newTicker.trim()}>
-              {adding ? 'Adding…' : 'Add & select'}
+            <Button variant="outline" onClick={() => setUnsupportedOpen(false)}>
+              Got it
             </Button>
           </DialogFooter>
         </DialogContent>

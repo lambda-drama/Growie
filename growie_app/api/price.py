@@ -1426,7 +1426,7 @@ def get_stocks_with_prices(market: str = None, sector: str = None, limit: int = 
 	price (KES or USD) and a non-null change_percent. Rows with missing/null cache
 	data are omitted so the Markets page only lists instruments with live price + change.
 	"""
-	filters = {"is_active": 1}
+	filters = {"is_active": 1, "verified": 1}
 	if market:
 		filters["market"] = market
 	if sector:
