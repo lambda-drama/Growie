@@ -390,8 +390,8 @@ def get_stack_overview():
 	)
 
 	classes = {
-		"nse-stocks": {"assetClass": "nse-stocks", "label": "NSE Stocks", "positions": 0, "valueKES": 0, "costKES": 0},
-		"global-stocks": {"assetClass": "global-stocks", "label": "Global Stocks", "positions": 0, "valueKES": 0, "costKES": 0},
+		"nse-stocks": {"assetClass": "nse-stocks", "label": "Stock", "positions": 0, "valueKES": 0, "costKES": 0},
+		"global-stocks": {"assetClass": "global-stocks", "label": "Stock", "positions": 0, "valueKES": 0, "costKES": 0},
 		"mmf": {"assetClass": "mmf", "label": "Money Market Funds", "positions": 0, "valueKES": 0, "costKES": 0},
 		"real-estate": {"assetClass": "real-estate", "label": "Real Estate", "positions": 0, "valueKES": 0, "costKES": 0},
 		"etf": {"assetClass": "etf", "label": "ETFs", "positions": 0, "valueKES": 0, "costKES": 0},
@@ -457,8 +457,8 @@ def get_stack_class(asset_class: str):
 	return {
 		"assetClass": asset_class,
 		"label": {
-			"nse-stocks": "NSE stocks",
-			"global-stocks": "Global stocks",
+			"nse-stocks": "Stock",
+			"global-stocks": "Stock",
 			"etf": "ETFs",
 			"mmf": "Money market funds",
 			"real-estate": "Real estate",

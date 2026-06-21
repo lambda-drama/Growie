@@ -40,6 +40,8 @@ interface StackStockPickerProps {
   assetClass: AssetClass
   /** Growe Asset Category — filters Growe Stock search. */
   assetCategory?: string
+  /** Growe Exchange Platform — filters investment dropdown (NSE, NYSE, LSE, …). */
+  exchangePlatform?: string
   value: string
   displayLabel: string
   onSelect: (stock: GroweStock, inferredClass?: AssetClass) => void
@@ -49,6 +51,7 @@ interface StackStockPickerProps {
 export function StackStockPicker({
   assetClass,
   assetCategory,
+  exchangePlatform,
   value,
   displayLabel,
   onSelect,
@@ -66,24 +69,25 @@ export function StackStockPicker({
 
   const instrumentType = (assetCategory || '').trim() || undefined
   const market = instrumentType ? undefined : CLASS_TO_MARKET[assetClass]
+  const exchange = (exchangePlatform || '').trim() || undefined
 
   const doSearch = useCallback(
     async (q: string) => {
       setLoading(true)
       try {
-        setStocks(await searchStocks(q, market, instrumentType))
+        setStocks(await searchStocks(q, market, instrumentType, exchange))
       } catch {
         setStocks([])
       } finally {
         setLoading(false)
       }
     },
-    [market, instrumentType]
+    [market, instrumentType, exchange]
   )
 
   useEffect(() => {
     if (open) doSearch(query)
-  }, [open, instrumentType, market]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, instrumentType, market, exchange]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePick = async (stock: GroweStock) => {
     try {
@@ -174,6 +178,11 @@ export function StackStockPicker({
                         />
                         <span className="font-medium">{s.ticker}</span>
                         <span className="ml-2 truncate text-muted-foreground">{s.company_name}</span>
+                        {s.exchange_platform ? (
+                          <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
+                            {s.exchange_platform}
+                          </span>
+                        ) : null}
                       </CommandItem>
                     ))}
                   </CommandGroup>

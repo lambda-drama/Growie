@@ -11,6 +11,7 @@ import {
 } from '@/lib/format'
 import type { StackHolding } from '@/services/stack'
 import { STACK_BUY_BUTTON_CLASS, STACK_SELL_BUTTON_CLASS } from '@/lib/stack-ui'
+import { displayMarketTagForUser } from '@/lib/asset-categories'
 import { cn } from '@/lib/utils'
 
 export interface StackHoldingRowCardProps {
@@ -45,6 +46,8 @@ export function StackHoldingRowCard({
   const ccy = (holding.currency || 'USD') as 'USD'
   const initialInvestmentNative = effectiveAvgBuyNative(holding) * (holding.quantity ?? 0)
 
+  const marketBadge = displayMarketTagForUser(holding.marketTag)
+
   return (
     <div
       className={cn(
@@ -65,9 +68,9 @@ export function StackHoldingRowCard({
               ) : (
                 <>
                   <span className="font-semibold">{holding.ticker || holding.name}</span>
-                  {holding.marketTag ? (
+                  {marketBadge ? (
                     <Badge variant="secondary" className="text-[10px]">
-                      {holding.marketTag}
+                      {marketBadge}
                     </Badge>
                   ) : null}
                 </>

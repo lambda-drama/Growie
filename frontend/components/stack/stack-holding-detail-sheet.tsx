@@ -36,7 +36,7 @@ import {
 import { STACK_BUY_BUTTON_CLASS, STACK_SELL_BUTTON_CLASS } from '@/lib/stack-ui'
 import { cn } from '@/lib/utils'
 import type { StackHolding } from '@/services/stack'
-import { deleteHolding } from '@/services/portfolio'
+import { displayMarketTagForUser } from '@/lib/asset-categories'
 
 interface StackHoldingDetailSheetProps {
   holding: StackHolding | null
@@ -93,9 +93,11 @@ export function StackHoldingDetailSheet({
     }
   }
 
+  const marketBadge = displayMarketTagForUser(holding?.marketTag)
+
   const title = holding
     ? holding.ticker
-      ? `${holding.ticker}${holding.marketTag ? ` · ${holding.marketTag}` : ''}`
+      ? `${holding.ticker}${marketBadge ? ` · ${marketBadge}` : ''}`
       : holding.name
     : 'Position'
 
@@ -123,8 +125,8 @@ export function StackHoldingDetailSheet({
               </div>
             ) : holding ? (
               <div className="space-y-4 pb-4">
-                {holding.marketTag && !holding.ticker ? (
-                  <Badge variant="secondary">{holding.marketTag}</Badge>
+                {marketBadge && !holding.ticker ? (
+                  <Badge variant="secondary">{marketBadge}</Badge>
                 ) : null}
                 <div className="rounded-xl border bg-muted/30 p-4">
                   <p className="text-xs text-muted-foreground">Current value</p>

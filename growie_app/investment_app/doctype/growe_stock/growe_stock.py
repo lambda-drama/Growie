@@ -8,8 +8,9 @@ from frappe.model.document import Document
 class GroweStock(Document):
 	def autoname(self):
 		ticker = self.ticker or "UNIT"
-		company_name = self.company_name or "GEN"
-		self.name = f"{ticker}-{company_name}"
+		# company_name = self.company_name or "GEN"
+		exchange_platform = self.exchange_platform or "NSE"
+		self.name = f"{ticker}-{exchange_platform}"
 
 	def before_save(self):
 		if self.is_new():

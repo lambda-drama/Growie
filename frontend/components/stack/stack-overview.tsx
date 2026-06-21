@@ -9,7 +9,7 @@ import { StackHeroCard } from '@/components/stack/stack-hero-card'
 import { StackMetricsGrid } from '@/components/stack/stack-metrics-grid'
 import { StackAnalyticsSection } from '@/components/stack/stack-analytics-section'
 import { StackBucketIcon } from '@/components/stack/stack-bucket-icon'
-import { StackClassList } from '@/components/stack/stack-class-list'
+import { StackCategoryList } from '@/components/stack/stack-category-list'
 import { StackTickerGroups } from '@/components/stack/stack-ticker-groups'
 import { StackClassHoldingsTable } from '@/components/stack/stack-class-holdings-table'
 import { StackExcelBulkImport } from '@/components/stack/stack-excel-bulk-import'
@@ -19,7 +19,7 @@ import { useStackOverview } from '@/hooks/use-stack'
 import { usePortfolio } from '@/hooks/use-portfolio'
 import { useAuth } from '@/hooks/use-auth'
 import { useAppStore, useDisplayMoney } from '@/lib/store'
-import { computeDashboardMetrics } from '@/lib/dashboard-data'
+import { computeDashboardMetrics, groupByAssetCategory } from '@/lib/dashboard-data'
 import {
   bucketIconKind,
   bucketLabelForHolding,
@@ -30,16 +30,15 @@ import {
   isBucketGroupingMode,
 } from '@/lib/stack-grouping'
 import { firstNameFrom, timeGreeting } from '@/lib/stack-ui'
-import type { StackClassSummary } from '@/services/stack'
 import type { StackHolding } from '@/services/stack'
 import { formatCurrency, formatPercentage } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 interface StackOverviewProps {
-  onOpenClass: (summary: StackClassSummary) => void
+  onOpenClass?: (summary: import('@/services/stack').StackClassSummary) => void
 }
 
-export function StackOverview({ onOpenClass }: StackOverviewProps) {
+export function StackOverview({ onOpenClass: _onOpenClass }: StackOverviewProps) {
   const { user } = useAuth()
   const { classes, isLoading: stackLoading, refresh, reload: reloadStack } = useStackOverview()
   const { holdings, summary, isLoading: portfolioLoading, reload: reloadPortfolio } = usePortfolio()
@@ -76,15 +75,14 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
 
   const groupedOverviewRows = useMemo(() => {
     if (!isBucketGroupingMode(stackGroupingMode)) return []
-    const map = new Map<string, { value: number; cost: number; positions: number; classCounts: Record<string, number> }>()
+    const map = new Map<string, { value: number; cost: number; positions: number }>()
     for (const h of holdings) {
       if (!holdingMatchesGroupingMode(h, stackGroupingMode)) continue
       const key = bucketLabelForHolding(h, stackGroupingMode)
-      const row = map.get(key) ?? { value: 0, cost: 0, positions: 0, classCounts: {} }
+      const row = map.get(key) ?? { value: 0, cost: 0, positions: 0 }
       row.value += h.valueInKES ?? h.valueKES ?? 0
       row.cost += h.costAtAvgKES ?? h.costBasisKES ?? 0
       row.positions += 1
-      row.classCounts[h.assetClass] = (row.classCounts[h.assetClass] || 0) + 1
       map.set(key, row)
     }
     return [...map.entries()]
@@ -93,12 +91,12 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
         value: row.value,
         gainPercent: row.cost > 0 ? ((row.value - row.cost) / row.cost) * 100 : 0,
         positions: row.positions,
-        breakdown: Object.entries(row.classCounts)
-          .map(([k, v]) => `${k.replace('-', ' ')} ${v}`)
-          .join(' • '),
       }))
       .sort((a, b) => a.label.localeCompare(b.label))
   }, [holdings, stackGroupingMode])
+
+  const categoryGroups = useMemo(() => groupByAssetCategory(holdings), [holdings])
+  const assetCategoryCount = categoryGroups.length
 
   const selectedBucketHoldings = useMemo(() => {
     if (!selectedOverviewBucket || !isBucketGroupingMode(stackGroupingMode)) return []
@@ -126,8 +124,6 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
     [classes]
   )
 
-  const activeClasses = useMemo(() => classes.filter((c) => c.positions > 0), [classes])
-  const assetClassCount = activeClasses.length || classes.length
   const isLoading = stackLoading && classes.length === 0
   const metricsReady = !portfolioLoading || holdings.length > 0
 
@@ -185,7 +181,7 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
         <Card>
           <CardContent className="py-16 text-center">
             <p className="text-muted-foreground">
-              No holdings yet. Add a position manually or bulk-import your Scope / global stocks Excel.
+              No holdings yet. Add a position manually or bulk-import your holdings Excel.
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               <StackExcelBulkImport onSuccess={afterBulkImport} />
@@ -213,7 +209,7 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
             <StackMetricsGrid
               metrics={metrics}
               totalPositions={totals.positions}
-              assetClassCount={assetClassCount}
+              assetClassCount={assetCategoryCount}
               currency={currency}
               kesToDisplayMultiplier={kesToDisplayMultiplier}
             />
@@ -261,11 +257,14 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
           </div>
 
           {isAssetClassOverviewMode(stackGroupingMode) ? (
-            <StackClassList
-              classes={activeClasses}
+            <StackCategoryList
+              groups={categoryGroups}
               currency={currency}
               kesToDisplayMultiplier={kesToDisplayMultiplier}
-              onOpenClass={onOpenClass}
+              onOpenCategory={(category) => {
+                setStackGroupingMode('assetCategory')
+                setSelectedOverviewBucket(category)
+              }}
             />
           ) : (
             <section>
@@ -296,7 +295,7 @@ export function StackOverview({ onOpenClass }: StackOverviewProps) {
                           {row.label}
                         </span>
                         <span className="block truncate text-xs text-muted-foreground sm:text-sm">
-                          {row.breakdown} • {row.positions} positions
+                          {row.positions} position{row.positions === 1 ? '' : 's'}
                         </span>
                       </span>
                       <span className="shrink-0 text-right">

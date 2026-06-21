@@ -1,10 +1,8 @@
 'use client'
 
 import { formatCurrency, formatPercentage } from '@/lib/format'
-import { ASSET_CLASS_SHORT } from '@/lib/stack-ui'
-import { getAssetClassColorHex } from '@/lib/format'
+import { mergeClassesForDisplay, colorForDisplaySegment } from '@/lib/stack-ui'
 import type { StackClassSummary } from '@/services/stack'
-import type { AssetClass } from '@/types'
 import { cn } from '@/lib/utils'
 
 interface StackHeroCardProps {
@@ -27,13 +25,11 @@ export function StackHeroCard({
   const positive = monthlyGrowthPercent >= 0
   const total = classes.reduce((s, c) => s + c.valueKES, 0) || totalValueKES || 1
 
-  const segments = classes
-    .filter((c) => c.valueKES > 0)
-    .map((c) => ({
-      assetClass: c.assetClass as AssetClass,
-      pct: (c.valueKES / total) * 100,
-      color: getAssetClassColorHex(c.assetClass),
-    }))
+  const segments = mergeClassesForDisplay(classes).map((seg) => ({
+    ...seg,
+    pct: (seg.valueKES / total) * 100,
+    color: colorForDisplaySegment(seg),
+  }))
 
   return (
     <section className="rounded-2xl bg-primary px-4 py-5 text-primary-foreground shadow-md sm:px-6 sm:py-6">
@@ -64,7 +60,7 @@ export function StackHeroCard({
           >
             {segments.map((seg) => (
               <div
-                key={seg.assetClass}
+                key={seg.key}
                 className="h-full min-w-[2px] transition-all"
                 style={{
                   width: `${Math.max(seg.pct, 0.5)}%`,
@@ -75,12 +71,12 @@ export function StackHeroCard({
           </div>
           <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-primary-foreground/90">
             {segments.map((seg) => (
-              <li key={seg.assetClass} className="flex items-center gap-1.5">
+              <li key={seg.key} className="flex items-center gap-1.5">
                 <span
                   className="h-2 w-2 shrink-0 rounded-full"
                   style={{ backgroundColor: seg.color }}
                 />
-                {ASSET_CLASS_SHORT[seg.assetClass]}
+                {seg.label}
               </li>
             ))}
           </ul>
