@@ -1,4 +1,8 @@
-import { normalizeAssetCategoryLabel } from '@/lib/asset-categories'
+import {
+  displayExchangeLabel,
+  isInternalMarketRoutingLabel,
+  normalizeAssetCategoryLabel,
+} from '@/lib/asset-categories'
 import { isEtfHolding } from '@/lib/stack-holding-classify'
 import type { StackBucketKind } from '@/lib/stack-bucket-icons'
 import type { HoldingsSummaryMetrics } from '@/lib/stack-holdings-summary'
@@ -62,15 +66,15 @@ function inferRegionFromHolding(h: StackHolding): string {
   if (tag.includes('lse') || tag.includes('euronext') || tag.includes('europe')) return 'Europe'
   if (tag.includes('jse') || tag.includes('africa')) return 'Africa'
   if ((h.currency || '').toUpperCase() === 'KES') return 'Africa'
-  return 'Global'
+  return 'Unclassified'
 }
 
 function inferExchangeFromHolding(h: StackHolding): string {
   const explicit = (h.exchangePlatform || '').trim()
-  if (explicit) return explicit
-  if (isEtfHolding(h)) return h.exchangePlatform || 'NASDAQ'
-  if (h.assetClass === 'nse-stocks' || h.assetClass === 'mmf' || h.assetClass === 'real-estate') return 'NSE'
-  return h.marketTag || 'Global'
+  if (explicit) return displayExchangeLabel(explicit)
+  const tag = (h.marketTag || '').trim()
+  if (tag && !isInternalMarketRoutingLabel(tag)) return displayExchangeLabel(tag)
+  return 'Unclassified'
 }
 
 function sectorLabel(h: StackHolding): string {
@@ -85,8 +89,8 @@ function industryLabel(h: StackHolding): string {
 
 /** Growe Asset Category label with fallbacks from holding / legacy asset class. */
 export function assetCategoryLabelForHolding(h: StackHolding): string {
-  const explicit = normalizeAssetCategoryLabel(h.holdingAssetCategory || h.assetCategory || '')
-  if (explicit) return explicit
+  const fromHolding = normalizeAssetCategoryLabel(h.holdingAssetCategory || h.assetCategory || '')
+  if (fromHolding) return fromHolding
   if (h.assetClass === 'mmf') return 'Money Market Fund'
   if (h.assetClass === 'real-estate') return 'Private Company/Other'
   if (h.assetClass === 'etf') return 'ETF'
@@ -115,7 +119,7 @@ export function groupingListTitle(mode: StackGroupingMode): string {
   if (mode === 'sector') return 'sector'
   if (mode === 'industry') return 'industry'
   if (mode === 'assetCategory') return 'asset category'
-  if (mode === 'ticker') return 'all asset classes'
+  if (mode === 'ticker') return 'category'
   return ''
 }
 

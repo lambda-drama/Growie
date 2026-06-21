@@ -119,14 +119,45 @@ export function StackExcelBulkImport({
 
   const formatSuccessMessage = (result: HoldingsBulkImportResult) => {
     const errs = (result.errors || []).filter(Boolean)
+    const unsupported = result.unsupported_tickers ?? []
     const lines = [
       `Created ${result.created} position(s).`,
       `Sheet: ${result.active_rows ?? '—'} active row(s), ${result.sold_rows ?? '—'} sold row(s).`,
     ]
-    if (errs.length) {
+    if (unsupported.length > 0 && !result.is_subscribed) {
+      lines.push(
+        `${unsupported.length} unsupported ticker(s) skipped: ${unsupported.join(', ')}. Upgrade to Pro or Coached to request new assets.`
+      )
+    }
+    const pending = result.pending_verification ?? []
+    if (pending.length > 0 && result.is_subscribed) {
+      const tickers = pending.map((p) => p.ticker).filter(Boolean).join(', ')
+      lines.push(
+        `${pending.length} new ticker(s) pending verification (${tickers}). We will review and email you when they are available.`
+      )
+    }
+    if (errs.length && unsupported.length === 0) {
       lines.push(`Some rows were skipped: ${errs.slice(0, 5).join(' · ')}`)
     }
     return lines.join(' ')
+  }
+
+  const showImportAlerts = (result: HoldingsBulkImportResult) => {
+    const unsupported = result.unsupported_tickers ?? []
+    if (unsupported.length > 0 && !result.is_subscribed) {
+      toast.warning('Some assets are not supported', {
+        description: `These tickers are not in the SumStack master and were not imported: ${unsupported.join(', ')}. Upgrade to Pro or Coached to request new listings.`,
+        duration: 12000,
+      })
+      return
+    }
+    const pending = result.pending_verification ?? []
+    if (!result.is_subscribed || pending.length === 0) return
+    const tickers = pending.map((p) => p.ticker || p.company_name).filter(Boolean)
+    toast.info('Verification in progress', {
+      description: `New tickers pending review: ${tickers.join(', ')}. Your positions were imported; we will email you when they are added to the master.`,
+      duration: 12000,
+    })
   }
 
   const runImport = async () => {
@@ -143,7 +174,10 @@ export function StackExcelBulkImport({
       } else {
         throw new Error('Nothing to import. Choose a file or paste a spreadsheet link.')
       }
-      toast.success(formatSuccessMessage(result), { id: toastId })
+      const mainToast =
+        result.created === 0 && (result.unsupported_tickers?.length ?? 0) > 0 ? toast.warning : toast.success
+      mainToast(formatSuccessMessage(result), { id: toastId })
+      showImportAlerts(result)
       setOpen(false)
       reset()
       void Promise.resolve(onSuccess()).catch(() => {
@@ -341,7 +375,11 @@ export function StackExcelBulkImport({
                     </>
                   ) : null}
                 </p>
-                <p>New tickers create Growe Stock records using each row’s currency.</p>
+                <p>
+                  Verified master tickers import as holdings. On Pro or Coached, new tickers are
+                  queued for review and imported as positions. Free plans can only import tickers
+                  already verified in the master — other tickers are skipped.
+                </p>
               </div>
               <DialogFooter className="gap-2 sm:gap-0">
                 <Button

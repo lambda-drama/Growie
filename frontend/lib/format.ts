@@ -302,8 +302,8 @@ export function getAssetClassName(assetClass: string): string {
   const names: Record<string, string> = {
     'mmf': 'Money Market Funds',
     'real-estate': 'Real Estate',
-    'nse-stocks': 'NSE Stocks',
-    'global-stocks': 'Global Stocks',
+    'nse-stocks': 'Stock',
+    'global-stocks': 'Stock',
     etf: 'ETFs',
   }
   return names[assetClass] || assetClass

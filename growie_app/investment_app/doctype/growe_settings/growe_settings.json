@@ -23,7 +23,10 @@
   "paystack_section",
   "paystack_public_key",
   "column_break_pakd",
-  "paystack_secret_key"
+  "paystack_secret_key",
+  "maintenance_section",
+  "stock_naming_migration_help",
+  "last_stock_naming_migration"
  ],
  "fields": [
   {
@@ -124,6 +127,23 @@
    "fieldtype": "Table",
    "label": "AI Limits",
    "options": "Subscription Details"
+  },
+  {
+   "fieldname": "maintenance_section",
+   "fieldtype": "Section Break",
+   "label": "Maintenance"
+  },
+  {
+   "fieldname": "stock_naming_migration_help",
+   "fieldtype": "HTML",
+   "label": "Growe Stock naming",
+   "options": "<p class=\"text-muted\">Legacy Growe Stock names used <code>ticker-company_name</code> (e.g. <code>KPLC-Kenya Power</code>). New records use <code>ticker-exchange_platform</code> (e.g. <code>KPLC-NSE</code>).</p><p class=\"text-muted\">Use the button below to rename existing records in the background, re-link holdings/transactions, merge duplicates, and remove old names.</p>"
+  },
+  {
+   "fieldname": "last_stock_naming_migration",
+   "fieldtype": "Small Text",
+   "label": "Last stock naming migration",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,

@@ -187,6 +187,13 @@ export async function updateHolding(holdingId: string, data: UpdateHoldingData):
   throw new Error(extractError(resData))
 }
 
+export interface PendingVerificationTicker {
+  stock_name: string
+  ticker: string
+  company_name: string
+  by_unsubscribed_member?: boolean
+}
+
 export interface HoldingsBulkImportResult {
   created: number
   skipped: number
@@ -194,6 +201,10 @@ export interface HoldingsBulkImportResult {
   sold_rows: number
   errors: string[]
   source?: string
+  unsupported_tickers?: string[]
+  pending_verification?: PendingVerificationTicker[]
+  pending_verification_count?: number
+  is_subscribed?: boolean
 }
 
 /** @deprecated Use HoldingsBulkImportResult */
@@ -288,12 +299,14 @@ export async function deleteHolding(holdingId: string): Promise<void> {
 export async function searchStocks(
   query: string = '',
   market?: string,
-  instrumentType?: string
+  instrumentType?: string,
+  exchangePlatform?: string
 ): Promise<GroweStock[]> {
   const params = new URLSearchParams()
   if (query) params.append('query', query)
   if (market) params.append('market', market)
   if (instrumentType) params.append('instrument_type', instrumentType)
+  if (exchangePlatform) params.append('exchange_platform', exchangePlatform)
 
   const response = await fetch(
     `/api/method/growie_app.api.portfolio.search_stocks?${params.toString()}`,

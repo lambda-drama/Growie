@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select'
 import { DisplayCurrencyPicker } from '@/components/currency/display-currency-picker'
 import { StackStockPicker } from '@/components/stack/stack-stock-picker'
-import { recordBuy, recordSell } from '@/services/stack'
+import { recordBuy, recordSell, getExchangePlatforms } from '@/services/stack'
 import { getAssetCategories } from '@/services/portfolio'
 import { categoryToPickerSlug } from '@/lib/asset-categories'
 import { STACK_BUY_BUTTON_CLASS, STACK_SELL_BUTTON_CLASS } from '@/lib/stack-ui'
@@ -43,6 +43,9 @@ interface TradeDialogProps {
 }
 
 const DEFAULT_CATEGORY = 'Stock'
+const ALL_EXCHANGES = '__all__'
+
+const FALLBACK_EXCHANGES = ['NSE', 'NYSE', 'NASDAQ', 'LSE', 'Euronext', 'JSE', 'HKEX', 'JPX']
 
 const FALLBACK_CATEGORIES = [
   { name: 'Stock', label: 'Stock' },
@@ -66,7 +69,9 @@ export function TradeDialog({
   const isNew = mode === 'buy-new'
 
   const [assetCategories, setAssetCategories] = useState(FALLBACK_CATEGORIES)
+  const [exchangePlatforms, setExchangePlatforms] = useState<string[]>(FALLBACK_EXCHANGES)
   const [assetCategory, setAssetCategory] = useState(DEFAULT_CATEGORY)
+  const [exchangePlatform, setExchangePlatform] = useState('')
   const [stockName, setStockName] = useState('')
   const [stockLabel, setStockLabel] = useState('')
   const [quantity, setQuantity] = useState('')
@@ -85,7 +90,16 @@ export function TradeDialog({
     getAssetCategories()
       .then(setAssetCategories)
       .catch(() => setAssetCategories(FALLBACK_CATEGORIES))
+    getExchangePlatforms('', 100)
+      .then(setExchangePlatforms)
+      .catch(() => setExchangePlatforms(FALLBACK_EXCHANGES))
   }, [open])
+
+  useEffect(() => {
+    if (!open || holding) return
+    setStockName('')
+    setStockLabel('')
+  }, [assetCategory, exchangePlatform, open, holding])
 
   useEffect(() => {
     if (!open) return
@@ -111,6 +125,7 @@ export function TradeDialog({
               ? 'Private Company/Other'
               : DEFAULT_CATEGORY
       setAssetCategory(initialCategory)
+      setExchangePlatform('')
       setStockName('')
       setStockLabel('')
       setQuantity('')
@@ -200,20 +215,41 @@ export function TradeDialog({
 
         <div className="grid gap-4 py-2">
           {isNew && (
-            <div className="grid gap-2">
-              <Label>Asset category</Label>
-              <Select value={assetCategory} onValueChange={setAssetCategory}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {assetCategories.map((o) => (
-                    <SelectItem key={o.name} value={o.name}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2">
+                <Label>Asset category</Label>
+                <Select value={assetCategory} onValueChange={setAssetCategory}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {assetCategories.map((o) => (
+                      <SelectItem key={o.name} value={o.name}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Exchange platform</Label>
+                <Select
+                  value={exchangePlatform || ALL_EXCHANGES}
+                  onValueChange={(v) => setExchangePlatform(v === ALL_EXCHANGES ? '' : v)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="All exchanges" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL_EXCHANGES}>All exchanges</SelectItem>
+                    {exchangePlatforms.map((name) => (
+                      <SelectItem key={name} value={name}>
+                        {name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           )}
 
@@ -221,6 +257,7 @@ export function TradeDialog({
             <StackStockPicker
               assetClass={pickerSlug}
               assetCategory={assetCategory}
+              exchangePlatform={exchangePlatform || undefined}
               value={stockName}
               displayLabel={stockLabel}
               onSelect={handleStockSelect}

@@ -1,27 +1,65 @@
 import type { AssetClass } from '@/types'
+import type { StackClassSummary } from '@/services/stack'
+import { getAssetClassColorHex } from '@/lib/format'
 
 export const ASSET_CLASS_SHORT: Record<AssetClass, string> = {
-  'nse-stocks': 'NSE',
+  'nse-stocks': 'Stock',
   mmf: 'MMF',
   'real-estate': 'RE',
-  'global-stocks': 'Global',
+  'global-stocks': 'Stock',
   etf: 'ETF',
 }
 
 export const ASSET_CLASS_MOBILE_LABEL: Record<AssetClass, string> = {
-  'nse-stocks': 'NSE stocks',
+  'nse-stocks': 'Stock',
   mmf: 'Money mkt funds',
   'real-estate': 'Real estate',
-  'global-stocks': 'Global stocks',
+  'global-stocks': 'Stock',
   etf: 'ETFs',
 }
 
 export const ASSET_CLASS_INITIAL: Record<AssetClass, string> = {
-  'nse-stocks': 'N',
+  'nse-stocks': 'S',
   mmf: 'M',
   'real-estate': 'R',
-  'global-stocks': 'G',
+  'global-stocks': 'S',
   etf: 'E',
+}
+
+const STOCK_ASSET_CLASSES = new Set<AssetClass>(['nse-stocks', 'global-stocks'])
+
+export interface DisplayClassSegment {
+  key: string
+  label: string
+  valueKES: number
+  colorClass: AssetClass
+}
+
+/** Merge NSE/global stock buckets into a single Stock segment for charts/legends. */
+export function mergeClassesForDisplay(classes: StackClassSummary[]): DisplayClassSegment[] {
+  const map = new Map<string, DisplayClassSegment>()
+  for (const row of classes) {
+    if (row.valueKES <= 0 && row.positions <= 0) continue
+    const ac = row.assetClass as AssetClass
+    const key = STOCK_ASSET_CLASSES.has(ac) ? 'stock' : ac
+    const label = STOCK_ASSET_CLASSES.has(ac) ? 'Stock' : ASSET_CLASS_SHORT[ac]
+    const existing = map.get(key)
+    if (existing) {
+      existing.valueKES += row.valueKES
+    } else {
+      map.set(key, {
+        key,
+        label,
+        valueKES: row.valueKES,
+        colorClass: STOCK_ASSET_CLASSES.has(ac) ? 'global-stocks' : ac,
+      })
+    }
+  }
+  return [...map.values()]
+}
+
+export function colorForDisplaySegment(seg: DisplayClassSegment): string {
+  return getAssetClassColorHex(seg.colorClass)
 }
 
 export function stackPositionsLabel(assetClass: AssetClass, count: number): string {

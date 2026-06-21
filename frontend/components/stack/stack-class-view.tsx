@@ -17,6 +17,7 @@ import { useAppStore, useDisplayMoney } from '@/lib/store'
 import { groupHoldingsByTicker } from '@/lib/stack-ticker-groups'
 import type { StackHolding } from '@/services/stack'
 import type { AssetClass } from '@/types'
+import { getAssetClassName } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 interface StackClassViewProps {
@@ -95,7 +96,7 @@ export function StackClassView({ assetClass, onBack }: StackClassViewProps) {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">{detail?.label ?? 'Asset class'}</h1>
+          <h1 className="text-2xl font-bold text-foreground">{getAssetClassName(assetClass)}</h1>
           <p className="text-muted-foreground">Positions in this class</p>
         </div>
         <div className="flex w-full gap-2 sm:w-auto">

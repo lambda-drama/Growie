@@ -19,6 +19,7 @@ import {
 } from '@/lib/format'
 import type { AssetClass } from '@/types'
 import { STACK_BUY_BUTTON_CLASS, STACK_SELL_BUTTON_CLASS } from '@/lib/stack-ui'
+import { displayMarketTagForUser } from '@/lib/asset-categories'
 import { cn } from '@/lib/utils'
 
 interface StackPositionViewProps {
@@ -50,6 +51,8 @@ export function StackPositionView({
 
   const bumpTransactions = () => setTxRefreshKey((k) => k + 1)
 
+  const marketBadge = displayMarketTagForUser(holding?.marketTag)
+
   return (
     <div className="space-y-6">
       <StackBreadcrumb
@@ -63,7 +66,7 @@ export function StackPositionView({
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold text-foreground">{holding?.ticker || holding?.name || 'Position'}</h1>
-            {holding?.marketTag && <Badge variant="secondary">{holding.marketTag}</Badge>}
+            {marketBadge ? <Badge variant="secondary">{marketBadge}</Badge> : null}
           </div>
           {holding?.name && holding.ticker && (
             <p className="text-muted-foreground">{holding.name}</p>

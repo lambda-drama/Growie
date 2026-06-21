@@ -580,7 +580,7 @@ export function StackAnalyticsSection({ holdings }: StackAnalyticsSectionProps) 
         <TabsContent value="stocks" className="mt-6 space-y-10">
           <TabSection
             title="Stock holdings"
-            description="Distribution of market value across NSE and global stock positions."
+            description="Distribution of market value across your stock positions."
           >
             <div className="grid gap-4 lg:grid-cols-2">
               <DonutCard

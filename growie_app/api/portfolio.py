@@ -48,8 +48,10 @@ _SLUG_TO_ASSET_CATEGORY = {
 _LEGACY_TO_ASSET_CATEGORY = {
 	"Global": "Stock",
 	"Global Stocks": "Stock",
+	"Global Stock": "Stock",
 	"NSE": "Stock",
 	"NSE Stocks": "Stock",
+	"NSE Stock": "Stock",
 	"ETF": "ETF",
 	"MMF": "Money Market Fund",
 	"Real Estate": "Private Company/Other",
@@ -61,12 +63,21 @@ def _normalize_asset_category_display(label: str) -> str:
 	param = (label or "").strip()
 	if not param:
 		return ""
+	# Legacy NSE/Global routing labels → Stock (never shown as separate categories).
+	if param in _LEGACY_TO_ASSET_CATEGORY:
+		param = _LEGACY_TO_ASSET_CATEGORY[param]
+	elif param in _SLUG_TO_ASSET_CATEGORY:
+		param = _SLUG_TO_ASSET_CATEGORY[param]
+	else:
+		lower = param.lower()
+		if "nse" in lower and "stock" in lower:
+			param = "Stock"
+		elif "global" in lower and "stock" in lower:
+			param = "Stock"
+		elif lower in ("nse", "global"):
+			param = "Stock"
 	if frappe.db.exists("Growe Asset Category", param):
 		return param
-	if param in _LEGACY_TO_ASSET_CATEGORY:
-		return _LEGACY_TO_ASSET_CATEGORY[param]
-	if param in _SLUG_TO_ASSET_CATEGORY:
-		return _SLUG_TO_ASSET_CATEGORY[param]
 	return param
 
 
@@ -589,17 +600,26 @@ def get_asset_categories():
 # ── Stock search ──────────────────────────────────────────────────────────────
 
 @frappe.whitelist()
-def search_stocks(query: str = "", market: str = None, instrument_type: str = None, limit: int = 20):
+def search_stocks(
+	query: str = "",
+	market: str = None,
+	instrument_type: str = None,
+	exchange_platform: str = None,
+	limit: int = 20,
+):
 	"""
 	Search Growe Stock by ticker or company name.
 	Used by the frontend searchable combobox on the Add Holding dialog.
 	"""
 	category = (instrument_type or "").strip()
-	filters = {"is_active": 1}
+	exchange = (exchange_platform or "").strip()
+	filters = {"is_active": 1, "verified": 1}
 	if market:
 		filters["market"] = market
 	if category:
 		filters["instrument_type"] = category
+	if exchange:
+		filters["exchange_platform"] = exchange
 
 	if query:
 		clauses = []
@@ -607,11 +627,14 @@ def search_stocks(query: str = "", market: str = None, instrument_type: str = No
 			clauses.append("AND market = %(market)s")
 		if category:
 			clauses.append("AND instrument_type = %(instrument_type)s")
+		if exchange:
+			clauses.append("AND exchange_platform = %(exchange_platform)s")
 		results = frappe.db.sql(
 			"""
 			SELECT name, ticker, company_name, market, currency, region, exchange_platform, instrument_type
 			FROM `tabGrowe Stock`
 			WHERE is_active = 1
+			  AND verified = 1
 			  AND (
 			        ticker       LIKE %(q)s
 			     OR company_name LIKE %(q)s
@@ -624,6 +647,7 @@ def search_stocks(query: str = "", market: str = None, instrument_type: str = No
 				"q": f"%{query}%",
 				"market": market,
 				"instrument_type": category,
+				"exchange_platform": exchange,
 				"limit": int(limit),
 			},
 			as_dict=True,

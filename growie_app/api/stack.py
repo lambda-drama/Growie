@@ -390,8 +390,8 @@ def get_stack_overview():
 	)
 
 	classes = {
-		"nse-stocks": {"assetClass": "nse-stocks", "label": "NSE Stocks", "positions": 0, "valueKES": 0, "costKES": 0},
-		"global-stocks": {"assetClass": "global-stocks", "label": "Global Stocks", "positions": 0, "valueKES": 0, "costKES": 0},
+		"nse-stocks": {"assetClass": "nse-stocks", "label": "Stock", "positions": 0, "valueKES": 0, "costKES": 0},
+		"global-stocks": {"assetClass": "global-stocks", "label": "Stock", "positions": 0, "valueKES": 0, "costKES": 0},
 		"mmf": {"assetClass": "mmf", "label": "Money Market Funds", "positions": 0, "valueKES": 0, "costKES": 0},
 		"real-estate": {"assetClass": "real-estate", "label": "Real Estate", "positions": 0, "valueKES": 0, "costKES": 0},
 		"etf": {"assetClass": "etf", "label": "ETFs", "positions": 0, "valueKES": 0, "costKES": 0},
@@ -457,8 +457,8 @@ def get_stack_class(asset_class: str):
 	return {
 		"assetClass": asset_class,
 		"label": {
-			"nse-stocks": "NSE stocks",
-			"global-stocks": "Global stocks",
+			"nse-stocks": "Stock",
+			"global-stocks": "Stock",
 			"etf": "ETFs",
 			"mmf": "Money market funds",
 			"real-estate": "Real estate",
@@ -539,8 +539,30 @@ def create_stock(
 	exchange_platform: str = None,
 	instrument_type: str = None,
 ):
-	"""Create a Growe Stock (e.g. when user adds a new listing)."""
-	_member_name()
+	"""
+	Create a Growe Stock. Portal users cannot self-create listings — use bulk upload instead.
+	System Managers may create verified master records from Desk.
+	"""
+	from growie_app.utils.stock_verification import member_is_subscribed
+
+	member = _member_name()
+	is_admin = "System Manager" in frappe.get_roles(frappe.session.user)
+
+	if not is_admin:
+		if not member_is_subscribed(member):
+			frappe.throw(
+				_(
+					"This asset is not supported yet. Upgrade to Pro or Coached to request "
+					"missing assets via bulk upload."
+				)
+			)
+		frappe.throw(
+			_(
+				"This asset is not in the Growe master yet. Use bulk upload to import your "
+				"positions — we will verify new tickers and notify you when they are available."
+			)
+		)
+
 	clean = (ticker or "").strip().upper()
 	if not clean:
 		frappe.throw(_("Ticker is required."))
@@ -584,6 +606,7 @@ def create_stock(
 			"region": region_val,
 			"exchange_platform": exchange_val,
 			"is_active": 1,
+			"verified": 1,
 		}
 	)
 	doc.flags.ignore_permissions = True
