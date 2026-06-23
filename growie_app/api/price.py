@@ -40,6 +40,14 @@ RapidAPI — Nairobi Stock Exchange (NSE only):
   Endpoint: GET /stocks?limit=1000
   Response: {"success":true,"data":[{"ticker":"SCOM","price":"28.75","change":"-0.50 (-1.71%)",...}]}
 
+Goldman Sachs Marquee (developer.gs.com):
+  Auth: OAuth2 client_credentials → https://idfs.gs.com/as/token.oauth2
+        scope=read_product_data; API Key=client_id, API Secret=client_secret
+  API:  POST https://api.gs.com/data/TREOD/last/query
+  Body: {"endDate":"YYYY-MM-DD","where":{"ticker":"AAPL"},"fields":["closePrice"]}
+  Equities use TREOD (Thomson Reuters EOD); optional Growe Stock.api_symbol as bbid (e.g. AAPL UW).
+  Secmaster fallback: GET /markets/securities?ticker=AAPL&isPrimary=true → assetId/bbid.
+
 Dispatch is determined by the "api_provider" Select field on the Growe Price API record.
 """
 
@@ -173,6 +181,7 @@ _PROVIDER_MARKETS: dict[str, frozenset] = {
 	"mansa markets": frozenset({"NSE"}),
 	"fcs api": frozenset({"NSE", "GLOBAL"}),
 	"finnhub": frozenset({"GLOBAL"}),
+	"goldman sachs": frozenset({"GLOBAL"}),
 	"alpha vantage": frozenset({"GLOBAL"}),
 }
 
@@ -182,6 +191,7 @@ _PROVIDER_FETCH_ORDER = {
 	"mansa markets": 1,
 	"fcs api": 2,
 	"finnhub": 3,
+	"goldman sachs": 4,
 	"alpha vantage": 9,
 }
 
@@ -810,6 +820,14 @@ def _fetch_from_provider(
 		if _normalize_market_label(market) != "GLOBAL":
 			return {}
 		return _fetch_finnhub(provider, symbols, market, symbol_override_map=symbol_override_map)
+	if api_prov == "goldman sachs":
+		if _normalize_market_label(market) != "GLOBAL":
+			return {}
+		from growie_app.utils.goldman_sachs_prices import fetch_goldman_sachs_prices
+
+		return fetch_goldman_sachs_prices(
+			provider, symbols, market, symbol_override_map=symbol_override_map
+		)
 	if api_prov == "alpha vantage":
 		if str(market).upper() != "GLOBAL":
 			return {}
@@ -823,7 +841,7 @@ def _fetch_from_provider(
 		message=(
 			f"No parser for provider '{provider.get('provider_name')}' "
 			f"(api_provider='{provider.get('api_provider')}'). "
-			"Supported: Mansa Markets, RapidAPI, FCS API, Finnhub, Alpha Vantage."
+			"Supported: Mansa Markets, RapidAPI, FCS API, Finnhub, Goldman Sachs, Alpha Vantage."
 		),
 	)
 	return {}
@@ -1350,16 +1368,16 @@ def test_provider(provider_name: str, test_ticker: str = "SCOM", market: str = N
 		"Growe Price API",
 		provider_name,
 		["name", "provider_name", "api_provider", "market_type",
-		 "api_base_url", "api_key", "endpoint_prices"],
+		 "api_base_url", "api_key", "api_secret", "endpoint_prices"],
 		as_dict=True,
 	)
+
+	ticker = (test_ticker or "AAPL").strip().upper()
 
 	# Auto-detect NSE vs global from Growe Stock exchange_platform when not given.
 	if not market:
 		exchange = frappe.db.get_value("Growe Stock", {"ticker": ticker}, "exchange_platform")
 		market = "NSE" if _is_nse_exchange(exchange) else "Global"
-
-	ticker = test_ticker.strip().upper()
 
 	sym_for_test: dict = {}
 	row = frappe.db.get_value(

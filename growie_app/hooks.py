@@ -29,18 +29,18 @@ fixtures = [
 		"doctype": "Workspace",
 		"filters": [["name", "in", ["Growe"]]],
 	},
-	{
-		"doctype": "Growe Sector",
-	},
-	{
-		"doctype": "Growe Region",
-	},
-	{
-		"doctype": "Growe Exchange Platform",
-	},
- {
-	 "doctype":"Growe Stock"
- },
+# 	{
+# 		"doctype": "Growe Sector",
+# 	},
+# 	{
+# 		"doctype": "Growe Region",
+# 	},
+# 	{
+# 		"doctype": "Growe Exchange Platform",
+# 	},
+#  {
+# 	 "doctype":"Growe Stock"
+#  },
  {
 	"doctype":"Subscription Tier"
  },

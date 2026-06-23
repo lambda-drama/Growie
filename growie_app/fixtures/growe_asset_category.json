@@ -1,5 +1,12 @@
 [
  {
+  "asset_category": "Real Estate",
+  "docstatus": 0,
+  "doctype": "Growe Asset Category",
+  "modified": "2026-06-05 17:04:53.019469",
+  "name": "Real Estate"
+ },
+ {
   "asset_category": "Stock",
   "docstatus": 0,
   "doctype": "Growe Asset Category",
