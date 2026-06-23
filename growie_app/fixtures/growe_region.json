@@ -2,6 +2,27 @@
  {
   "docstatus": 0,
   "doctype": "Growe Region",
+  "modified": "2026-06-03 22:27:56.385273",
+  "name": "North America",
+  "region_name": "North America"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Region",
+  "modified": "2026-06-03 22:28:48.082358",
+  "name": "Alternative/Manual",
+  "region_name": "Alternative/Manual"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Region",
+  "modified": "2026-06-03 23:35:17.039542",
+  "name": "Oceania",
+  "region_name": "Oceania"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Region",
   "modified": "2026-05-28 16:21:27.518641",
   "name": "USA",
   "region_name": "USA"

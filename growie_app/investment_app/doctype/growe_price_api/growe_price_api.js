@@ -158,6 +158,18 @@ frappe.ui.form.on("Growe Price API", {
 			);
 		}
 
+		if (api_prov.includes("goldman")) {
+			frm.dashboard.add_comment(
+				__("<b>Goldman Sachs Marquee</b> — OAuth2 EOD prices via dataset <code>TREOD</code>. "
+				   + "API Key = <code>client_id</code>, API Secret = <code>client_secret</code> "
+				   + "(from <a href=\"https://developer.gs.com/docs\" target=\"_blank\">developer.gs.com</a>). "
+				   + "Prices endpoint = dataset id (default <code>TREOD</code>). "
+				   + "Global / non-NSE only. Test with <code>AAPL</code>."),
+				"blue",
+				true
+			);
+		}
+
 		if (api_prov.includes("rapidapi")) {
 			frm.dashboard.add_comment(
 				__("<b>RapidAPI — Nairobi NSE only.</b> API Key = your <code>x-rapidapi-key</code>. " +
@@ -217,6 +229,12 @@ function _set_provider_hints(frm) {
 			endpoint_prices: "/quote",
 			calls_per_month: 60000, // free tier ~60/min; adjust if you upgrade
 			market_type: "Both",
+		},
+		"goldman sachs": {
+			api_base_url: "https://api.gs.com",
+			endpoint_prices: "TREOD",
+			calls_per_month: 50000,
+			market_type: "Global",
 		},
 		rapidapi: {
 			api_base_url: "https://nairobi-stock-exchange-nse.p.rapidapi.com",

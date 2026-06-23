@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_bulk_edit": 1,
  "allow_rename": 1,
  "autoname": "field:provider_name",
  "creation": "2026-04-24 14:53:31.822003",
@@ -107,7 +108,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "API Provider",
-   "options": "\nMansa Markets\nFCS API\nFinnhub\nNSE Data API (Open Source)\nAfrimarket (Python)\nAlpha Vantage\nYahoo Finance\nTwelve Data\nIntrinio\nICE Data Services\nRapidApi\nNone (Manual Entry)"
+   "options": "\nMansa Markets\nFCS API\nFinnhub\nNSE Data API (Open Source)\nAfrimarket (Python)\nAlpha Vantage\nYahoo Finance\nTwelve Data\nIntrinio\nICE Data Services\nRapidApi\nGoldman Sachs\nNone (Manual Entry)"
   },
   {
    "fieldname": "test_section",
@@ -134,7 +135,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-22 13:31:17.536565",
+ "modified": "2026-06-24 01:08:29.909115",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Price API",

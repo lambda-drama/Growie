@@ -2,6 +2,90 @@
  {
   "docstatus": 0,
   "doctype": "Growe Sector",
+  "growe_sector": "Cash & Money Markets",
+  "modified": "2026-06-05 16:10:34.797324",
+  "name": "Cash & Money Markets"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Commodities",
+  "modified": "2026-06-05 16:10:34.914501",
+  "name": "Commodities"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Communication Services",
+  "modified": "2026-06-05 16:10:34.922616",
+  "name": "Communication Services"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Consumer Discretionary",
+  "modified": "2026-06-05 16:10:34.926564",
+  "name": "Consumer Discretionary"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Consumer Staples",
+  "modified": "2026-06-05 16:10:34.931201",
+  "name": "Consumer Staples"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Fixed Income",
+  "modified": "2026-06-05 16:10:34.945858",
+  "name": "Fixed Income"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Industrials",
+  "modified": "2026-06-05 16:10:34.956873",
+  "name": "Industrials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Investment Companies",
+  "modified": "2026-06-05 16:10:34.960472",
+  "name": "Investment Companies"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Materials",
+  "modified": "2026-06-05 16:10:34.964292",
+  "name": "Materials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Multi-sector",
+  "modified": "2026-06-05 16:10:34.968398",
+  "name": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Real Estate",
+  "modified": "2026-06-05 16:10:34.972090",
+  "name": "Real Estate"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
+  "growe_sector": "Utilities",
+  "modified": "2026-06-05 16:10:34.980147",
+  "name": "Utilities"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Sector",
   "growe_sector": "Banking",
   "modified": "2026-04-24 15:45:18.266288",
   "name": "Banking"

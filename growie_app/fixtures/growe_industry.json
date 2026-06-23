@@ -2,148 +2,1665 @@
  {
   "docstatus": 0,
   "doctype": "Growe Industry",
+  "industry": "Mutual Fund",
+  "modified": "2026-06-05 16:11:18.291247",
+  "name": "Mutual Fund",
+  "sector": "Cash & Money Markets"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Commodity ETF",
+  "modified": "2026-06-05 16:11:18.298582",
+  "name": "Commodity ETF",
+  "sector": "Commodities"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Commodity/Theme ETF",
+  "modified": "2026-06-05 16:11:18.304974",
+  "name": "Commodity/Theme ETF",
+  "sector": "Commodities"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Gold ETF",
+  "modified": "2026-06-05 16:11:18.311034",
+  "name": "Gold ETF",
+  "sector": "Commodities"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Advertising",
+  "modified": "2026-06-05 16:11:18.317290",
+  "name": "Advertising",
+  "sector": "Communication Services"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Cable & Media",
+  "modified": "2026-06-05 16:11:18.327143",
+  "name": "Cable & Media",
+  "sector": "Communication Services"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Entertainment",
+  "modified": "2026-06-05 16:11:18.334572",
+  "name": "Entertainment",
+  "sector": "Communication Services"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Gaming",
+  "modified": "2026-06-05 16:11:18.341711",
+  "name": "Gaming",
+  "sector": "Communication Services"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Internet & Media",
+  "modified": "2026-06-05 16:11:18.347050",
+  "name": "Internet & Media",
+  "sector": "Communication Services"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Internet Services",
+  "modified": "2026-06-05 16:11:18.351930",
+  "name": "Internet Services",
+  "sector": "Communication Services"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Media",
+  "modified": "2026-06-05 16:11:18.358083",
+  "name": "Media",
+  "sector": "Communication Services"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Publishing",
+  "modified": "2026-06-05 16:11:18.363063",
+  "name": "Publishing",
+  "sector": "Communication Services"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Social Media",
+  "modified": "2026-06-05 16:11:18.367225",
+  "name": "Social Media",
+  "sector": "Communication Services"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Streaming Media",
+  "modified": "2026-06-05 16:11:18.371381",
+  "name": "Streaming Media",
+  "sector": "Communication Services"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Streaming Platform",
+  "modified": "2026-06-05 16:11:18.378536",
+  "name": "Streaming Platform",
+  "sector": "Communication Services"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Apparel",
+  "modified": "2026-06-05 16:11:18.387931",
+  "name": "Apparel",
+  "sector": "Consumer Discretionary"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Apparel Retail",
+  "modified": "2026-06-05 16:11:18.392796",
+  "name": "Apparel Retail",
+  "sector": "Consumer Discretionary"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Automobiles",
+  "modified": "2026-06-05 16:11:18.398397",
+  "name": "Automobiles",
+  "sector": "Consumer Discretionary"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Discount Retail",
+  "modified": "2026-06-05 16:11:18.403606",
+  "name": "Discount Retail",
+  "sector": "Consumer Discretionary"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "E-commerce",
+  "modified": "2026-06-05 16:11:18.408108",
+  "name": "E-commerce",
+  "sector": "Consumer Discretionary"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Electric Vehicles",
+  "modified": "2026-06-05 16:11:18.413161",
+  "name": "Electric Vehicles",
+  "sector": "Consumer Discretionary"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Home Improvement Retail",
+  "modified": "2026-06-05 16:11:18.417973",
+  "name": "Home Improvement Retail",
+  "sector": "Consumer Discretionary"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Hotels",
+  "modified": "2026-06-05 16:11:18.427113",
+  "name": "Hotels",
+  "sector": "Consumer Discretionary"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Internet Retail",
+  "modified": "2026-06-05 16:11:18.431986",
+  "name": "Internet Retail",
+  "sector": "Consumer Discretionary"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Luxury Goods",
+  "modified": "2026-06-05 16:11:18.436712",
+  "name": "Luxury Goods",
+  "sector": "Consumer Discretionary"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Online Services",
+  "modified": "2026-06-05 16:11:18.443702",
+  "name": "Online Services",
+  "sector": "Consumer Discretionary"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Online Travel",
+  "modified": "2026-06-05 16:11:18.448731",
+  "name": "Online Travel",
+  "sector": "Consumer Discretionary"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Restaurants",
+  "modified": "2026-06-05 16:11:18.453753",
+  "name": "Restaurants",
+  "sector": "Consumer Discretionary"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Agriculture",
+  "modified": "2026-06-05 16:11:18.459078",
+  "name": "Agriculture",
+  "sector": "Consumer Staples"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Beverages",
+  "modified": "2026-06-05 16:11:18.464774",
+  "name": "Beverages",
+  "sector": "Consumer Staples"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Confectionery",
+  "modified": "2026-06-05 16:11:18.472304",
+  "name": "Confectionery",
+  "sector": "Consumer Staples"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Food Distribution",
+  "modified": "2026-06-05 16:11:18.477201",
+  "name": "Food Distribution",
+  "sector": "Consumer Staples"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Food Products",
+  "modified": "2026-06-05 16:11:18.483230",
+  "name": "Food Products",
+  "sector": "Consumer Staples"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Food Retail",
+  "modified": "2026-06-05 16:11:18.489643",
+  "name": "Food Retail",
+  "sector": "Consumer Staples"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Grocery Retail",
+  "modified": "2026-06-05 16:11:18.494554",
+  "name": "Grocery Retail",
+  "sector": "Consumer Staples"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Household Products",
+  "modified": "2026-06-05 16:11:18.502103",
+  "name": "Household Products",
+  "sector": "Consumer Staples"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Packaged Foods",
+  "modified": "2026-06-05 16:11:18.506578",
+  "name": "Packaged Foods",
+  "sector": "Consumer Staples"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Personal Products",
+  "modified": "2026-06-05 16:11:18.512495",
+  "name": "Personal Products",
+  "sector": "Consumer Staples"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Pharmacy Retail",
+  "modified": "2026-06-05 16:11:18.518105",
+  "name": "Pharmacy Retail",
+  "sector": "Consumer Staples"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Retail",
+  "modified": "2026-06-05 16:11:18.523349",
+  "name": "Retail",
+  "sector": "Consumer Staples"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Tea",
+  "modified": "2026-06-05 16:11:18.528762",
+  "name": "Tea",
+  "sector": "Consumer Staples"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Tobacco",
+  "modified": "2026-06-05 16:11:18.534053",
+  "name": "Tobacco",
+  "sector": "Consumer Staples"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Warehouse Retail",
+  "modified": "2026-06-05 16:11:18.538446",
+  "name": "Warehouse Retail",
+  "sector": "Consumer Staples"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Diversified Energy",
+  "modified": "2026-06-05 16:11:18.542913",
+  "name": "Diversified Energy",
+  "sector": "Energy"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Integrated Oil & Gas",
+  "modified": "2026-06-05 16:11:18.550310",
+  "name": "Integrated Oil & Gas",
+  "sector": "Energy"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Oil & Gas Exploration",
+  "modified": "2026-06-05 16:11:18.555490",
+  "name": "Oil & Gas Exploration",
+  "sector": "Energy"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Oil & Gas Marketing",
+  "modified": "2026-06-05 16:11:18.560787",
+  "name": "Oil & Gas Marketing",
+  "sector": "Energy"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Oilfield Services",
+  "modified": "2026-06-05 16:11:18.566087",
+  "name": "Oilfield Services",
+  "sector": "Energy"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Asset Management",
+  "modified": "2026-06-05 16:11:18.570752",
+  "name": "Asset Management",
+  "sector": "Financials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Banking",
+  "modified": "2026-06-05 16:11:18.574969",
+  "name": "Banking",
+  "sector": "Financials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Brokerage",
+  "modified": "2026-06-05 16:11:18.579784",
+  "name": "Brokerage",
+  "sector": "Financials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Capital Markets",
+  "modified": "2026-06-05 16:11:18.584026",
+  "name": "Capital Markets",
+  "sector": "Financials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Consumer Finance",
+  "modified": "2026-06-05 16:11:18.588664",
+  "name": "Consumer Finance",
+  "sector": "Financials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Credit Ratings",
+  "modified": "2026-06-05 16:11:18.593787",
+  "name": "Credit Ratings",
+  "sector": "Financials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Crypto Exchange",
+  "modified": "2026-06-05 16:11:18.600936",
+  "name": "Crypto Exchange",
+  "sector": "Financials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Custody Banking",
+  "modified": "2026-06-05 16:11:18.605964",
+  "name": "Custody Banking",
+  "sector": "Financials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Diversified Holding Company",
+  "modified": "2026-06-05 16:11:18.610811",
+  "name": "Diversified Holding Company",
+  "sector": "Financials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Exchange Operator",
+  "modified": "2026-06-05 16:11:18.615265",
+  "name": "Exchange Operator",
+  "sector": "Financials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Financial Data",
+  "modified": "2026-06-05 16:11:18.620222",
+  "name": "Financial Data",
+  "sector": "Financials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Financial Technology",
+  "modified": "2026-06-05 16:11:18.623562",
+  "name": "Financial Technology",
+  "sector": "Financials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Insurance",
+  "modified": "2026-06-05 16:11:18.627662",
+  "name": "Insurance",
+  "sector": "Financials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Insurance Brokerage",
+  "modified": "2026-06-05 16:11:18.632573",
+  "name": "Insurance Brokerage",
+  "sector": "Financials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Investment Banking",
+  "modified": "2026-06-05 16:11:18.637605",
+  "name": "Investment Banking",
+  "sector": "Financials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Investment Holding",
+  "modified": "2026-06-05 16:11:18.644286",
+  "name": "Investment Holding",
+  "sector": "Financials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Mortgage Finance",
+  "modified": "2026-06-05 16:11:18.648647",
+  "name": "Mortgage Finance",
+  "sector": "Financials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Payment Processing",
+  "modified": "2026-06-05 16:11:18.652493",
+  "name": "Payment Processing",
+  "sector": "Financials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Payments",
+  "modified": "2026-06-05 16:11:18.656320",
+  "name": "Payments",
+  "sector": "Financials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Bond ETF",
+  "modified": "2026-06-05 16:11:18.660486",
+  "name": "Bond ETF",
+  "sector": "Fixed Income"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Corporate Bond ETF",
+  "modified": "2026-06-05 16:11:18.664587",
+  "name": "Corporate Bond ETF",
+  "sector": "Fixed Income"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Emerging Market Bond ETF",
+  "modified": "2026-06-05 16:11:18.668127",
+  "name": "Emerging Market Bond ETF",
+  "sector": "Fixed Income"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "High Yield Bond ETF",
+  "modified": "2026-06-05 16:11:18.672111",
+  "name": "High Yield Bond ETF",
+  "sector": "Fixed Income"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Inflation-Protected Bond ETF",
+  "modified": "2026-06-05 16:11:18.676116",
+  "name": "Inflation-Protected Bond ETF",
+  "sector": "Fixed Income"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Municipal Bond ETF",
+  "modified": "2026-06-05 16:11:18.682706",
+  "name": "Municipal Bond ETF",
+  "sector": "Fixed Income"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Treasury Bill ETF",
+  "modified": "2026-06-05 16:11:18.686626",
+  "name": "Treasury Bill ETF",
+  "sector": "Fixed Income"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Treasury Bond ETF",
+  "modified": "2026-06-05 16:11:18.691295",
+  "name": "Treasury Bond ETF",
+  "sector": "Fixed Income"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Animal Health",
+  "modified": "2026-06-05 16:11:18.695888",
+  "name": "Animal Health",
+  "sector": "Healthcare"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Biotechnology",
+  "modified": "2026-06-05 16:11:18.700762",
+  "name": "Biotechnology",
+  "sector": "Healthcare"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Diagnostics",
+  "modified": "2026-06-05 16:11:18.705575",
+  "name": "Diagnostics",
+  "sector": "Healthcare"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Healthcare Distribution",
+  "modified": "2026-06-05 16:11:18.711310",
+  "name": "Healthcare Distribution",
+  "sector": "Healthcare"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Healthcare Services",
+  "modified": "2026-06-05 16:11:18.717171",
+  "name": "Healthcare Services",
+  "sector": "Healthcare"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Hospital Services",
+  "modified": "2026-06-05 16:11:18.721511",
+  "name": "Hospital Services",
+  "sector": "Healthcare"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Life Sciences Tools",
+  "modified": "2026-06-05 16:11:18.729023",
+  "name": "Life Sciences Tools",
+  "sector": "Healthcare"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Managed Healthcare",
+  "modified": "2026-06-05 16:11:18.733211",
+  "name": "Managed Healthcare",
+  "sector": "Healthcare"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Medical Devices",
+  "modified": "2026-06-05 16:11:18.737486",
+  "name": "Medical Devices",
+  "sector": "Healthcare"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Pharmaceuticals",
+  "modified": "2026-06-05 16:11:18.741724",
+  "name": "Pharmaceuticals",
+  "sector": "Healthcare"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Aerospace",
+  "modified": "2026-06-05 16:11:18.745611",
+  "name": "Aerospace",
+  "sector": "Industrials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Aerospace & Defense",
+  "modified": "2026-06-05 16:11:18.749771",
+  "name": "Aerospace & Defense",
+  "sector": "Industrials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Agricultural Machinery",
+  "modified": "2026-06-05 16:11:18.754553",
+  "name": "Agricultural Machinery",
+  "sector": "Industrials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Auctions & Services",
+  "modified": "2026-06-05 16:11:18.758905",
+  "name": "Auctions & Services",
+  "sector": "Industrials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Automotive Distribution",
+  "modified": "2026-06-05 16:11:18.763029",
+  "name": "Automotive Distribution",
+  "sector": "Industrials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Business Services",
+  "modified": "2026-06-05 16:11:18.769434",
+  "name": "Business Services",
+  "sector": "Industrials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Construction Machinery",
+  "modified": "2026-06-05 16:11:18.774136",
+  "name": "Construction Machinery",
+  "sector": "Industrials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Diversified Industrials",
+  "modified": "2026-06-05 16:11:18.777703",
+  "name": "Diversified Industrials",
+  "sector": "Industrials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Electrical Equipment",
+  "modified": "2026-06-05 16:11:18.782294",
+  "name": "Electrical Equipment",
+  "sector": "Industrials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Industrial Automation",
+  "modified": "2026-06-05 16:11:18.786435",
+  "name": "Industrial Automation",
+  "sector": "Industrials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Industrial Conglomerates",
+  "modified": "2026-06-05 16:11:18.790398",
+  "name": "Industrial Conglomerates",
+  "sector": "Industrials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Industrial Distribution",
+  "modified": "2026-06-05 16:11:18.794103",
+  "name": "Industrial Distribution",
+  "sector": "Industrials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Industrial Products",
+  "modified": "2026-06-05 16:11:18.797680",
+  "name": "Industrial Products",
+  "sector": "Industrials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Infrastructure",
+  "modified": "2026-06-05 16:11:18.801307",
+  "name": "Infrastructure",
+  "sector": "Industrials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Logistics",
+  "modified": "2026-06-05 16:11:18.807473",
+  "name": "Logistics",
+  "sector": "Industrials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Mobility Platform",
+  "modified": "2026-06-05 16:11:18.811625",
+  "name": "Mobility Platform",
+  "sector": "Industrials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Trucking",
+  "modified": "2026-06-05 16:11:18.815573",
+  "name": "Trucking",
+  "sector": "Industrials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Alternative Investment",
+  "modified": "2026-06-05 16:11:18.820358",
+  "name": "Alternative Investment",
+  "sector": "Investment Companies"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Cement Manufacturing",
+  "modified": "2026-06-05 16:11:18.824259",
+  "name": "Cement Manufacturing",
+  "sector": "Materials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Copper Mining",
+  "modified": "2026-06-05 16:11:18.827508",
+  "name": "Copper Mining",
+  "sector": "Materials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Diversified Mining",
+  "modified": "2026-06-05 16:11:18.831268",
+  "name": "Diversified Mining",
+  "sector": "Materials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Gold Mining",
+  "modified": "2026-06-05 16:11:18.835110",
+  "name": "Gold Mining",
+  "sector": "Materials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Industrial Gases",
+  "modified": "2026-06-05 16:11:18.838757",
+  "name": "Industrial Gases",
+  "sector": "Materials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Iron Ore",
+  "modified": "2026-06-05 16:11:18.845407",
+  "name": "Iron Ore",
+  "sector": "Materials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Paints & Coatings",
+  "modified": "2026-06-05 16:11:18.850097",
+  "name": "Paints & Coatings",
+  "sector": "Materials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Platinum Mining",
+  "modified": "2026-06-05 16:11:18.854613",
+  "name": "Platinum Mining",
+  "sector": "Materials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Specialty Chemicals",
+  "modified": "2026-06-05 16:11:18.858075",
+  "name": "Specialty Chemicals",
+  "sector": "Materials"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Aerospace & Defense ETF",
+  "modified": "2026-06-05 16:11:18.861959",
+  "name": "Aerospace & Defense ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Airlines ETF",
+  "modified": "2026-06-05 16:11:18.865725",
+  "name": "Airlines ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Bank ETF",
+  "modified": "2026-06-05 16:11:18.869157",
+  "name": "Bank ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Biotechnology ETF",
+  "modified": "2026-06-05 16:11:18.874577",
+  "name": "Biotechnology ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Broad Market ETF",
+  "modified": "2026-06-05 16:11:18.879691",
+  "name": "Broad Market ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "China Equity ETF",
+  "modified": "2026-06-05 16:11:18.887213",
+  "name": "China Equity ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "China Internet ETF",
+  "modified": "2026-06-05 16:11:18.891706",
+  "name": "China Internet ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Clean Energy ETF",
+  "modified": "2026-06-05 16:11:18.895866",
+  "name": "Clean Energy ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Country ETF",
+  "modified": "2026-06-05 16:11:18.900697",
+  "name": "Country ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Covered Call ETF",
+  "modified": "2026-06-05 16:11:18.904515",
+  "name": "Covered Call ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Cybersecurity ETF",
+  "modified": "2026-06-05 16:11:18.907985",
+  "name": "Cybersecurity ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Developed Markets ETF",
+  "modified": "2026-06-05 16:11:18.911956",
+  "name": "Developed Markets ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Dividend ETF",
+  "modified": "2026-06-05 16:11:18.915904",
+  "name": "Dividend ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Emerging Markets ETF",
+  "modified": "2026-06-05 16:11:18.919790",
+  "name": "Emerging Markets ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Frontier Markets ETF",
+  "modified": "2026-06-05 16:11:18.926226",
+  "name": "Frontier Markets ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Global Equity ETF",
+  "modified": "2026-06-05 16:11:18.930353",
+  "name": "Global Equity ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Growth Equity ETF",
+  "modified": "2026-06-05 16:11:18.936039",
+  "name": "Growth Equity ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Healthcare ETF",
+  "modified": "2026-06-05 16:11:18.940759",
+  "name": "Healthcare ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Homebuilders ETF",
+  "modified": "2026-06-05 16:11:18.945385",
+  "name": "Homebuilders ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Index ETF",
+  "modified": "2026-06-05 16:11:18.949851",
+  "name": "Index ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Infrastructure ETF",
+  "modified": "2026-06-05 16:11:18.954651",
+  "name": "Infrastructure ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "International Equity ETF",
+  "modified": "2026-06-05 16:11:18.959744",
+  "name": "International Equity ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Large Cap ETF",
+  "modified": "2026-06-05 16:11:18.965300",
+  "name": "Large Cap ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Materials ETF",
+  "modified": "2026-06-05 16:11:18.972401",
+  "name": "Materials ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "NASDAQ 100 ETF",
+  "modified": "2026-06-05 16:11:18.980402",
+  "name": "NASDAQ 100 ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Pharmaceutical ETF",
+  "modified": "2026-06-05 16:11:18.986258",
+  "name": "Pharmaceutical ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Preferred Stock ETF",
+  "modified": "2026-06-05 16:11:18.995609",
+  "name": "Preferred Stock ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Regional Bank ETF",
+  "modified": "2026-06-05 16:11:19.001145",
+  "name": "Regional Bank ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Regional Equity ETF",
+  "modified": "2026-06-05 16:11:19.005816",
+  "name": "Regional Equity ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Retail ETF",
+  "modified": "2026-06-05 16:11:19.009811",
+  "name": "Retail ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Sector ETF",
+  "modified": "2026-06-05 16:11:19.013790",
+  "name": "Sector ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Semiconductor ETF",
+  "modified": "2026-06-05 16:11:19.018190",
+  "name": "Semiconductor ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Small Cap ETF",
+  "modified": "2026-06-05 16:11:19.023203",
+  "name": "Small Cap ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Thematic ETF",
+  "modified": "2026-06-05 16:11:19.028029",
+  "name": "Thematic ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Value Equity ETF",
+  "modified": "2026-06-05 16:11:19.034358",
+  "name": "Value Equity ETF",
+  "sector": "Multi-sector"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Data Center REIT",
+  "modified": "2026-06-05 16:11:19.038675",
+  "name": "Data Center REIT",
+  "sector": "Real Estate"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Global REIT ETF",
+  "modified": "2026-06-05 16:11:19.042432",
+  "name": "Global REIT ETF",
+  "sector": "Real Estate"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Income REIT",
+  "modified": "2026-06-05 16:11:19.047365",
+  "name": "Income REIT",
+  "sector": "Real Estate"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Industrial REIT",
+  "modified": "2026-06-05 16:11:19.051879",
+  "name": "Industrial REIT",
+  "sector": "Real Estate"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Real Estate ETF",
+  "modified": "2026-06-05 16:11:19.056903",
+  "name": "Real Estate ETF",
+  "sector": "Real Estate"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Real Estate Services",
+  "modified": "2026-06-05 16:11:19.061911",
+  "name": "Real Estate Services",
+  "sector": "Real Estate"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "REIT ETF",
+  "modified": "2026-06-05 16:11:19.071183",
+  "name": "REIT ETF",
+  "sector": "Real Estate"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Residential Property",
+  "modified": "2026-06-05 16:11:19.076758",
+  "name": "Residential Property",
+  "sector": "Real Estate"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Retail REIT",
+  "modified": "2026-06-05 16:11:19.082865",
+  "name": "Retail REIT",
+  "sector": "Real Estate"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Telecom REIT",
+  "modified": "2026-06-05 16:11:19.090669",
+  "name": "Telecom REIT",
+  "sector": "Real Estate"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Automation Software",
+  "modified": "2026-06-05 16:11:19.095921",
+  "name": "Automation Software",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Cloud Communications",
+  "modified": "2026-06-05 16:11:19.106884",
+  "name": "Cloud Communications",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Cloud Infrastructure",
+  "modified": "2026-06-05 16:11:19.111992",
+  "name": "Cloud Infrastructure",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Cloud Monitoring",
+  "modified": "2026-06-05 16:11:19.117095",
+  "name": "Cloud Monitoring",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Consumer Electronics",
+  "modified": "2026-06-05 16:11:19.122279",
+  "name": "Consumer Electronics",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Cybersecurity",
+  "modified": "2026-06-05 16:11:19.126811",
+  "name": "Cybersecurity",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Data Analytics",
+  "modified": "2026-06-05 16:11:19.131085",
+  "name": "Data Analytics",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Data Cloud",
+  "modified": "2026-06-05 16:11:19.135633",
+  "name": "Data Cloud",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Database Software",
+  "modified": "2026-06-05 16:11:19.141672",
+  "name": "Database Software",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "DevOps Software",
+  "modified": "2026-06-05 16:11:19.146600",
+  "name": "DevOps Software",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "E-commerce Software",
+  "modified": "2026-06-05 16:11:19.152067",
+  "name": "E-commerce Software",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Electronic Equipment",
+  "modified": "2026-06-05 16:11:19.156764",
+  "name": "Electronic Equipment",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Electronics Manufacturing",
+  "modified": "2026-06-05 16:11:19.160379",
+  "name": "Electronics Manufacturing",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Enterprise AI Software",
+  "modified": "2026-06-05 16:11:19.167298",
+  "name": "Enterprise AI Software",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Enterprise Software",
+  "modified": "2026-06-05 16:11:19.172342",
+  "name": "Enterprise Software",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Financial Software",
+  "modified": "2026-06-05 16:11:19.176688",
+  "name": "Financial Software",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Identity Management",
+  "modified": "2026-06-05 16:11:19.181491",
+  "name": "Identity Management",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "IT Consulting",
+  "modified": "2026-06-05 16:11:19.186100",
+  "name": "IT Consulting",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "IT Services",
+  "modified": "2026-06-05 16:11:19.190241",
+  "name": "IT Services",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Networking Equipment",
+  "modified": "2026-06-05 16:11:19.194449",
+  "name": "Networking Equipment",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Restaurant Software",
+  "modified": "2026-06-05 16:11:19.198655",
+  "name": "Restaurant Software",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Search Software",
+  "modified": "2026-06-05 16:11:19.202856",
+  "name": "Search Software",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Semiconductor Equipment",
+  "modified": "2026-06-05 16:11:19.207154",
+  "name": "Semiconductor Equipment",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Semiconductors",
+  "modified": "2026-06-05 16:11:19.211940",
+  "name": "Semiconductors",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Software",
+  "modified": "2026-06-05 16:11:19.216700",
+  "name": "Software",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Software & Equipment",
+  "modified": "2026-06-05 16:11:19.223475",
+  "name": "Software & Equipment",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Solar Technology",
+  "modified": "2026-06-05 16:11:19.228374",
+  "name": "Solar Technology",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Video Communications",
+  "modified": "2026-06-05 16:11:19.233020",
+  "name": "Video Communications",
+  "sector": "Technology"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Electric Utilities",
+  "modified": "2026-06-05 16:11:19.238281",
+  "name": "Electric Utilities",
+  "sector": "Utilities"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
+  "industry": "Power Generation",
+  "modified": "2026-06-05 16:11:19.242674",
+  "name": "Power Generation",
+  "sector": "Utilities"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Growe Industry",
   "industry": "Technology",
   "modified": "2026-06-03 01:04:03.120305",
-  "name": "Technology"
+  "name": "Technology",
+  "sector": null
  },
  {
   "docstatus": 0,
   "doctype": "Growe Industry",
   "industry": "Financials",
   "modified": "2026-06-03 01:04:03.127686",
-  "name": "Financials"
+  "name": "Financials",
+  "sector": null
  },
  {
   "docstatus": 0,
   "doctype": "Growe Industry",
   "industry": "Healthcare",
   "modified": "2026-06-03 01:04:03.128769",
-  "name": "Healthcare"
+  "name": "Healthcare",
+  "sector": null
  },
  {
   "docstatus": 0,
   "doctype": "Growe Industry",
   "industry": "Consumer Staples",
   "modified": "2026-06-03 01:04:03.129879",
-  "name": "Consumer Staples"
+  "name": "Consumer Staples",
+  "sector": null
  },
  {
   "docstatus": 0,
   "doctype": "Growe Industry",
   "industry": "Consumer Discretionary",
   "modified": "2026-06-03 01:04:03.130902",
-  "name": "Consumer Discretionary"
+  "name": "Consumer Discretionary",
+  "sector": null
  },
  {
   "docstatus": 0,
   "doctype": "Growe Industry",
   "industry": "Industrials",
   "modified": "2026-06-03 01:04:03.131895",
-  "name": "Industrials"
+  "name": "Industrials",
+  "sector": null
  },
  {
   "docstatus": 0,
   "doctype": "Growe Industry",
   "industry": "Energy",
   "modified": "2026-06-03 01:04:03.132885",
-  "name": "Energy"
+  "name": "Energy",
+  "sector": null
  },
  {
   "docstatus": 0,
   "doctype": "Growe Industry",
   "industry": "Materials",
   "modified": "2026-06-03 01:04:03.133861",
-  "name": "Materials"
+  "name": "Materials",
+  "sector": null
  },
  {
   "docstatus": 0,
   "doctype": "Growe Industry",
   "industry": "Communication Services",
   "modified": "2026-06-03 01:04:03.134819",
-  "name": "Communication Services"
+  "name": "Communication Services",
+  "sector": null
  },
  {
   "docstatus": 0,
   "doctype": "Growe Industry",
   "industry": "Telecommunications",
   "modified": "2026-06-03 01:04:03.135738",
-  "name": "Telecommunications"
+  "name": "Telecommunications",
+  "sector": null
  },
  {
   "docstatus": 0,
   "doctype": "Growe Industry",
   "industry": "Real Estate",
   "modified": "2026-06-03 01:04:03.136849",
-  "name": "Real Estate"
+  "name": "Real Estate",
+  "sector": null
  },
  {
   "docstatus": 0,
   "doctype": "Growe Industry",
   "industry": "REIT",
   "modified": "2026-06-03 01:04:03.138011",
-  "name": "REIT"
+  "name": "REIT",
+  "sector": null
  },
  {
   "docstatus": 0,
   "doctype": "Growe Industry",
   "industry": "Investment Companies",
   "modified": "2026-06-03 01:04:03.139160",
-  "name": "Investment Companies"
+  "name": "Investment Companies",
+  "sector": null
  },
  {
   "docstatus": 0,
   "doctype": "Growe Industry",
   "industry": "Exchange Traded Fund",
   "modified": "2026-06-03 01:04:03.140271",
-  "name": "Exchange Traded Fund"
+  "name": "Exchange Traded Fund",
+  "sector": null
  },
  {
   "docstatus": 0,
   "doctype": "Growe Industry",
   "industry": "Multi-sector",
   "modified": "2026-06-03 01:04:03.143621",
-  "name": "Multi-sector"
+  "name": "Multi-sector",
+  "sector": null
  },
  {
   "docstatus": 0,
   "doctype": "Growe Industry",
   "industry": "Cash & Money Markets",
   "modified": "2026-06-03 01:04:03.144701",
-  "name": "Cash & Money Markets"
+  "name": "Cash & Money Markets",
+  "sector": null
  },
  {
   "docstatus": 0,
   "doctype": "Growe Industry",
   "industry": "Money Market Fund",
   "modified": "2026-06-03 01:04:03.145755",
-  "name": "Money Market Fund"
+  "name": "Money Market Fund",
+  "sector": null
  },
  {
   "docstatus": 0,
   "doctype": "Growe Industry",
   "industry": "Commodities/Precious Metals",
   "modified": "2026-06-03 01:04:03.146817",
-  "name": "Commodities/Precious Metals"
+  "name": "Commodities/Precious Metals",
+  "sector": null
  },
  {
   "docstatus": 0,
   "doctype": "Growe Industry",
   "industry": "Alternative/Manual",
   "modified": "2026-06-03 01:04:03.147880",
-  "name": "Alternative/Manual"
+  "name": "Alternative/Manual",
+  "sector": null
  },
  {
   "docstatus": 0,
   "doctype": "Growe Industry",
   "industry": "Private Company/Other",
   "modified": "2026-06-03 01:04:03.148952",
-  "name": "Private Company/Other"
+  "name": "Private Company/Other",
+  "sector": null
  },
  {
   "docstatus": 0,
   "doctype": "Growe Industry",
   "industry": "To classify",
   "modified": "2026-06-03 01:04:03.150010",
-  "name": "To classify"
+  "name": "To classify",
+  "sector": null
  }
 ]

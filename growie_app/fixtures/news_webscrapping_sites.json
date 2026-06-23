@@ -2,6 +2,33 @@
  {
   "docstatus": 0,
   "doctype": "News WebScrapping Sites",
+  "modified": "2026-05-09 19:42:00.461173",
+  "name": "Reuters Markets",
+  "rss_feed": "https://feeds.reuters.com/reuters/businessNews",
+  "site_link": "https://www.reuters.com/markets/",
+  "site_name": "Reuters Markets"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "News WebScrapping Sites",
+  "modified": "2026-05-09 20:08:45.167527",
+  "name": "MarketWatch",
+  "rss_feed": "http://feeds.marketwatch.com/marketwatch/topstories/",
+  "site_link": "https://www.marketwatch.com",
+  "site_name": "MarketWatch"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "News WebScrapping Sites",
+  "modified": "2026-05-09 20:18:19.704315",
+  "name": "CNBC Markets",
+  "rss_feed": "https://www.cnbc.com/id/100003114/device/rss/rss.html",
+  "site_link": "https://www.cnbc.com/markets/",
+  "site_name": "CNBC Markets"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "News WebScrapping Sites",
   "modified": "2026-05-06 02:06:46.335944",
   "name": "Yahoo finance",
   "rss_feed": "https://finance.yahoo.com/rss/topstories",
