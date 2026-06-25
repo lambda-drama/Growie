@@ -27,8 +27,10 @@ from growie_app.api.portfolio import (
 from growie_app.investment_app.holding_ledger import create_holding_transaction
 from growie_app.api.price import (
 	_api_symbol_maps_for_tickers,
+	_backfill_price_cache_stock_links,
 	_enqueue_price_refresh,
 	_fetch_market_for_refresh,
+	_stock_meta_for_tickers,
 	_update_holdings_for_ticker,
 )
 
@@ -312,16 +314,31 @@ def _execute_refresh_stack_prices(
 		member, asset_class=asset_class, holding_name=holding_name
 	)
 	nse_map, global_map = _api_symbol_maps_for_tickers(nse_tickers, global_tickers)
+	stock_meta = _stock_meta_for_tickers(list(set(nse_tickers) | set(global_tickers)))
 
-	nse_updated = _fetch_market_for_refresh("NSE", nse_tickers, nse_map) if nse_tickers else 0
+	nse_updated = (
+		_fetch_market_for_refresh(
+			"NSE", nse_tickers, nse_map, stock_meta=stock_meta
+		)
+		if nse_tickers
+		else 0
+	)
 	global_updated = (
-		_fetch_market_for_refresh("Global", global_tickers, global_map) if global_tickers else 0
+		_fetch_market_for_refresh(
+			"Global", global_tickers, global_map, stock_meta=stock_meta
+		)
+		if global_tickers
+		else 0
 	)
 
 	for t in set(nse_tickers) | set(global_tickers):
 		cache = frappe.db.get_value("Growe Price Cache", t, "price_kes")
 		if cache:
 			_update_holdings_for_ticker(t, float(cache))
+
+	_backfill_price_cache_stock_links(
+		list(set(nse_tickers) | set(global_tickers)), stock_meta
+	)
 
 	frappe.db.commit()
 

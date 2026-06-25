@@ -78,7 +78,9 @@ frappe.ui.form.on("Growe Price API", {
 				? __("This provider only updates <b>NSE</b> tickers; Global symbols are skipped.")
 				: prov.includes("finnhub") || prov.includes("alpha")
 					? __("This provider only updates <b>Global</b> tickers; NSE symbols are skipped.")
-					: __("Updates tickers this provider supports (by market).");
+					: prov.includes("twelve")
+						? __("Uses Growe Stock <b>Exchange platform</b> for NSE and global tickers (batch API).")
+						: __("Updates tickers this provider supports (by market).");
 			frappe.confirm(
 				__(
 					"This will fetch live prices for active tickers (portfolio first) using <b>{0}</b> only. {1} Continue?",
@@ -87,7 +89,9 @@ frappe.ui.form.on("Growe Price API", {
 				function () {
 					frappe.call({
 						method: "growie_app.api.price.refresh_prices",
-						args: { provider_name: frm.doc.name },
+						args: { provider_name: frm.doc.name, sync: 1 },
+						freeze: true,
+						freeze_message: __("Fetching live prices…"),
 						callback: function (r) {
 							if (!r.message) return;
 							if (r.message.queued) {
@@ -170,6 +174,17 @@ frappe.ui.form.on("Growe Price API", {
 			);
 		}
 
+		if (api_prov.includes("twelve")) {
+			frm.dashboard.add_comment(
+				__("<b>Twelve Data</b> — batch quotes with <code>exchange</code> from Growe Stock "
+				   + "<b>Exchange platform</b> (NSE, NYSE, NASDAQ, LSE, …). "
+				   + "Up to 120 symbols per batch per exchange. "
+				   + "<a href=\"https://support.twelvedata.com/en/articles/5203360-batch-api-requests\" target=\"_blank\">Batch docs</a>"),
+				"blue",
+				true
+			);
+		}
+
 		if (api_prov.includes("rapidapi")) {
 			frm.dashboard.add_comment(
 				__("<b>RapidAPI — Nairobi NSE only.</b> API Key = your <code>x-rapidapi-key</code>. " +
@@ -217,6 +232,12 @@ function _set_provider_hints(frm) {
 			endpoint_prices: "/stock/latest",
 			calls_per_month: 500,
 			market_type: "Global",
+		},
+		"twelve data": {
+			api_base_url: "https://api.twelvedata.com",
+			endpoint_prices: "/quote",
+			calls_per_month: 8000,
+			market_type: "Both",
 		},
 		"alpha vantage": {
 			api_base_url: "https://www.alphavantage.co",
