@@ -48,6 +48,14 @@ Goldman Sachs Marquee (developer.gs.com):
   Equities use TREOD (Thomson Reuters EOD); optional Growe Stock.api_symbol as bbid (e.g. AAPL UW).
   Secmaster fallback: GET /markets/securities?ticker=AAPL&isPrimary=true → assetId/bbid.
 
+Twelve Data (twelvedata.com):
+  Base: https://api.twelvedata.com
+  Auth: ?apikey={key}
+  Quote: GET /quote?symbol=AAPL&exchange=NASDAQ&apikey={key}
+  Batch: GET /quote?symbol=AAPL,MSFT&exchange=NASDAQ (up to 120, same exchange)
+         POST /batch?apikey={key} body {"q0":"/quote?symbol=AAPL&exchange=NASDAQ", ...}
+  Uses Growe Stock exchange_platform as `exchange` (NSE, NYSE, NASDAQ, LSE, …).
+
 Dispatch is determined by the "api_provider" Select field on the Growe Price API record.
 """
 
@@ -180,6 +188,7 @@ _PROVIDER_MARKETS: dict[str, frozenset] = {
 	"rapidapi": frozenset({"NSE"}),
 	"mansa markets": frozenset({"NSE"}),
 	"fcs api": frozenset({"NSE", "GLOBAL"}),
+	"twelve data": frozenset({"NSE", "GLOBAL"}),
 	"finnhub": frozenset({"GLOBAL"}),
 	"goldman sachs": frozenset({"GLOBAL"}),
 	"alpha vantage": frozenset({"GLOBAL"}),
@@ -190,6 +199,7 @@ _PROVIDER_FETCH_ORDER = {
 	"rapidapi": -1,
 	"mansa markets": 1,
 	"fcs api": 2,
+	"twelve data": 2,
 	"finnhub": 3,
 	"goldman sachs": 4,
 	"alpha vantage": 9,
@@ -816,6 +826,12 @@ def _fetch_from_provider(
 		return _fetch_mansa(provider, symbols, market)
 	if api_prov == "fcs api":
 		return _fetch_fcs(provider, symbols, market)
+	if api_prov == "twelve data":
+		from growie_app.utils.twelve_data_prices import fetch_twelve_data_prices
+
+		return fetch_twelve_data_prices(
+			provider, symbols, market, symbol_override_map=symbol_override_map
+		)
 	if api_prov == "finnhub":
 		if _normalize_market_label(market) != "GLOBAL":
 			return {}
@@ -841,7 +857,7 @@ def _fetch_from_provider(
 		message=(
 			f"No parser for provider '{provider.get('provider_name')}' "
 			f"(api_provider='{provider.get('api_provider')}'). "
-			"Supported: Mansa Markets, RapidAPI, FCS API, Finnhub, Goldman Sachs, Alpha Vantage."
+			"Supported: Mansa Markets, RapidAPI, FCS API, Twelve Data, Finnhub, Goldman Sachs, Alpha Vantage."
 		),
 	)
 	return {}
@@ -849,7 +865,88 @@ def _fetch_from_provider(
 
 # ── Price cache upsert ────────────────────────────────────────────────────────
 
-def _upsert_cache(ticker: str, market: str, price_data: dict, usd_to_kes: float, source: str):
+def _stock_row_for_ticker(ticker: str) -> dict | None:
+	"""Growe Stock row for cache link + exchange_platform (prefer active)."""
+	ticker_u = (ticker or "").upper().strip()
+	if not ticker_u:
+		return None
+	rows = frappe.get_all(
+		"Growe Stock",
+		filters={"ticker": ticker_u},
+		fields=["name", "exchange_platform", "is_active"],
+		order_by="is_active desc, modified desc",
+		limit=1,
+	)
+	return rows[0] if rows else None
+
+
+def _apply_stock_link_to_cache(cache, ticker: str, stock_meta: dict | None = None) -> None:
+	"""Link Growe Stock and exchange_platform on a price cache row."""
+	ticker_u = (ticker or "").upper().strip()
+	meta = (stock_meta or {}).get(ticker_u) if stock_meta else None
+	if not meta:
+		meta = _stock_row_for_ticker(ticker_u)
+	if not meta or not meta.get("name"):
+		return
+
+	cache.stock = meta["name"]
+	if hasattr(cache, "set_fetch_from_values"):
+		cache.set_fetch_from_values()
+	if meta.get("exchange_platform"):
+		cache.exchange_platform = meta["exchange_platform"]
+
+
+def _stock_meta_for_tickers(tickers: list) -> dict[str, dict]:
+	"""Map ticker → {name, exchange_platform} from Growe Stock (prefer active)."""
+	uniq = list(dict.fromkeys((t or "").upper() for t in tickers if (t or "").strip()))
+	if not uniq:
+		return {}
+	rows = frappe.get_all(
+		"Growe Stock",
+		filters={"ticker": ["in", uniq]},
+		fields=["name", "ticker", "exchange_platform", "is_active"],
+		order_by="is_active desc, modified desc",
+	)
+	meta: dict[str, dict] = {}
+	for row in rows:
+		t = (row.ticker or "").upper()
+		if t and t not in meta:
+			meta[t] = {
+				"name": row.name,
+				"exchange_platform": row.get("exchange_platform"),
+			}
+	return meta
+
+
+def _backfill_price_cache_stock_links(tickers: list, stock_meta: dict | None = None) -> int:
+	"""Fill missing Growe Stock / exchange_platform on existing cache rows."""
+	updated = 0
+	meta = stock_meta or _stock_meta_for_tickers(tickers)
+	for ticker in tickers:
+		tu = (ticker or "").upper().strip()
+		if not tu or not frappe.db.exists("Growe Price Cache", tu):
+			continue
+		cache = frappe.get_doc("Growe Price Cache", tu)
+		if cache.stock and cache.get("exchange_platform"):
+			continue
+		before_stock = cache.stock
+		before_ex = cache.get("exchange_platform")
+		_apply_stock_link_to_cache(cache, tu, meta)
+		if cache.stock != before_stock or cache.get("exchange_platform") != before_ex:
+			cache.flags.ignore_permissions = True
+			cache.save()
+			updated += 1
+	return updated
+
+
+def _upsert_cache(
+	ticker: str,
+	market: str,
+	price_data: dict,
+	usd_to_kes: float,
+	source: str,
+	stock_meta: dict | None = None,
+):
 	price = price_data["price"]
 	currency = (price_data.get("currency") or "KES").upper()
 	change_pct = float(price_data.get("change_percent", 0) or 0)
@@ -862,6 +959,8 @@ def _upsert_cache(ticker: str, market: str, price_data: dict, usd_to_kes: float,
 	else:
 		cache = frappe.new_doc("Growe Price Cache")
 		cache.ticker = ticker
+
+	_apply_stock_link_to_cache(cache, ticker, stock_meta)
 
 	cache.market = market
 	cache.price_kes = round(price_kes, 4)
@@ -1003,6 +1102,7 @@ def _fetch_and_store(
 	tickers: list,
 	sym_map: dict | None = None,
 	provider_name: str | None = None,
+	stock_meta: dict | None = None,
 ) -> dict:
 	if not tickers:
 		return {}
@@ -1018,6 +1118,7 @@ def _fetch_and_store(
 
 	usd_to_kes = _get_usd_to_kes()
 	sym_map = sym_map or {}
+	stock_meta = stock_meta or _stock_meta_for_tickers(tickers)
 
 	for provider in providers:
 		
@@ -1045,7 +1146,9 @@ def _fetch_and_store(
 			tu = (ticker or "").upper()
 			if tu not in remaining:
 				continue
-			_upsert_cache(tu, market, data, usd_to_kes, provider["provider_name"])
+			_upsert_cache(
+				tu, market, data, usd_to_kes, provider["provider_name"], stock_meta=stock_meta
+			)
 			currency = (data.get("currency") or "KES").upper()
 			price_kes = data["price"] if currency == "KES" else data["price"] * usd_to_kes
 			prices[tu] = price_kes
@@ -1076,7 +1179,9 @@ def _fetch_and_store(
 					tu = (ticker or "").upper()
 					if tu not in remaining:
 						continue
-					_upsert_cache(tu, market, data, usd_to_kes, provider["provider_name"])
+					_upsert_cache(
+						tu, market, data, usd_to_kes, provider["provider_name"], stock_meta=stock_meta
+					)
 					currency = (data.get("currency") or "KES").upper()
 					price_kes = data["price"] if currency == "KES" else data["price"] * usd_to_kes
 					prices[tu] = price_kes
@@ -1122,9 +1227,10 @@ def _execute_refresh_prices(provider_name: str = None, show_user_messages: bool 
 	If provider_name is passed (e.g. Growe Price API name from Desk), only that row is used.
 	Otherwise all active providers for each market run in sequence.
 	"""
-	nse_tickers, global_tickers, nse_map, global_map = _collect_tickers_for_live_prices()
+	nse_tickers, global_tickers, nse_map, global_map, stock_meta = _collect_tickers_for_live_prices()
 	nse_tickers = _sort_tickers_holdings_first(nse_tickers)
 	global_tickers = _sort_tickers_holdings_first(global_tickers)
+	all_tickers = list(dict.fromkeys((nse_tickers or []) + (global_tickers or [])))
 
 	eligible: list = []
 	if provider_name:
@@ -1142,12 +1248,12 @@ def _execute_refresh_prices(provider_name: str = None, show_user_messages: bool 
 
 		if _provider_supports_market(p, "NSE") and nse_tickers:
 			nse_updated_count = _fetch_market_for_refresh(
-				"NSE", nse_tickers, nse_map, providers=prov
+				"NSE", nse_tickers, nse_map, providers=prov, stock_meta=stock_meta
 			)
 			all_prices.update(_prices_from_cache_for_tickers(nse_tickers))
 		if _provider_supports_market(p, "GLOBAL") and global_tickers:
 			global_updated_count = _fetch_market_for_refresh(
-				"Global", global_tickers, global_map, providers=prov
+				"Global", global_tickers, global_map, providers=prov, stock_meta=stock_meta
 			)
 			all_prices.update(_prices_from_cache_for_tickers(global_tickers))
 
@@ -1185,8 +1291,12 @@ def _execute_refresh_prices(provider_name: str = None, show_user_messages: bool 
 			else:
 				frappe.logger("growie.price").warning(warning)
 	else:
-		nse_updated_count = _fetch_market_for_refresh("NSE", nse_tickers, nse_map)
-		global_updated_count = _fetch_market_for_refresh("Global", global_tickers, global_map)
+		nse_updated_count = _fetch_market_for_refresh(
+			"NSE", nse_tickers, nse_map, stock_meta=stock_meta
+		)
+		global_updated_count = _fetch_market_for_refresh(
+			"Global", global_tickers, global_map, stock_meta=stock_meta
+		)
 		all_prices = {}
 		for t in set(nse_tickers) | set(global_tickers):
 			cache = frappe.db.get_value("Growe Price Cache", t, "price_kes")
@@ -1198,6 +1308,8 @@ def _execute_refresh_prices(provider_name: str = None, show_user_messages: bool 
 		cache = frappe.db.get_value("Growe Price Cache", t, "price_kes")
 		if cache:
 			_update_holdings_for_ticker(t, float(cache))
+
+	_backfill_price_cache_stock_links(all_tickers, stock_meta)
 
 	frappe.db.commit()
 
@@ -1255,16 +1367,23 @@ def _run_refresh_prices(provider_name: str = None, notify_user: str = None) -> d
 
 
 def _execute_refresh_stock_prices() -> dict:
-	nse_tickers, global_tickers, nse_map, gmap = _collect_tickers_for_live_prices()
+	nse_tickers, global_tickers, nse_map, gmap, stock_meta = _collect_tickers_for_live_prices()
 	nse_tickers = _sort_tickers_holdings_first(nse_tickers)
 	global_tickers = _sort_tickers_holdings_first(global_tickers)
+	all_tickers = list(dict.fromkeys((nse_tickers or []) + (global_tickers or [])))
 
-	nse_updated = _fetch_market_for_refresh("NSE", nse_tickers, nse_map)
-	global_updated = _fetch_market_for_refresh("Global", global_tickers, gmap)
+	nse_updated = _fetch_market_for_refresh(
+		"NSE", nse_tickers, nse_map, stock_meta=stock_meta
+	)
+	global_updated = _fetch_market_for_refresh(
+		"Global", global_tickers, gmap, stock_meta=stock_meta
+	)
 	for t in set(nse_tickers) | set(global_tickers):
 		cache = frappe.db.get_value("Growe Price Cache", t, "price_kes")
 		if cache:
 			_update_holdings_for_ticker(t, float(cache))
+
+	_backfill_price_cache_stock_links(all_tickers, stock_meta)
 
 	frappe.db.commit()
 
@@ -1339,7 +1458,7 @@ def get_price_cache():
 	"""Return all cached prices."""
 	return frappe.get_all(
 		"Growe Price Cache",
-		fields=["ticker", "market", "price_kes", "price_usd", "change_percent", "source", "fetched_at"],
+		fields=["ticker", "market", "exchange_platform", "price_kes", "price_usd", "change_percent", "source", "fetched_at"],
 		order_by="market asc, ticker asc",
 	)
 
@@ -1368,7 +1487,7 @@ def test_provider(provider_name: str, test_ticker: str = "SCOM", market: str = N
 		"Growe Price API",
 		provider_name,
 		["name", "provider_name", "api_provider", "market_type",
-		 "api_base_url", "api_key", "api_secret", "endpoint_prices"],
+		 "api_base_url", "api_key", "endpoint_prices"],
 		as_dict=True,
 	)
 
@@ -1517,27 +1636,35 @@ def _price_fetch_bucket(exchange_platform: str | None) -> str:
 	return "NSE" if _is_nse_exchange(exchange_platform) else "GLOBAL"
 
 
-def _collect_tickers_for_live_prices() -> tuple[list, list, dict, dict]:
+def _collect_tickers_for_live_prices() -> tuple[list, list, dict, dict, dict]:
 	"""
 	Build NSE / Global ticker lists from Growe Stock exchange_platform:
 	- exchange_platform = NSE → Mansa / RapidAPI
 	- any other exchange (or unset) → Finnhub / Alpha Vantage / FCS
 	Also includes portfolio tickers not in the active stock master.
+
+	Returns stock_meta: {TICKER: {name, exchange_platform}} for cache linking.
 	"""
 	
 	nse: set = set()
 	global_: set = set()
 	nse_map: dict = {}
 	global_map: dict = {}
+	stock_meta: dict[str, dict] = {}
 
 	for s in frappe.get_all(
 		"Growe Stock",
 		filters={"is_active": 1},
-		fields=["ticker", "api_symbol", "exchange_platform"],
+		fields=["name", "ticker", "api_symbol", "exchange_platform"],
 	):
 		t = (s.ticker or "").upper()
 		if not t:
 			continue
+		if t not in stock_meta:
+			stock_meta[t] = {
+				"name": s.name,
+				"exchange_platform": s.get("exchange_platform"),
+			}
 		bucket = _price_fetch_bucket(s.exchange_platform)
 		if bucket == "NSE":
 			nse.add(t)
@@ -1562,10 +1689,15 @@ def _collect_tickers_for_live_prices() -> tuple[list, list, dict, dict]:
 		stock = frappe.db.get_value(
 			"Growe Stock",
 			{"ticker": t},
-			["exchange_platform"],
+			["name", "exchange_platform"],
 			as_dict=True,
 		)
 		if stock:
+			if t not in stock_meta:
+				stock_meta[t] = {
+					"name": stock.name,
+					"exchange_platform": stock.get("exchange_platform"),
+				}
 			bucket = _price_fetch_bucket(stock.exchange_platform)
 		else:
 			bucket = "NSE" if (h.currency or "USD").upper() == "KES" else "GLOBAL"
@@ -1574,7 +1706,7 @@ def _collect_tickers_for_live_prices() -> tuple[list, list, dict, dict]:
 		else:
 			global_.add(t)
 
-	return list(nse), list(global_), nse_map, global_map
+	return list(nse), list(global_), nse_map, global_map, stock_meta
 
 
 def _run_fetch_providers_round(
@@ -1582,6 +1714,7 @@ def _run_fetch_providers_round(
 	remaining: list,
 	sym_map: dict,
 	providers: list,
+	stock_meta: dict | None = None,
 ) -> set[str]:
 	"""Mutates `remaining`; returns tickers upserted this round."""
 	updated: set[str] = set()
@@ -1603,7 +1736,7 @@ def _run_fetch_providers_round(
 			tu = (ticker or "").upper()
 			if tu not in remaining:
 				continue
-			_upsert_cache(tu, market, data, _usd, provider["provider_name"])
+			_upsert_cache(tu, market, data, _usd, provider["provider_name"], stock_meta=stock_meta)
 			updated.add(tu)
 			remaining.remove(tu)
 
@@ -1626,14 +1759,18 @@ def _run_fetch_providers_round(
 				for tk, data in list(fetched.items()):
 					tu = (tk or "").upper()
 					if tu in remaining:
-						_upsert_cache(tu, market, data, _usd, provider["provider_name"])
+						_upsert_cache(tu, market, data, _usd, provider["provider_name"], stock_meta=stock_meta)
 						updated.add(tu)
 						remaining.remove(tu)
 	return updated
 
 
 def _fetch_market_for_refresh(
-	market: str, tickers: list, sym_map: dict, providers: list | None = None
+	market: str,
+	tickers: list,
+	sym_map: dict,
+	providers: list | None = None,
+	stock_meta: dict | None = None,
 ) -> int:
 	"""
 	Fetch and upsert for one market. Each active provider runs in order (batch, then
@@ -1659,12 +1796,18 @@ def _fetch_market_for_refresh(
 		return 0
 
 	remaining = list(original)
-	updated = _run_fetch_providers_round(market, remaining, sym_map, providers)
+	if stock_meta is None:
+		stock_meta = _stock_meta_for_tickers(original)
+	updated = _run_fetch_providers_round(
+		market, remaining, sym_map, providers, stock_meta=stock_meta
+	)
 
 	still_incomplete = [t for t in original if _ticker_cache_incomplete(t)]
 	if still_incomplete:
 		remaining = list(still_incomplete)
-		updated |= _run_fetch_providers_round(market, remaining, sym_map, providers)
+		updated |= _run_fetch_providers_round(
+			market, remaining, sym_map, providers, stock_meta=stock_meta
+		)
 
 	return len(updated)
 
