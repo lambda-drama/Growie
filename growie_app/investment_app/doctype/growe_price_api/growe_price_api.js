@@ -3,6 +3,8 @@
 
 frappe.ui.form.on("Growe Price API", {
 	refresh(frm) {
+		_bind_price_refresh_realtime(frm);
+
 		// ── Test Connection button ────────────────────────────────────────────────
 		frm.add_custom_button(__("Test Connection"), function () {
 			frappe.prompt(
@@ -87,20 +89,42 @@ frappe.ui.form.on("Growe Price API", {
 					[frm.doc.provider_name || frm.doc.name, scopeHint]
 				),
 				function () {
+					frm._price_refresh_active = true;
+					frm.dashboard.set_headline_alert(
+						__("Starting price refresh in background…"),
+						"blue"
+					);
 					frappe.call({
 						method: "growie_app.api.price.refresh_prices",
-						args: { provider_name: frm.doc.name, sync: 1 },
-						freeze: true,
-						freeze_message: __("Fetching live prices…"),
+						args: { provider_name: frm.doc.name },
 						callback: function (r) {
-							if (!r.message) return;
-							if (r.message.queued) {
-								frappe.show_alert({
-									message: r.message.message || __("Price refresh queued."),
-									indicator: "blue",
-								}, 8);
+							if (!r.message) {
+								frm._price_refresh_active = false;
+								frm.dashboard.clear_headline();
 								return;
 							}
+							if (r.message.queued) {
+								const total = r.message.tickers_requested || 0;
+								frappe.show_alert({
+									message:
+										r.message.message ||
+										__(
+											"Price refresh queued for {0} ticker(s). Watch the progress bar above.",
+											[total]
+										),
+									indicator: "blue",
+								}, 8);
+								frm.dashboard.set_headline_alert(
+									__(
+										"Refreshing prices in background… 0/{0} (0%)",
+										[total]
+									),
+									"blue"
+								);
+								return;
+							}
+							frm._price_refresh_active = false;
+							frm.dashboard.clear_headline();
 							frappe.msgprint({
 								title: __("✅ Prices Refreshed"),
 								indicator: "green",
@@ -108,6 +132,10 @@ frappe.ui.form.on("Growe Price API", {
 									`<b>NSE</b>: ${r.message.nse_updated} ticker(s) updated<br>` +
 									`<b>Global</b>: ${r.message.global_updated} ticker(s) updated`,
 							});
+						},
+						error: function () {
+							frm._price_refresh_active = false;
+							frm.dashboard.clear_headline();
 						},
 					});
 				}
@@ -176,10 +204,10 @@ frappe.ui.form.on("Growe Price API", {
 
 		if (api_prov.includes("twelve")) {
 			frm.dashboard.add_comment(
-				__("<b>Twelve Data</b> — batch quotes with <code>exchange</code> from Growe Stock "
-				   + "<b>Exchange platform</b> (NSE, NYSE, NASDAQ, LSE, …). "
-				   + "Up to 120 symbols per batch per exchange. "
-				   + "<a href=\"https://support.twelvedata.com/en/articles/5203360-batch-api-requests\" target=\"_blank\">Batch docs</a>"),
+				__("<b>Twelve Data</b> — one quote per symbol (same as Test Connection). "
+				   + "Bulk refresh runs in the <b>background</b>; progress shows above. "
+				   + "Set <b>Exchange platform</b> on Growe Stock for NSE/global routing. "
+				   + "<a href=\"https://twelvedata.com/docs\" target=\"_blank\">Docs</a>"),
 				"blue",
 				true
 			);
@@ -213,6 +241,63 @@ frappe.ui.form.on("Growe Price API", {
 		_set_provider_hints(frm);
 	},
 });
+
+function _bind_price_refresh_realtime(frm) {
+	if (frm._growie_price_refresh_bound) {
+		return;
+	}
+	frm._growie_price_refresh_bound = true;
+
+	frappe.realtime.on("growie_price_refresh_progress", (data) => {
+		if (!frm._price_refresh_active) return;
+		if (data.provider_name && data.provider_name !== frm.doc.name) return;
+		const total = data.total || 0;
+		const done = data.done || 0;
+		const pct = total ? Math.round((done / total) * 100) : 0;
+		const market = data.market ? ` (${data.market})` : "";
+		const last = data.last_ticker ? ` — ${data.last_ticker}` : "";
+		frm.dashboard.set_headline_alert(
+			__(
+				"Refreshing prices{0}… {1}/{2} ({3}%){4}",
+				[market, done, total, pct, last]
+			),
+			"blue"
+		);
+	});
+
+	frappe.realtime.on("growie_price_refresh_done", (data) => {
+		if (data.provider_name && data.provider_name !== frm.doc.name) return;
+		frm._price_refresh_active = false;
+		frm.dashboard.clear_headline();
+
+		if (data.success === false) {
+			frappe.msgprint({
+				title: __("❌ Price Refresh Failed"),
+				indicator: "red",
+				message: frappe.utils.escape_html(data.error || __("Unknown error")),
+			});
+			return;
+		}
+
+		frappe.show_alert({
+			message: __(
+				"Prices refreshed — NSE: {0}, Global: {1}",
+				[data.nse_updated || 0, data.global_updated || 0]
+			),
+			indicator: "green",
+		}, 10);
+		frappe.msgprint({
+			title: __("✅ Prices Refreshed"),
+			indicator: "green",
+			message:
+				`<b>NSE</b>: ${data.nse_updated || 0} ticker(s) updated<br>` +
+				`<b>Global</b>: ${data.global_updated || 0} ticker(s) updated<br>` +
+				(data.tickers_requested
+					? `<small>${__("Requested")}: ${data.tickers_requested}</small>`
+					: ""),
+		});
+	});
+}
 
 /**
  * Auto-fill base URL and endpoint when the user picks a known provider,
