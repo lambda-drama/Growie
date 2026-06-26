@@ -1194,6 +1194,31 @@ def _fetch_and_store(
 
 PRICE_REFRESH_QUEUE = "long"
 PRICE_REFRESH_TIMEOUT = 3600
+REFRESH_FETCH_CHUNK = 30
+
+
+def _publish_price_refresh_progress(
+	notify_user: str | None,
+	*,
+	provider_name: str | None = None,
+	market: str | None = None,
+	done: int = 0,
+	total: int = 0,
+	last_ticker: str | None = None,
+) -> None:
+	if not notify_user:
+		return
+	frappe.publish_realtime(
+		"growie_price_refresh_progress",
+		{
+			"provider_name": provider_name,
+			"market": market,
+			"done": done,
+			"total": total,
+			"last_ticker": last_ticker,
+		},
+		user=notify_user,
+	)
 
 
 def _log_price_fetch_error(provider_label: str, symbol: str, exc: Exception) -> None:
@@ -1218,7 +1243,11 @@ def _enqueue_price_refresh(method: str, job_id: str, **kwargs) -> None:
 	)
 
 
-def _execute_refresh_prices(provider_name: str = None, show_user_messages: bool = False) -> dict:
+def _execute_refresh_prices(
+	provider_name: str = None,
+	show_user_messages: bool = False,
+	notify_user: str | None = None,
+) -> dict:
 	"""
 	Fetch fresh prices for every active Growe Stock ticker (and any held ticker not in
 	the stock master), same universe as refresh_stock_prices. Holdings tickers are
@@ -1231,6 +1260,8 @@ def _execute_refresh_prices(provider_name: str = None, show_user_messages: bool 
 	nse_tickers = _sort_tickers_holdings_first(nse_tickers)
 	global_tickers = _sort_tickers_holdings_first(global_tickers)
 	all_tickers = list(dict.fromkeys((nse_tickers or []) + (global_tickers or [])))
+	progress_total = len(all_tickers)
+	progress_done = 0
 
 	eligible: list = []
 	if provider_name:
@@ -1248,12 +1279,29 @@ def _execute_refresh_prices(provider_name: str = None, show_user_messages: bool 
 
 		if _provider_supports_market(p, "NSE") and nse_tickers:
 			nse_updated_count = _fetch_market_for_refresh(
-				"NSE", nse_tickers, nse_map, providers=prov, stock_meta=stock_meta
+				"NSE",
+				nse_tickers,
+				nse_map,
+				providers=prov,
+				stock_meta=stock_meta,
+				notify_user=notify_user,
+				provider_name=provider_name,
+				progress_total=progress_total,
+				progress_done=progress_done,
 			)
+			progress_done += nse_updated_count
 			all_prices.update(_prices_from_cache_for_tickers(nse_tickers))
 		if _provider_supports_market(p, "GLOBAL") and global_tickers:
 			global_updated_count = _fetch_market_for_refresh(
-				"Global", global_tickers, global_map, providers=prov, stock_meta=stock_meta
+				"Global",
+				global_tickers,
+				global_map,
+				providers=prov,
+				stock_meta=stock_meta,
+				notify_user=notify_user,
+				provider_name=provider_name,
+				progress_total=progress_total,
+				progress_done=progress_done,
 			)
 			all_prices.update(_prices_from_cache_for_tickers(global_tickers))
 
@@ -1292,10 +1340,25 @@ def _execute_refresh_prices(provider_name: str = None, show_user_messages: bool 
 				frappe.logger("growie.price").warning(warning)
 	else:
 		nse_updated_count = _fetch_market_for_refresh(
-			"NSE", nse_tickers, nse_map, stock_meta=stock_meta
+			"NSE",
+			nse_tickers,
+			nse_map,
+			stock_meta=stock_meta,
+			notify_user=notify_user,
+			provider_name=provider_name,
+			progress_total=progress_total,
+			progress_done=progress_done,
 		)
+		progress_done += nse_updated_count
 		global_updated_count = _fetch_market_for_refresh(
-			"Global", global_tickers, global_map, stock_meta=stock_meta
+			"Global",
+			global_tickers,
+			global_map,
+			stock_meta=stock_meta,
+			notify_user=notify_user,
+			provider_name=provider_name,
+			progress_total=progress_total,
+			progress_done=progress_done,
 		)
 		all_prices = {}
 		for t in set(nse_tickers) | set(global_tickers):
@@ -1336,6 +1399,9 @@ def _execute_refresh_prices(provider_name: str = None, show_user_messages: bool 
 		"nse_updated": nse_updated_count,
 		"global_updated": global_updated_count,
 		"prices": all_prices,
+		"success": True,
+		"provider_name": provider_name,
+		"tickers_requested": progress_total,
 	}
 
 
@@ -1344,7 +1410,10 @@ def _run_refresh_prices(provider_name: str = None, notify_user: str = None) -> d
 	if notify_user:
 		frappe.set_user(notify_user)
 	try:
-		result = _execute_refresh_prices(provider_name=provider_name)
+		result = _execute_refresh_prices(
+			provider_name=provider_name,
+			notify_user=notify_user,
+		)
 		frappe.logger("growie.price").info(
 			"Price refresh complete (provider=%s): NSE=%s Global=%s",
 			provider_name or "all",
@@ -1354,15 +1423,25 @@ def _run_refresh_prices(provider_name: str = None, notify_user: str = None) -> d
 		if notify_user:
 			frappe.publish_realtime(
 				"growie_price_refresh_done",
-				result,
+				{**result, "success": True, "provider_name": provider_name},
 				user=notify_user,
 			)
 		return result
-	except Exception:
+	except Exception as exc:
 		frappe.log_error(
 			title=f"Price refresh job failed ({provider_name or 'all'})",
 			message=frappe.get_traceback(),
 		)
+		if notify_user:
+			frappe.publish_realtime(
+				"growie_price_refresh_done",
+				{
+					"success": False,
+					"error": str(exc),
+					"provider_name": provider_name,
+				},
+				user=notify_user,
+			)
 		raise
 
 
@@ -1437,7 +1516,14 @@ def refresh_prices(provider_name: str = None, sync: int = 0):
 			frappe.throw(_(f"Provider '{provider_name}' is not active."))
 
 	if int(sync or 0):
-		return _execute_refresh_prices(provider_name=provider_name, show_user_messages=True)
+		return _execute_refresh_prices(
+			provider_name=provider_name,
+			show_user_messages=True,
+			notify_user=frappe.session.user,
+		)
+
+	nse_tickers, global_tickers, _nse_map, _global_map, _stock_meta = _collect_tickers_for_live_prices()
+	total_tickers = len(set(nse_tickers) | set(global_tickers))
 
 	_enqueue_price_refresh(
 		"growie_app.api.price._run_refresh_prices",
@@ -1448,8 +1534,12 @@ def refresh_prices(provider_name: str = None, sync: int = 0):
 	return {
 		"queued": True,
 		"message": _(
-			"Price refresh started in the background. Updated prices will appear shortly."
+			"Price refresh started in the background. Progress will appear on this form."
 		),
+		"provider_name": provider_name,
+		"nse_tickers": len(nse_tickers),
+		"global_tickers": len(global_tickers),
+		"tickers_requested": total_tickers,
 	}
 
 
@@ -1715,30 +1805,87 @@ def _run_fetch_providers_round(
 	sym_map: dict,
 	providers: list,
 	stock_meta: dict | None = None,
+	notify_user: str | None = None,
+	provider_name: str | None = None,
+	progress_total: int = 0,
+	progress_done: int = 0,
 ) -> set[str]:
 	"""Mutates `remaining`; returns tickers upserted this round."""
 	updated: set[str] = set()
+	last_ticker: str | None = None
+
 	for provider in providers:
 		if not remaining:
 			break
 		if _provider_is_rate_limited(provider):
 			continue
-		if _provider_uses_alpha_vantage(provider):
-			fetched = _fetch_alpha_vantage(
-				provider, remaining, market, symbol_override_map=sym_map
-			)
-		else:
-			fetched = _fetch_from_provider(
-				provider, remaining, market, symbol_override_map=sym_map
-			)
-		_usd = _get_usd_to_kes()
-		for ticker, data in list(fetched.items()):
-			tu = (ticker or "").upper()
-			if tu not in remaining:
-				continue
-			_upsert_cache(tu, market, data, _usd, provider["provider_name"], stock_meta=stock_meta)
-			updated.add(tu)
-			remaining.remove(tu)
+
+		while remaining:
+			if _provider_is_rate_limited(provider):
+				break
+			count_before = len(updated)
+			chunk = remaining[:REFRESH_FETCH_CHUNK]
+
+			if _provider_uses_alpha_vantage(provider):
+				fetched = _fetch_alpha_vantage(
+					provider, chunk, market, symbol_override_map=sym_map
+				)
+			else:
+				fetched = _fetch_from_provider(
+					provider, chunk, market, symbol_override_map=sym_map
+				)
+
+			_usd = _get_usd_to_kes()
+			for ticker, data in list(fetched.items()):
+				tu = (ticker or "").upper()
+				if tu not in remaining:
+					continue
+				_upsert_cache(
+					tu, market, data, _usd, provider["provider_name"], stock_meta=stock_meta
+				)
+				updated.add(tu)
+				remaining.remove(tu)
+				last_ticker = tu
+
+			if len(updated) == count_before and chunk:
+				for lone in chunk:
+					if lone not in remaining:
+						continue
+					if _provider_uses_alpha_vantage(provider):
+						fetched_one = _fetch_alpha_vantage(
+							provider, [lone], market, symbol_override_map=sym_map
+						)
+					else:
+						fetched_one = _fetch_from_provider(
+							provider, [lone], market, symbol_override_map=sym_map
+						)
+					for tk, data in list(fetched_one.items()):
+						tu = (tk or "").upper()
+						if tu in remaining:
+							_upsert_cache(
+								tu,
+								market,
+								data,
+								_usd,
+								provider["provider_name"],
+								stock_meta=stock_meta,
+							)
+							updated.add(tu)
+							remaining.remove(tu)
+							last_ticker = tu
+
+			if len(updated) > count_before:
+				frappe.db.commit()
+				_publish_price_refresh_progress(
+					notify_user,
+					provider_name=provider_name,
+					market=market,
+					done=progress_done + len(updated),
+					total=progress_total,
+					last_ticker=last_ticker,
+				)
+			elif chunk:
+				break
 
 	if remaining:
 		for provider in providers:
@@ -1759,9 +1906,25 @@ def _run_fetch_providers_round(
 				for tk, data in list(fetched.items()):
 					tu = (tk or "").upper()
 					if tu in remaining:
-						_upsert_cache(tu, market, data, _usd, provider["provider_name"], stock_meta=stock_meta)
+						_upsert_cache(
+							tu,
+							market,
+							data,
+							_usd,
+							provider["provider_name"],
+							stock_meta=stock_meta,
+						)
 						updated.add(tu)
 						remaining.remove(tu)
+						frappe.db.commit()
+						_publish_price_refresh_progress(
+							notify_user,
+							provider_name=provider_name,
+							market=market,
+							done=progress_done + len(updated),
+							total=progress_total,
+							last_ticker=tu,
+						)
 	return updated
 
 
@@ -1771,6 +1934,10 @@ def _fetch_market_for_refresh(
 	sym_map: dict,
 	providers: list | None = None,
 	stock_meta: dict | None = None,
+	notify_user: str | None = None,
+	provider_name: str | None = None,
+	progress_total: int = 0,
+	progress_done: int = 0,
 ) -> int:
 	"""
 	Fetch and upsert for one market. Each active provider runs in order (batch, then
@@ -1798,15 +1965,38 @@ def _fetch_market_for_refresh(
 	remaining = list(original)
 	if stock_meta is None:
 		stock_meta = _stock_meta_for_tickers(original)
+	_publish_price_refresh_progress(
+		notify_user,
+		provider_name=provider_name,
+		market=market,
+		done=progress_done,
+		total=progress_total,
+	)
 	updated = _run_fetch_providers_round(
-		market, remaining, sym_map, providers, stock_meta=stock_meta
+		market,
+		remaining,
+		sym_map,
+		providers,
+		stock_meta=stock_meta,
+		notify_user=notify_user,
+		provider_name=provider_name,
+		progress_total=progress_total,
+		progress_done=progress_done,
 	)
 
 	still_incomplete = [t for t in original if _ticker_cache_incomplete(t)]
 	if still_incomplete:
 		remaining = list(still_incomplete)
 		updated |= _run_fetch_providers_round(
-			market, remaining, sym_map, providers, stock_meta=stock_meta
+			market,
+			remaining,
+			sym_map,
+			providers,
+			stock_meta=stock_meta,
+			notify_user=notify_user,
+			provider_name=provider_name,
+			progress_total=progress_total,
+			progress_done=progress_done + len(updated),
 		)
 
 	return len(updated)

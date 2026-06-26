@@ -18,8 +18,6 @@ import requests
 
 _TD_DEFAULT_BASE = "https://api.twelvedata.com"
 _TD_QUOTE_PATH = "/quote"
-_TD_BATCH_PATH = "/batch"
-_TD_BATCH_SIZE = 120
 
 # Growe Exchange Platform → Twelve Data exchange name
 _TD_EXCHANGE_MAP = {
@@ -91,8 +89,15 @@ def _load_exchange_map(tickers: list[str]) -> dict[str, str]:
 def _parse_quote_payload(body: dict) -> dict | None:
 	if not isinstance(body, dict):
 		return None
-	if body.get("status") == "error" or (body.get("code") and int(body.get("code") or 0) >= 400):
+	if body.get("status") == "error":
 		return None
+	code = body.get("code")
+	if code is not None:
+		try:
+			if int(code) >= 400:
+				return None
+		except (TypeError, ValueError):
+			pass
 
 	price_raw = body.get("close")
 	if price_raw is None:
@@ -132,18 +137,22 @@ def _parse_quote_payload(body: dict) -> dict | None:
 	}
 
 
-def _parse_batch_quote_response(data: dict, id_to_ticker: dict[str, str]) -> dict:
-	results: dict = {}
-	if not isinstance(data, dict):
-		return results
-	for req_id, payload in data.items():
-		ticker = id_to_ticker.get(req_id)
-		if not ticker:
-			continue
-		parsed = _parse_quote_payload(payload if isinstance(payload, dict) else {})
-		if parsed:
-			results[ticker] = parsed
-	return results
+def _quote_url(
+	base: str,
+	path: str,
+	api_key: str,
+	ticker: str,
+	exchange: str | None = None,
+	country: str | None = None,
+) -> str:
+	"""Build a full GET /quote URL."""
+	root = f"{base.rstrip('/')}{path}"
+	parts = [f"symbol={quote(ticker, safe='')}", f"apikey={quote(api_key, safe='')}"]
+	if exchange:
+		parts.append(f"exchange={quote(exchange, safe='')}")
+	if country:
+		parts.append(f"country={quote(country, safe='')}")
+	return f"{root}?{'&'.join(parts)}"
 
 
 def _quote_get_single(
@@ -154,60 +163,15 @@ def _quote_get_single(
 	exchange: str | None,
 	country: str | None,
 ) -> dict:
-	"""GET /quote for one symbol (fallback when batch misses)."""
-	url = f"{base.rstrip('/')}{path}"
-	params: dict = {"symbol": ticker, "apikey": api_key}
-	if exchange:
-		params["exchange"] = exchange
-	if country:
-		params["country"] = country
-
-	resp = requests.get(url, params=params, timeout=25)
+	"""GET /quote for one symbol."""
+	url = _quote_url(base, path, api_key, ticker, exchange, country)
+	resp = requests.get(url, timeout=25)
 	if resp.status_code == 429:
 		raise RuntimeError("Twelve Data rate limited (429)")
 	resp.raise_for_status()
 	body = resp.json()
 	parsed = _parse_quote_payload(body if isinstance(body, dict) else {})
 	return {ticker.upper(): parsed} if parsed else {}
-
-
-def _quote_post_batch(
-	base: str,
-	api_key: str,
-	items: list[tuple[str, str | None, str | None]],
-) -> dict:
-	"""POST /batch — per-symbol quote URLs with individual exchange/country params."""
-	url = f"{base.rstrip('/')}{_TD_BATCH_PATH}"
-	payload: dict[str, str] = {}
-	id_to_ticker: dict[str, str] = {}
-	for idx, (ticker, exchange, country) in enumerate(items):
-		req_id = f"q{idx}"
-		id_to_ticker[req_id] = ticker.upper()
-		q = f"/quote?symbol={quote(ticker, safe='')}"
-		if exchange:
-			q += f"&exchange={quote(exchange, safe='')}"
-		if country:
-			q += f"&country={quote(country, safe='')}"
-		payload[req_id] = q
-
-	resp = requests.post(
-		url,
-		params={"apikey": api_key},
-		json=payload,
-		timeout=45,
-	)
-	if resp.status_code == 429:
-		raise RuntimeError("Twelve Data batch rate limited (429)")
-	resp.raise_for_status()
-	body = resp.json()
-	if isinstance(body, dict) and body.get("status") == "error":
-		msg = body.get("message") or str(body)
-		if re.search(r"(?i)limit|quota|rate", msg):
-			raise RuntimeError(msg)
-		return {}
-
-	data = body.get("data") if isinstance(body, dict) else None
-	return _parse_batch_quote_response(data or {}, id_to_ticker)
 
 
 def fetch_twelve_data_prices(
@@ -241,34 +205,19 @@ def fetch_twelve_data_prices(
 
 	exchange_map = _load_exchange_map(tickers)
 	market_label = str(market or "Global")
-
-	# /quote only accepts one symbol per GET; use POST /batch for all tickers.
-	items: list[tuple[str, str | None, str | None]] = []
-	for t in tickers:
-		ex_platform = exchange_map.get(t)
-		td_ex = twelve_data_exchange(ex_platform, market_label)
-		td_country = twelve_data_country(ex_platform, market_label)
-		items.append((t, td_ex, td_country))
-
 	results: dict = {}
 
 	try:
-		for i in range(0, len(items), _TD_BATCH_SIZE):
-			chunk = items[i : i + _TD_BATCH_SIZE]
-			if not chunk:
-				continue
-			if i > 0:
-				time.sleep(0.4)
-			results.update(_quote_post_batch(base, api_key, chunk))
-
-		# Fallback: single GET for any ticker the batch did not return
-		missing = [t for t in tickers if t not in results]
-		for t in missing:
+		# One GET /quote per symbol — same path as Test Connection (reliable for bulk).
+		for i, t in enumerate(tickers):
 			ex_platform = exchange_map.get(t)
 			td_ex = twelve_data_exchange(ex_platform, market_label)
 			td_country = twelve_data_country(ex_platform, market_label)
-			results.update(_quote_get_single(base, path, api_key, t, td_ex, td_country))
-			time.sleep(0.15)
+			results.update(
+				_quote_get_single(base, path, api_key, t, td_ex, td_country)
+			)
+			if i + 1 < len(tickers):
+				time.sleep(0.08)
 
 		if not results and tickers:
 			frappe.log_error(
