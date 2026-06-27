@@ -64,6 +64,7 @@ from urllib.parse import urlparse
 
 import frappe
 from frappe import _
+from frappe.exceptions import ValidationError
 from frappe.utils import now_datetime, today
 import requests as _requests
 import time
@@ -103,6 +104,58 @@ def _provider_is_rate_limited(provider: dict) -> bool:
 	return bool(provider.get("_rate_limited") or provider.get("_alpha_rate_limited"))
 
 
+def _begin_price_refresh_run() -> None:
+	frappe.local.growie_price_refresh_warnings = []
+
+
+def _note_price_refresh_warning(message: str) -> None:
+	if not message:
+		return
+	warnings = getattr(frappe.local, "growie_price_refresh_warnings", None)
+	if warnings is None:
+		warnings = []
+		frappe.local.growie_price_refresh_warnings = warnings
+	if message not in warnings:
+		warnings.append(message)
+
+
+def _price_refresh_warnings() -> list[str]:
+	return list(getattr(frappe.local, "growie_price_refresh_warnings", None) or [])
+
+
+def _mark_provider_key_invalid(provider: dict, reason: str = "") -> None:
+	provider["_key_invalid"] = True
+	if reason:
+		provider["_key_invalid_reason"] = reason[:500]
+	label = provider.get("provider_name") or provider.get("name") or "Growe Price API"
+	_note_price_refresh_warning(
+		_("{0}: skipped — {1}").format(
+			label,
+			reason or _("API key unavailable."),
+		)
+	)
+	frappe.logger("growie.price").info(
+		"Skipping price provider %s: %s",
+		label,
+		reason or "no API key",
+	)
+
+
+def _provider_key_invalid(provider: dict) -> bool:
+	return bool(provider.get("_key_invalid"))
+
+
+def _provider_ready(provider: dict) -> bool:
+	"""True when provider can be called (active key, not rate-limited)."""
+	if _provider_is_rate_limited(provider) or _provider_key_invalid(provider):
+		return False
+	if "_api_key_resolved" in provider:
+		return bool(provider["_api_key_resolved"])
+	key = _price_api_key(provider)
+	provider["_api_key_resolved"] = bool(key)
+	return provider["_api_key_resolved"]
+
+
 def _http_response_rate_limited(resp, provider: dict, vendor: str) -> bool:
 	"""True when HTTP status indicates quota exhaustion; provider is skipped for this run."""
 	if getattr(resp, "status_code", None) != 429:
@@ -130,22 +183,36 @@ def _price_api_key(provider: dict) -> str:
 	"""
 	Resolve API key for Growe Price API. Password fields are omitted from get_value/get_all;
 	load the document and read the secret via get_password.
+
+	Decryption failures (e.g. site encryption key changed) are logged and skipped so other
+	providers can still run — re-save the API key in Desk to fix the provider row.
 	"""
 	name = provider.get("name")
-	details = frappe.get_doc("Growe Price API", name)
-	key =  details.get_password("api_key")
-	if key:
-		return str(key).strip()
-	doc_name = provider.get("name")
-	if doc_name:
+	if not name:
+		return ""
+	try:
+		doc = frappe.get_doc("Growe Price API", name)
 		try:
-			doc = frappe.get_doc("Growe Price API", doc_name)
-			pw = doc.get_password("api_key")
-			if pw:
-				return str(pw).strip()
-		except Exception:
-			pass
-	return ""
+			key = doc.get_password("api_key", raise_exception=False)
+		except ValidationError as exc:
+			_mark_provider_key_invalid(provider, str(exc))
+			return ""
+		if key:
+			return str(key).strip()
+		has_stored = bool(frappe.db.get_value("Growe Price API", name, "api_key"))
+		_mark_provider_key_invalid(
+			provider,
+			_("API key is not set.")
+			if not has_stored
+			else _("Stored API key could not be decrypted."),
+		)
+		return ""
+	except Exception as exc:
+		_mark_provider_key_invalid(provider, str(exc))
+		frappe.logger("growie.price").warning(
+			"Growe Price API %s api_key unreadable: %s", name, exc
+		)
+		return ""
 
 
 def _mansa_kes_usd_rate(provider: dict) -> float | None:
@@ -324,6 +391,8 @@ def _fetch_mansa(provider: dict, symbols: list, market: str = "NSE") -> dict:
 	base = provider["api_base_url"].rstrip("/")
 	api_key = _price_api_key(provider)
 	results: dict = {}
+	if not api_key:
+		return results
 
 	# Map our internal market → Mansa exchange code
 	exchange_map = {"NSE": "NSE", "Global": None}
@@ -425,10 +494,6 @@ def _fetch_rapidapi_nse(provider: dict, symbols: list, market: str = "NSE") -> d
 
 	api_key = _price_api_key(provider)
 	if not api_key:
-		frappe.log_error(
-			title="RapidAPI NSE: missing API key",
-			message="Growe Price API.api_key is empty for RapidAPI.",
-		)
 		return {}
 
 	host = _rapidapi_nse_host(provider)
@@ -528,6 +593,9 @@ def _fetch_fcs(provider: dict, symbols: list, market: str = "Global") -> dict:
 	endpoint = provider.get("endpoint_prices") or "/stock/latest"
 	url = f"{base}{endpoint}"
 	access_key = _price_api_key(provider)
+	results: dict = {}
+	if not access_key:
+		return results
 
 	prefix = _FCS_EXCHANGE_PREFIX.get(market, "")
 
@@ -536,7 +604,6 @@ def _fetch_fcs(provider: dict, symbols: list, market: str = "Global") -> dict:
 	for s in symbols:
 		sym_list.append(f"{prefix}:{s.upper()}" if prefix else s.upper())
 
-	results: dict = {}
 	# FCS allows up to 30 symbols per request; batch to be safe
 	batch_size = 20
 	for i in range(0, len(sym_list), batch_size):
@@ -735,10 +802,6 @@ def _fetch_finnhub(
 	results: dict = {}
 
 	if not token:
-		frappe.log_error(
-			title="Finnhub: missing API token",
-			message="Growe Price API.api_key is empty for Finnhub.",
-		)
 		return {}
 
 	url = f"{base}{endpoint}"
@@ -947,6 +1010,11 @@ def _upsert_cache(
 	source: str,
 	stock_meta: dict | None = None,
 ):
+	"""Insert or overwrite Growe Price Cache — always replace price and change % on refresh."""
+	ticker = (ticker or "").upper().strip()
+	if not ticker:
+		return
+
 	price = price_data["price"]
 	currency = (price_data.get("currency") or "KES").upper()
 	change_pct = float(price_data.get("change_percent", 0) or 0)
@@ -969,7 +1037,10 @@ def _upsert_cache(
 	cache.source = source
 	cache.fetched_at = now_datetime()
 	cache.flags.ignore_permissions = True
-	cache.save()
+	if cache.is_new():
+		cache.insert()
+	else:
+		cache.save()
 
 
 # ── Holding value updater ─────────────────────────────────────────────────────
@@ -1124,7 +1195,7 @@ def _fetch_and_store(
 		
 		if not remaining:
 			break
-		if _provider_is_rate_limited(provider):
+		if not _provider_ready(provider):
 			continue
 
 		# Try to get live KES rate from Mansa forex endpoint
@@ -1159,7 +1230,7 @@ def _fetch_and_store(
 		for provider in providers:
 			if not remaining:
 				break
-			if _provider_is_rate_limited(provider):
+			if not _provider_ready(provider):
 				continue
 			api_prov = (provider.get("api_provider") or "").lower()
 			if "mansa" in api_prov or "mansa" in (provider.get("provider_name") or "").lower():
@@ -1256,6 +1327,7 @@ def _execute_refresh_prices(
 	If provider_name is passed (e.g. Growe Price API name from Desk), only that row is used.
 	Otherwise all active providers for each market run in sequence.
 	"""
+	_begin_price_refresh_run()
 	nse_tickers, global_tickers, nse_map, global_map, stock_meta = _collect_tickers_for_live_prices()
 	nse_tickers = _sort_tickers_holdings_first(nse_tickers)
 	global_tickers = _sort_tickers_holdings_first(global_tickers)
@@ -1402,6 +1474,7 @@ def _execute_refresh_prices(
 		"success": True,
 		"provider_name": provider_name,
 		"tickers_requested": progress_total,
+		"warnings": _price_refresh_warnings(),
 	}
 
 
@@ -1446,6 +1519,7 @@ def _run_refresh_prices(provider_name: str = None, notify_user: str = None) -> d
 
 
 def _execute_refresh_stock_prices() -> dict:
+	_begin_price_refresh_run()
 	nse_tickers, global_tickers, nse_map, gmap, stock_meta = _collect_tickers_for_live_prices()
 	nse_tickers = _sort_tickers_holdings_first(nse_tickers)
 	global_tickers = _sort_tickers_holdings_first(global_tickers)
@@ -1470,6 +1544,7 @@ def _execute_refresh_stock_prices() -> dict:
 		"nse_updated": nse_updated,
 		"global_updated": global_updated,
 		"total": nse_updated + global_updated,
+		"warnings": _price_refresh_warnings(),
 	}
 
 
@@ -1817,11 +1892,11 @@ def _run_fetch_providers_round(
 	for provider in providers:
 		if not remaining:
 			break
-		if _provider_is_rate_limited(provider):
+		if not _provider_ready(provider):
 			continue
 
 		while remaining:
-			if _provider_is_rate_limited(provider):
+			if not _provider_ready(provider):
 				break
 			count_before = len(updated)
 			chunk = remaining[:REFRESH_FETCH_CHUNK]
@@ -1885,13 +1960,15 @@ def _run_fetch_providers_round(
 					last_ticker=last_ticker,
 				)
 			elif chunk:
+				if _provider_key_invalid(provider):
+					break
 				break
 
 	if remaining:
 		for provider in providers:
 			if not remaining:
 				break
-			if _provider_is_rate_limited(provider):
+			if not _provider_ready(provider):
 				continue
 			for lone in list(remaining):
 				if _provider_uses_alpha_vantage(provider):
@@ -1941,8 +2018,9 @@ def _fetch_market_for_refresh(
 ) -> int:
 	"""
 	Fetch and upsert for one market. Each active provider runs in order (batch, then
-	stragglers). A second pass repeats the same for tickers still missing a complete
-	quote so later APIs can fill gaps the first pass missed.
+	stragglers). A second pass retries every ticker that did not receive a fresh quote
+	in the first pass (including rows that already had cache — refresh always overwrites
+	when the API returns data). A third pass retries rows still missing a complete quote.
 
 	providers: optional fixed list (Desk refresh using one Growe Price API row).
 
@@ -1984,12 +2062,27 @@ def _fetch_market_for_refresh(
 		progress_done=progress_done,
 	)
 
-	still_incomplete = [t for t in original if _ticker_cache_incomplete(t)]
-	if still_incomplete:
-		remaining = list(still_incomplete)
+	not_refreshed = [t for t in original if t not in updated]
+	if not_refreshed:
+		retry_remaining = list(not_refreshed)
 		updated |= _run_fetch_providers_round(
 			market,
-			remaining,
+			retry_remaining,
+			sym_map,
+			providers,
+			stock_meta=stock_meta,
+			notify_user=notify_user,
+			provider_name=provider_name,
+			progress_total=progress_total,
+			progress_done=progress_done + len(updated),
+		)
+
+	still_incomplete = [t for t in original if _ticker_cache_incomplete(t) and t not in updated]
+	if still_incomplete:
+		retry_remaining = list(still_incomplete)
+		updated |= _run_fetch_providers_round(
+			market,
+			retry_remaining,
 			sym_map,
 			providers,
 			stock_meta=stock_meta,

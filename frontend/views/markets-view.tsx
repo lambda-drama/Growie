@@ -14,9 +14,10 @@ import { cn } from '@/lib/utils'
 import { formatDateRelative } from '@/lib/format'
 import { useAuth } from '@/hooks/use-auth'
 import {
-  getStocksWithPrices, refreshStockPrices, getStockPicks,
+  getStocksWithPrices, getStockPicks,
   type StockWithPrice, type StockPickRaw,
 } from '@/services/markets'
+import { refreshStackPrices } from '@/services/stack'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -170,11 +171,15 @@ export function MarketsView() {
     setIsRefreshing(true)
     setRefreshMsg('')
     try {
-      const result = await refreshStockPrices()
+      const result = await refreshStackPrices()
       if (result.queued) {
         setRefreshMsg(result.message ?? 'Price refresh started in the background.')
       } else {
-        setRefreshMsg(`Updated: NSE ${result.nse_updated ?? 0} · Global ${result.global_updated ?? 0}`)
+        const n = result.tickers_requested ?? (result.nse_tickers?.length ?? 0) + (result.global_tickers?.length ?? 0)
+        setRefreshMsg(
+          `Updated ${result.nse_updated ?? 0} NSE · ${result.global_updated ?? 0} global`
+          + (n ? ` (${n} holding ticker${n === 1 ? '' : 's'})` : ''),
+        )
       }
       await loadData()
     } catch (err) {
@@ -251,7 +256,7 @@ export function MarketsView() {
               {isRefreshing
                 ? <Loader2 className="h-4 w-4 animate-spin" />
                 : <RefreshCcw className="h-4 w-4" />}
-              {isRefreshing ? 'Updating all APIs…' : 'Refresh Prices'}
+              {isRefreshing ? 'Updating holdings…' : 'Refresh my holdings'}
             </Button>
           ) : (
             <p className="text-xs text-muted-foreground">Sign in to refresh prices</p>

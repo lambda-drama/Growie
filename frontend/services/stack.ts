@@ -87,6 +87,9 @@ export interface StackPositionDetail {
 export interface RefreshStackPricesResult {
   queued?: boolean
   message?: string
+  success?: boolean
+  error?: string
+  warnings?: string[]
   nse_updated?: number
   global_updated?: number
   tickers_requested?: number

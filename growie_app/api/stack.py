@@ -28,8 +28,10 @@ from growie_app.investment_app.holding_ledger import create_holding_transaction
 from growie_app.api.price import (
 	_api_symbol_maps_for_tickers,
 	_backfill_price_cache_stock_links,
+	_begin_price_refresh_run,
 	_enqueue_price_refresh,
 	_fetch_market_for_refresh,
+	_price_refresh_warnings,
 	_stock_meta_for_tickers,
 	_update_holdings_for_ticker,
 )
@@ -310,6 +312,7 @@ def _execute_refresh_stack_prices(
 	asset_class: str = None,
 	holding_name: str = None,
 ) -> dict:
+	_begin_price_refresh_run()
 	nse_tickers, global_tickers = _member_holding_tickers_by_market(
 		member, asset_class=asset_class, holding_name=holding_name
 	)
@@ -342,13 +345,20 @@ def _execute_refresh_stack_prices(
 
 	frappe.db.commit()
 
-	return {
+	warnings = _price_refresh_warnings()
+	total_updated = nse_updated + global_updated
+	result = {
 		"nse_updated": nse_updated,
 		"global_updated": global_updated,
 		"tickers_requested": len(nse_tickers) + len(global_tickers),
 		"nse_tickers": nse_tickers,
 		"global_tickers": global_tickers,
+		"warnings": warnings,
+		"success": total_updated > 0 or not (nse_tickers or global_tickers),
 	}
+	if warnings and total_updated == 0 and (nse_tickers or global_tickers):
+		result["error"] = warnings[0]
+	return result
 
 
 def _run_refresh_stack_prices(
@@ -376,12 +386,26 @@ def _run_refresh_stack_prices(
 				user=notify_user,
 			)
 		return result
-	except Exception:
+	except Exception as exc:
 		frappe.log_error(
 			title=f"Stack price refresh job failed ({member})",
 			message=frappe.get_traceback(),
 		)
-		raise
+		result = {
+			"success": False,
+			"error": str(exc),
+			"warnings": _price_refresh_warnings(),
+			"nse_updated": 0,
+			"global_updated": 0,
+			"member": member,
+		}
+		if notify_user:
+			frappe.publish_realtime(
+				"growie_price_refresh_done",
+				result,
+				user=notify_user,
+			)
+		return result
 
 
 @frappe.whitelist()

@@ -35,17 +35,9 @@ _TD_EXCHANGE_MAP = {
 
 
 def _provider_api_key(provider: dict) -> str:
-	name = provider.get("name")
-	if not name:
-		return ""
-	try:
-		doc = frappe.get_doc("Growe Price API", name)
-		pw = doc.get_password("api_key")
-		if pw:
-			return str(pw).strip()
-	except Exception:
-		pass
-	return ""
+	from growie_app.api.price import _price_api_key
+
+	return _price_api_key(provider)
 
 
 def twelve_data_exchange(exchange_platform: str | None, market: str = "Global") -> str | None:
@@ -188,10 +180,6 @@ def fetch_twelve_data_prices(
 
 	api_key = _provider_api_key(provider)
 	if not api_key:
-		frappe.log_error(
-			title="Twelve Data: missing API key",
-			message="Set API Key on Growe Price API (Twelve Data).",
-		)
 		return {}
 
 	base = (provider.get("api_base_url") or "").strip().rstrip("/") or _TD_DEFAULT_BASE

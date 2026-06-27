@@ -13,6 +13,12 @@ import {
 import { useAuth } from '@/providers/auth-provider'
 import type { AssetClass } from '@/types'
 
+function priceRefreshMessage(result: Awaited<ReturnType<typeof refreshStackPrices>>): string | null {
+  if (result.error) return result.error
+  if (result.warnings?.length) return result.warnings.join(' ')
+  return null
+}
+
 export function useStackOverview() {
   const { isAuthenticated } = useAuth()
   const [classes, setClasses] = useState<StackClassSummary[]>([])
@@ -30,7 +36,8 @@ export function useStackOverview() {
     setError(null)
     let priceRefreshError: string | null = null
     try {
-      await refreshStackPrices()
+      const result = await refreshStackPrices()
+      priceRefreshError = priceRefreshMessage(result)
     } catch (err) {
       priceRefreshError =
         err instanceof Error ? err.message : 'Live prices could not be refreshed from your APIs'
@@ -76,7 +83,8 @@ export function useStackClass(assetClass: AssetClass | null) {
     setError(null)
     let priceRefreshError: string | null = null
     try {
-      await refreshStackPrices({ assetClass })
+      const result = await refreshStackPrices({ assetClass })
+      priceRefreshError = priceRefreshMessage(result)
     } catch (err) {
       priceRefreshError =
         err instanceof Error ? err.message : 'Live prices could not be refreshed from your APIs'
@@ -122,7 +130,8 @@ export function useStackPosition(holdingId: string | null) {
     setError(null)
     let priceRefreshError: string | null = null
     try {
-      await refreshStackPrices({ holdingId })
+      const result = await refreshStackPrices({ holdingId })
+      priceRefreshError = priceRefreshMessage(result)
     } catch (err) {
       priceRefreshError =
         err instanceof Error ? err.message : 'Live prices could not be refreshed from your APIs'
