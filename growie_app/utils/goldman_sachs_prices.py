@@ -31,17 +31,9 @@ _TOKEN_CACHE: dict[str, tuple[str, float]] = {}
 
 
 def _provider_client_id(provider: dict) -> str:
-	name = provider.get("name")
-	if not name:
-		return ""
-	try:
-		doc = frappe.get_doc("Growe Price API", name)
-		pw = doc.get_password("api_key")
-		if pw:
-			return str(pw).strip()
-	except Exception:
-		pass
-	return ""
+	from growie_app.api.price import _price_api_key
+
+	return _price_api_key(provider)
 
 
 def _provider_secret(provider: dict) -> str:

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronRight, Plus } from 'lucide-react'
+import { ChevronRight, Plus, RefreshCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -144,6 +144,16 @@ export function StackOverview({ onOpenClass: _onOpenClass }: StackOverviewProps)
           {greeting}, {firstName}
         </h1>
         <div className="hidden shrink-0 gap-2 sm:flex">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => void refresh()}
+            disabled={stackLoading}
+          >
+            <RefreshCcw className={cn('h-4 w-4', stackLoading && 'animate-spin')} />
+            Refresh
+          </Button>
           <StackExcelBulkImport variant="compact" onSuccess={afterBulkImport} disabled={stackLoading} />
           <Button size="sm" className="gap-1.5" onClick={() => setTradeOpen(true)}>
             <Plus className="h-4 w-4" />
@@ -153,6 +163,16 @@ export function StackOverview({ onOpenClass: _onOpenClass }: StackOverviewProps)
       </div>
 
       <div className="flex w-full gap-2 sm:hidden">
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex-1 gap-2"
+          onClick={() => void refresh()}
+          disabled={stackLoading}
+        >
+          <RefreshCcw className={cn('h-4 w-4', stackLoading && 'animate-spin')} />
+          Refresh
+        </Button>
         <StackExcelBulkImport
           variant="compact"
           className="flex-1"
