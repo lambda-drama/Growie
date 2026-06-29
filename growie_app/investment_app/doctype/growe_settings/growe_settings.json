@@ -25,6 +25,8 @@
   "column_break_pakd",
   "paystack_secret_key",
   "maintenance_section",
+  "exchange_platform_migration_help",
+  "last_exchange_platform_migration",
   "stock_naming_migration_help",
   "last_stock_naming_migration"
  ],
@@ -132,6 +134,18 @@
    "fieldname": "maintenance_section",
    "fieldtype": "Section Break",
    "label": "Maintenance"
+  },
+  {
+   "fieldname": "exchange_platform_migration_help",
+   "fieldtype": "HTML",
+   "label": "Exchange platform IDs",
+   "options": "<p class=\"text-muted\">Legacy Growe Exchange Platform records used <code>platform_name</code> as the document ID (e.g. <code>NASDAQ</code>, <code>LSE</code>). New records use <code>exchange_code</code> (e.g. <code>XNAS</code>, <code>XLON</code>).</p><p class=\"text-muted\">Use the button below to rename existing platforms in the background, update Growe Stock and price-cache links, merge duplicates, then refresh Growe Stock names. Platforms without an <code>exchange_code</code> are skipped — fill those in first.</p>"
+  },
+  {
+   "fieldname": "last_exchange_platform_migration",
+   "fieldtype": "Small Text",
+   "label": "Last exchange platform migration",
+   "read_only": 1
   },
   {
    "fieldname": "stock_naming_migration_help",
