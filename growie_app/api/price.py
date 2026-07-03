@@ -1790,7 +1790,18 @@ def get_stocks_with_prices(market: str = None, sector: str = None, limit: int = 
 
 def _is_nse_exchange(exchange_platform: str | None) -> bool:
 	"""True when Growe Stock exchange_platform is Nairobi Securities Exchange."""
-	return (exchange_platform or "").strip().upper() == "NSE"
+	raw = (exchange_platform or "").strip()
+	if not raw:
+		return False
+	if raw.upper() in ("NSE", "KENYA_FUNDS"):
+		return True
+	if not frappe.db.exists("Growe Exchange Platform", raw):
+		return False
+	country = frappe.db.get_value("Growe Exchange Platform", raw, "country")
+	if country == "Kenya":
+		return True
+	platform_name = (frappe.db.get_value("Growe Exchange Platform", raw, "platform_name") or "").upper()
+	return platform_name == "NSE"
 
 
 def _price_fetch_bucket(exchange_platform: str | None) -> str:

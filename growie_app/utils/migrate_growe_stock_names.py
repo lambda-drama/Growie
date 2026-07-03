@@ -38,11 +38,26 @@ def target_stock_name(ticker: str | None, exchange_platform: str | None) -> str:
 	return f"{ticker_val}-{exchange_val}"
 
 
+def _find_exchange_platform_link(exchange: str) -> str | None:
+	"""Resolve a legacy or current Growe Exchange Platform document name."""
+	exchange = (exchange or "").strip()
+	if not exchange:
+		return None
+	if frappe.db.exists("Growe Exchange Platform", exchange):
+		return exchange
+	for field in ("platform_name", "exchange_code"):
+		match = frappe.db.get_value("Growe Exchange Platform", {field: exchange}, "name")
+		if match:
+			return match
+	return None
+
+
 def _resolve_exchange(stock: dict) -> tuple[str, str | None]:
 	"""Return (exchange for naming, link value to persist when missing)."""
 	current = (stock.get("exchange_platform") or "").strip()
 	if current:
-		return current, None
+		link = _find_exchange_platform_link(current) or current
+		return link, None if link == current else link
 
 	from growie_app.api.stack import _infer_region_exchange_for_stock
 
@@ -52,15 +67,14 @@ def _resolve_exchange(stock: dict) -> tuple[str, str | None]:
 		market = (stock.get("market") or "").strip()
 		exchange = "NSE" if market == "NSE" else "NASDAQ"
 
-	link_value = exchange if frappe.db.exists("Growe Exchange Platform", exchange) else None
+	link_value = _find_exchange_platform_link(exchange)
 	if not link_value:
 		fallback = "NSE" if (stock.get("market") or "").strip() == "NSE" else "NASDAQ"
-		if frappe.db.exists("Growe Exchange Platform", fallback):
-			link_value = fallback
-			if not frappe.db.exists("Growe Exchange Platform", exchange):
-				exchange = fallback
+		link_value = _find_exchange_platform_link(fallback)
+		if link_value and not _find_exchange_platform_link(exchange):
+			exchange = link_value
 
-	return exchange, link_value
+	return exchange if link_value else exchange, link_value
 
 
 def migrate_growe_stock_names(*, dry_run: bool = False) -> dict:

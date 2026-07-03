@@ -686,22 +686,23 @@ def get_regions(query: str = "", limit: int = 50):
 
 @frappe.whitelist()
 def get_exchange_platforms(query: str = "", limit: int = 50):
-	filters = {}
 	if query:
+		q = f"%{query.strip()}%"
 		return frappe.db.sql(
 			"""
 			SELECT name
 			FROM `tabGrowe Exchange Platform`
 			WHERE name LIKE %(q)s
+				OR platform_name LIKE %(q)s
+				OR exchange_code LIKE %(q)s
 			ORDER BY name ASC
 			LIMIT %(limit)s
 			""",
-			{"q": f"%{query}%", "limit": int(limit)},
+			{"q": q, "limit": int(limit)},
 			as_dict=True,
 		)
 	return frappe.get_all(
 		"Growe Exchange Platform",
-		filters=filters,
 		fields=["name"],
 		order_by="name asc",
 		limit=int(limit),
@@ -723,7 +724,11 @@ def seed_region_exchange_masters():
 	for name in exchanges:
 		if not frappe.db.exists("Growe Exchange Platform", name):
 			doc = frappe.get_doc(
-				{"doctype": "Growe Exchange Platform", "platform_name": name}
+				{
+					"doctype": "Growe Exchange Platform",
+					"platform_name": name,
+					"exchange_code": name,
+				}
 			)
 			doc.flags.ignore_permissions = True
 			doc.insert()

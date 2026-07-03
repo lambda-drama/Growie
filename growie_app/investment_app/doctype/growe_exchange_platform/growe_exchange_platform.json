@@ -1,7 +1,8 @@
 {
  "actions": [],
+ "allow_bulk_edit": 1,
  "allow_rename": 1,
- "autoname": "field:platform_name",
+ "autoname": "field:exchange_code",
  "creation": "2026-05-28 16:31:00",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -35,7 +36,10 @@
   {
    "fieldname": "exchange_code",
    "fieldtype": "Data",
-   "label": "Exchange Code"
+   "in_list_view": 1,
+   "label": "Exchange Code",
+   "reqd": 1,
+   "unique": 1
   },
   {
    "fieldname": "region",
@@ -53,7 +57,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-03 23:01:33.109923",
+ "modified": "2026-06-29 23:32:42.667290",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Exchange Platform",

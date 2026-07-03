@@ -19,18 +19,27 @@ import requests
 _TD_DEFAULT_BASE = "https://api.twelvedata.com"
 _TD_QUOTE_PATH = "/quote"
 
-# Growe Exchange Platform → Twelve Data exchange name
+# Growe Exchange Platform doc name / exchange_code → Twelve Data exchange name
 _TD_EXCHANGE_MAP = {
 	"NSE": "NSE",
+	"XNSE": "NSE",
 	"NYSE": "NYSE",
 	"NASDAQ": "NASDAQ",
+	"XNAS": "NASDAQ",
 	"LSE": "LSE",
+	"XLON": "LSE",
 	"EURONEXT": "Euronext",
+	"XAMS/XPAR": "Euronext",
 	"JPX": "JPX",
+	"XTKS": "JPX",
 	"HKEX": "HKEX",
 	"JSE": "JSE",
+	"XJSE": "JSE",
 	"AMEX": "NYSE",
 	"XETRA": "XETR",
+	"TSE": "TSE",
+	"PRIVATE": "Private",
+	"KENYA_FUNDS": "Private",
 }
 
 
@@ -55,8 +64,13 @@ def twelve_data_country(exchange_platform: str | None, market: str = "Global") -
 	"""Disambiguate Nairobi NSE from Indian NSE on Twelve Data."""
 	if str(market or "").upper() == "NSE":
 		return "Kenya"
-	if (exchange_platform or "").strip().upper() == "NSE":
+	raw = (exchange_platform or "").strip().upper()
+	if raw in ("NSE", "KENYA_FUNDS"):
 		return "Kenya"
+	if raw and frappe.db.exists("Growe Exchange Platform", exchange_platform):
+		country = frappe.db.get_value("Growe Exchange Platform", exchange_platform, "country")
+		if country == "Kenya":
+			return "Kenya"
 	return None
 
 
