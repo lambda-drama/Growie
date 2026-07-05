@@ -168,7 +168,7 @@ export async function inferAssetClass(assetName: string): Promise<{
 export async function createStock(payload: {
   ticker: string
   companyName: string
-  market: 'NSE' | 'Global' | 'ETF'
+  market: 'Kenya' | 'Global' | 'ETF'
   currency?: string
   region?: string
   exchangePlatform?: string

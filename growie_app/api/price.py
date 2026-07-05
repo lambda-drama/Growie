@@ -56,6 +56,15 @@ Twelve Data (twelvedata.com):
          POST /batch?apikey={key} body {"q0":"/quote?symbol=AAPL&exchange=NASDAQ", ...}
   Uses Growe Stock exchange_platform as `exchange` (NSE, NYSE, NASDAQ, LSE, …).
 
+EODData (eoddata.com):
+  Base: https://api.eoddata.com
+  Auth: ?ApiKey={api_key} on every request
+  Quote: GET /Quote/Get/{exchangeCode}/{symbolCode}?ApiKey={key}
+  Response JSON: { close, previous, change, currency, … }
+  ApiKey from https://eoddata.com/myaccount/api.aspx
+  Uses Growe Stock exchange_platform (NYSE, NASDAQ, LSE, …).
+  Kenya (Nairobi NSE) tickers are skipped — EODData NSE is the Indian exchange.
+
 Dispatch is determined by the "api_provider" Select field on the Growe Price API record.
 """
 
@@ -239,6 +248,16 @@ def _provider_key(provider: dict) -> str:
 	return str(provider.get("api_provider") or "").strip().lower()
 
 
+def _provider_fetches_per_symbol(provider: dict) -> bool:
+	"""True when the provider issues one HTTP request per symbol (not a batch quote API)."""
+	return _provider_key(provider) in (
+		"finnhub",
+		"eoddata",
+		"alpha vantage",
+		"goldman sachs",
+	)
+
+
 def _is_rapidapi_nse_provider(provider: dict) -> bool:
 	"""True for RapidAPI Nairobi NSE rows (by select, name, or host URL)."""
 	if _provider_key(provider) == "rapidapi":
@@ -257,6 +276,7 @@ _PROVIDER_MARKETS: dict[str, frozenset] = {
 	"fcs api": frozenset({"NSE", "GLOBAL"}),
 	"twelve data": frozenset({"NSE", "GLOBAL"}),
 	"finnhub": frozenset({"GLOBAL"}),
+	"eoddata": frozenset({"GLOBAL"}),
 	"goldman sachs": frozenset({"GLOBAL"}),
 	"alpha vantage": frozenset({"GLOBAL"}),
 }
@@ -268,14 +288,16 @@ _PROVIDER_FETCH_ORDER = {
 	"fcs api": 2,
 	"twelve data": 2,
 	"finnhub": 3,
+	"eoddata": 3,
 	"goldman sachs": 4,
 	"alpha vantage": 9,
 }
 
 
 def _normalize_market_label(market: str) -> str:
-	m = str(market or "NSE").strip().upper()
-	return "GLOBAL" if m == "GLOBAL" else "NSE"
+	from growie_app.utils.market_labels import normalize_market_bucket
+
+	return normalize_market_bucket(market)
 
 
 def _provider_supports_market(provider: dict, market: str) -> bool:
@@ -283,6 +305,8 @@ def _provider_supports_market(provider: dict, market: str) -> bool:
 	Whether this Growe Price API row may fetch quotes for the given market.
 	NSE tickers never use Finnhub/Alpha Vantage even when market_type is Both.
 	"""
+	from growie_app.utils.market_labels import market_type_supports_bucket
+
 	m = _normalize_market_label(market)
 	if _is_rapidapi_nse_provider(provider):
 		return m == "NSE"
@@ -290,10 +314,7 @@ def _provider_supports_market(provider: dict, market: str) -> bool:
 	allowed = _PROVIDER_MARKETS.get(key)
 	if allowed is not None:
 		return m in allowed
-	mt = (provider.get("market_type") or "").strip().upper()
-	if mt == "BOTH":
-		return True
-	return mt == m
+	return market_type_supports_bucket(provider.get("market_type"), m)
 
 _RAPIDAPI_NSE_DEFAULT_HOST = "nairobi-stock-exchange-nse.p.rapidapi.com"
 
@@ -879,6 +900,7 @@ def _fetch_from_provider(
 	symbols: list,
 	market: str = "NSE",
 	symbol_override_map: dict | None = None,
+	stock_meta: dict | None = None,
 ) -> dict:
 	api_prov = _provider_key(provider)
 	symbol_override_map = symbol_override_map or {}
@@ -899,6 +921,18 @@ def _fetch_from_provider(
 		if _normalize_market_label(market) != "GLOBAL":
 			return {}
 		return _fetch_finnhub(provider, symbols, market, symbol_override_map=symbol_override_map)
+	if api_prov == "eoddata":
+		if _normalize_market_label(market) != "GLOBAL":
+			return {}
+		from growie_app.utils.eoddata_prices import fetch_eoddata_prices
+
+		return fetch_eoddata_prices(
+			provider,
+			symbols,
+			market,
+			symbol_override_map=symbol_override_map,
+			stock_meta=stock_meta,
+		)
 	if api_prov == "goldman sachs":
 		if _normalize_market_label(market) != "GLOBAL":
 			return {}
@@ -920,7 +954,7 @@ def _fetch_from_provider(
 		message=(
 			f"No parser for provider '{provider.get('provider_name')}' "
 			f"(api_provider='{provider.get('api_provider')}'). "
-			"Supported: Mansa Markets, RapidAPI, FCS API, Twelve Data, Finnhub, Goldman Sachs, Alpha Vantage."
+			"Supported: Mansa Markets, RapidAPI, FCS API, Twelve Data, Finnhub, EODData, Goldman Sachs, Alpha Vantage."
 		),
 	)
 	return {}
@@ -1467,6 +1501,7 @@ def _execute_refresh_prices(
 		else:
 			frappe.logger("growie.price").warning(hint)
 
+	eligible_count = len(eligible) if provider_name else progress_total
 	return {
 		"nse_updated": nse_updated_count,
 		"global_updated": global_updated_count,
@@ -1474,6 +1509,7 @@ def _execute_refresh_prices(
 		"success": True,
 		"provider_name": provider_name,
 		"tickers_requested": progress_total,
+		"tickers_eligible": eligible_count,
 		"warnings": _price_refresh_warnings(),
 	}
 
@@ -1661,7 +1697,7 @@ def test_provider(provider_name: str, test_ticker: str = "SCOM", market: str = N
 	# Auto-detect NSE vs global from Growe Stock exchange_platform when not given.
 	if not market:
 		exchange = frappe.db.get_value("Growe Stock", {"ticker": ticker}, "exchange_platform")
-		market = "NSE" if _is_nse_exchange(exchange) else "Global"
+		market = "Kenya" if _is_nse_exchange(exchange) else "Global"
 
 	sym_for_test: dict = {}
 	row = frappe.db.get_value(
@@ -1730,7 +1766,8 @@ def get_stocks_with_prices(market: str = None, sector: str = None, limit: int = 
 	"""
 	filters = {"is_active": 1, "verified": 1}
 	if market:
-		filters["market"] = market
+		values = market_db_values(market)
+		filters["market"] = values[0] if len(values) == 1 else ["in", values]
 	if sector:
 		filters["sector"] = sector
 
@@ -1918,7 +1955,11 @@ def _run_fetch_providers_round(
 				)
 			else:
 				fetched = _fetch_from_provider(
-					provider, chunk, market, symbol_override_map=sym_map
+					provider,
+					chunk,
+					market,
+					symbol_override_map=sym_map,
+					stock_meta=stock_meta,
 				)
 
 			_usd = _get_usd_to_kes()
@@ -1933,7 +1974,7 @@ def _run_fetch_providers_round(
 				remaining.remove(tu)
 				last_ticker = tu
 
-			if len(updated) == count_before and chunk:
+			if len(updated) == count_before and chunk and not _provider_fetches_per_symbol(provider):
 				for lone in chunk:
 					if lone not in remaining:
 						continue
@@ -1943,7 +1984,11 @@ def _run_fetch_providers_round(
 						)
 					else:
 						fetched_one = _fetch_from_provider(
-							provider, [lone], market, symbol_override_map=sym_map
+							provider,
+							[lone],
+							market,
+							symbol_override_map=sym_map,
+							stock_meta=stock_meta,
 						)
 					for tk, data in list(fetched_one.items()):
 						tu = (tk or "").upper()
@@ -1971,8 +2016,12 @@ def _run_fetch_providers_round(
 					last_ticker=last_ticker,
 				)
 			elif chunk:
-				if _provider_key_invalid(provider):
+				if _provider_key_invalid(provider) or _provider_is_rate_limited(provider):
 					break
+				if _provider_fetches_per_symbol(provider):
+					# Per-symbol APIs may 404 individual tickers; keep going.
+					del remaining[: len(chunk)]
+					continue
 				break
 
 	if remaining:
@@ -1988,7 +2037,11 @@ def _run_fetch_providers_round(
 					)
 				else:
 					fetched = _fetch_from_provider(
-						provider, [lone], market, symbol_override_map=sym_map
+						provider,
+						[lone],
+						market,
+						symbol_override_map=sym_map,
+						stock_meta=stock_meta,
 					)
 				_usd = _get_usd_to_kes()
 				for tk, data in list(fetched.items()):
@@ -2047,7 +2100,7 @@ def _fetch_market_for_refresh(
 	if not providers:
 		frappe.log_error(
 			title="Growe Price: no active API provider",
-			message=f"Market {market!r} has no active Growe Price API with matching market (NSE / Global / Both).",
+			message=f"Market {market!r} has no active Growe Price API with matching market (Kenya / Global / Both).",
 		)
 		return 0
 
@@ -2138,7 +2191,7 @@ def get_nse_index():
 	"""
 	providers = frappe.get_all(
 		"Growe Price API",
-		filters={"is_active": 1, "market_type": ["in", ["NSE", "Both"]]},
+		filters={"is_active": 1, "market_type": ["in", ["Kenya", "NSE", "Both"]]},
 		fields=["name", "provider_name", "api_provider", "api_base_url", "api_key"],
 		order_by="creation asc",
 		limit=5,

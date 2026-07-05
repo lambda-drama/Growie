@@ -2,6 +2,19 @@ import { formatBarbsAIReply } from '@/lib/barbs-ai-text'
 
 /** Parse portfolio analysis text into UI sections (best-effort). */
 
+export type InsightSectionKey = 'strengths' | 'risks' | 'opportunities' | 'watchlist'
+
+export const INSIGHT_SECTION_KEYS: InsightSectionKey[] = [
+  'strengths',
+  'risks',
+  'opportunities',
+  'watchlist',
+]
+
+export function isInsightSectionKey(value: string | null): value is InsightSectionKey {
+  return !!value && INSIGHT_SECTION_KEYS.includes(value as InsightSectionKey)
+}
+
 export interface ParsedPortfolioAnalysis {
   strengths: string
   risks: string
@@ -19,6 +32,25 @@ const SECTION_PATTERNS: { key: keyof Omit<ParsedPortfolioAnalysis, 'recommendati
 
 function cleanSection(s: string): string {
   return formatBarbsAIReply(s.replace(/\n+/g, ' '))
+}
+
+function cleanFullSection(s: string): string {
+  return formatBarbsAIReply(s.trim())
+}
+
+/** Full section text from a saved portfolio analysis (not truncated for cards). */
+export function extractFullSectionText(text: string, key: InsightSectionKey): string {
+  const normalized = formatBarbsAIReply(text)
+
+  for (const { key: sectionKey, re } of SECTION_PATTERNS) {
+    if (sectionKey !== key) continue
+    const match = normalized.match(re)
+    if (!match) continue
+    const raw = key === 'opportunities' ? match[2] : match[1]
+    if (raw?.trim()) return cleanFullSection(raw)
+  }
+
+  return parsePortfolioAnalysis(text)[key]
 }
 
 function firstSentence(text: string, maxLen = 220): string {

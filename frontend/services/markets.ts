@@ -20,7 +20,7 @@ export interface StockWithPrice {
 
 export interface PriceCacheRow {
   ticker: string
-  market: 'NSE' | 'Global'
+  market: 'Kenya' | 'Global'
   price_kes: number
   price_usd: number
   change_percent: number

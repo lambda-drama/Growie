@@ -42,6 +42,7 @@ import {
   type GroweStock,
 } from '@/services/portfolio'
 import { categoryToPickerSlug } from '@/lib/asset-categories'
+import { MARKET_KENYA, MARKET_GLOBAL, MARKET_ETF } from '@/lib/market-labels'
 import { usePortfolio } from '@/hooks/use-portfolio'
 import { StackExcelBulkImport } from '@/components/stack/stack-excel-bulk-import'
 import type { AssetClass, Holding } from '@/types'
@@ -61,9 +62,9 @@ const FALLBACK_CATEGORIES: AssetCategoryOption[] = [
 
 // market filter per asset class
 const CLASS_TO_MARKET: Record<string, string | undefined> = {
-  'nse-stocks':    'NSE',
-  'global-stocks': 'Global',
-  etf: 'ETF',
+  'nse-stocks':    MARKET_KENYA,
+  'global-stocks': MARKET_GLOBAL,
+  etf: MARKET_ETF,
 }
 
 // ─── Stock combobox ───────────────────────────────────────────────────────────

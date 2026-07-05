@@ -35,7 +35,7 @@ export interface PostDetail {
   comments: CommunityComment[]
 }
 
-export type PostCategory = 'all' | 'General' | 'NSE Stocks' | 'Global Stocks' | 'MMF' | 'Question' | 'Win'
+export type PostCategory = 'all' | 'General' | 'Kenya Stocks' | 'Global Stocks' | 'MMF' | 'Question' | 'Win'
 
 export interface ToggleLikeResult {
   liked: boolean

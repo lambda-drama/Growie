@@ -14,14 +14,14 @@ frappe.ui.form.on("Growe Price API", {
 						fieldname: "test_ticker",
 						fieldtype: "Data",
 						default: frm.doc.market_type === "Global" ? "AAPL" : "SCOM",
-						description: __("e.g. SCOM for NSE, AAPL for Global"),
+						description: __("e.g. SCOM for Kenya, AAPL for Global"),
 					},
 					{
 						label: __("Market"),
 						fieldname: "market",
 						fieldtype: "Select",
-						options: "\nNSE\nGlobal",
-						default: frm.doc.market_type === "Global" ? "Global" : "NSE",
+						options: "\nKenya\nGlobal",
+						default: frm.doc.market_type === "Global" ? "Global" : "Kenya",
 					},
 				],
 				function (values) {
@@ -30,7 +30,7 @@ frappe.ui.form.on("Growe Price API", {
 						args: {
 							provider_name: frm.doc.name,
 							test_ticker: values.test_ticker || "SCOM",
-							market: values.market || "NSE",
+							market: values.market || "Kenya",
 						},
 						freeze: true,
 						freeze_message: __("Connecting to {0}…", [frm.doc.provider_name]),
@@ -77,11 +77,11 @@ frappe.ui.form.on("Growe Price API", {
 		frm.add_custom_button(__("Refresh All Prices Now"), function () {
 			const prov = (frm.doc.api_provider || "").toLowerCase();
 			const scopeHint = prov.includes("rapidapi") || prov.includes("mansa")
-				? __("This provider only updates <b>NSE</b> tickers; Global symbols are skipped.")
-				: prov.includes("finnhub") || prov.includes("alpha")
-					? __("This provider only updates <b>Global</b> tickers; NSE symbols are skipped.")
+				? __("This provider only updates <b>Kenya</b> tickers; Global symbols are skipped.")
+				: prov.includes("finnhub") || prov.includes("alpha") || prov.includes("eoddata")
+					? __("This provider only updates <b>Global</b> tickers; Kenya symbols are skipped.")
 					: prov.includes("twelve")
-						? __("Uses Growe Stock <b>Exchange platform</b> for NSE and global tickers (batch API).")
+						? __("Uses Growe Stock <b>Exchange platform</b> for Kenya and global tickers (batch API).")
 						: __("Updates tickers this provider supports (by market).");
 			frappe.confirm(
 				__(
@@ -90,17 +90,14 @@ frappe.ui.form.on("Growe Price API", {
 				),
 				function () {
 					frm._price_refresh_active = true;
-					frm.dashboard.set_headline_alert(
-						__("Starting price refresh in background…"),
-						"blue"
-					);
+					_update_price_refresh_progress(frm, { total: 0, done: 0, market: null });
 					frappe.call({
 						method: "growie_app.api.price.refresh_prices",
 						args: { provider_name: frm.doc.name },
 						callback: function (r) {
 							if (!r.message) {
 								frm._price_refresh_active = false;
-								frm.dashboard.clear_headline();
+								_clear_price_refresh_progress(frm);
 								return;
 							}
 							if (r.message.queued) {
@@ -114,28 +111,24 @@ frappe.ui.form.on("Growe Price API", {
 										),
 									indicator: "blue",
 								}, 8);
-								frm.dashboard.set_headline_alert(
-									__(
-										"Refreshing prices in background… 0/{0} (0%)",
-										[total]
-									),
-									"blue"
-								);
+								_update_price_refresh_progress(frm, {
+									total,
+									done: 0,
+									market: null,
+								});
 								return;
 							}
 							frm._price_refresh_active = false;
-							frm.dashboard.clear_headline();
+							_clear_price_refresh_progress(frm);
 							frappe.msgprint({
 								title: __("✅ Prices Refreshed"),
 								indicator: "green",
-								message:
-									`<b>NSE</b>: ${r.message.nse_updated} ticker(s) updated<br>` +
-									`<b>Global</b>: ${r.message.global_updated} ticker(s) updated`,
+								message: _format_price_refresh_summary(r.message),
 							});
 						},
 						error: function () {
 							frm._price_refresh_active = false;
-							frm.dashboard.clear_headline();
+							_clear_price_refresh_progress(frm);
 						},
 					});
 				}
@@ -181,10 +174,24 @@ frappe.ui.form.on("Growe Price API", {
 
 		if (api_prov.includes("finnhub")) {
 			frm.dashboard.add_comment(
-				__("<b>Non-NSE exchanges only.</b> Finnhub refreshes Growe Stock where "
-				   + "<b>Exchange platform</b> is not NSE (NYSE, NASDAQ, …). "
-				   + "NSE tickers use RapidAPI / Mansa. Test with <code>AAPL</code>. "
+				__("<b>Global exchanges only.</b> Finnhub refreshes Growe Stock where "
+				   + "<b>Exchange platform</b> is not Nairobi NSE (NYSE, NASDAQ, …). "
+				   + "Kenya tickers use RapidAPI / Mansa. Test with <code>AAPL</code>. "
 				   + "<a href=\"https://finnhub.io/docs/api\" target=\"_blank\">Docs</a>"),
+				"blue",
+				true
+			);
+		}
+
+		if (api_prov.includes("eoddata")) {
+			frm.dashboard.add_comment(
+				__("<b>EODData</b> — end-of-day quotes via REST API. "
+				   + "API Key = your <b>ApiKey</b> from "
+				   + "<a href=\"https://eoddata.com/myaccount/api.aspx\" target=\"_blank\">My Account → API</a>. "
+				   + "Set <b>Exchange platform</b> on Growe Stock (NASDAQ, NYSE, LSE, …). "
+				   + "Kenya (Nairobi NSE) tickers are skipped. Test with <code>AAPL</code>. "
+				   + "<a href=\"https://api.eoddata.com/scalar/v1\" target=\"_blank\">API docs</a> · "
+				   + "<a href=\"https://www.eoddata.com/products/default.aspx\" target=\"_blank\">Plans</a>"),
 				"blue",
 				true
 			);
@@ -196,7 +203,7 @@ frappe.ui.form.on("Growe Price API", {
 				   + "API Key = <code>client_id</code>, API Secret = <code>client_secret</code> "
 				   + "(from <a href=\"https://developer.gs.com/docs\" target=\"_blank\">developer.gs.com</a>). "
 				   + "Prices endpoint = dataset id (default <code>TREOD</code>). "
-				   + "Global / non-NSE only. Test with <code>AAPL</code>."),
+				   + "Global / non-Kenya only. Test with <code>AAPL</code>."),
 				"blue",
 				true
 			);
@@ -206,7 +213,7 @@ frappe.ui.form.on("Growe Price API", {
 			frm.dashboard.add_comment(
 				__("<b>Twelve Data</b> — one quote per symbol (same as Test Connection). "
 				   + "Bulk refresh runs in the <b>background</b>; progress shows above. "
-				   + "Set <b>Exchange platform</b> on Growe Stock for NSE/global routing. "
+				   + "Set <b>Exchange platform</b> on Growe Stock for Kenya/global routing. "
 				   + "<a href=\"https://twelvedata.com/docs\" target=\"_blank\">Docs</a>"),
 				"blue",
 				true
@@ -217,7 +224,7 @@ frappe.ui.form.on("Growe Price API", {
 			frm.dashboard.add_comment(
 				__("<b>RapidAPI — Nairobi NSE only.</b> API Key = your <code>x-rapidapi-key</code>. " +
 				   "Bulk <code>GET /stocks</code> (all listings, then filtered to your tickers). " +
-				   "Market Type must be <b>NSE</b>. " +
+				   "Market Type must be <b>Kenya</b>. " +
 				   "<a href=\"https://rapidapi.com/iancenry/api/nairobi-stock-exchange-nse\" target=\"_blank\">Docs</a>"),
 				"blue",
 				true
@@ -242,6 +249,24 @@ frappe.ui.form.on("Growe Price API", {
 	},
 });
 
+function _format_price_refresh_summary(data) {
+	const eligible = data.tickers_eligible;
+	const requested = data.tickers_requested;
+	let extra = "";
+	if (eligible != null && requested && eligible !== requested) {
+		extra =
+			`<small>${__("Eligible for this provider")}: ${eligible}<br>` +
+			`${__("Total active tickers")}: ${requested}</small>`;
+	} else if (requested) {
+		extra = `<small>${__("Total active tickers")}: ${requested}</small>`;
+	}
+	return (
+		`<b>Kenya</b>: ${data.nse_updated || 0} ticker(s) updated<br>` +
+		`<b>Global</b>: ${data.global_updated || 0} ticker(s) updated<br>` +
+		extra
+	);
+}
+
 function _bind_price_refresh_realtime(frm) {
 	if (frm._growie_price_refresh_bound) {
 		return;
@@ -251,24 +276,13 @@ function _bind_price_refresh_realtime(frm) {
 	frappe.realtime.on("growie_price_refresh_progress", (data) => {
 		if (!frm._price_refresh_active) return;
 		if (data.provider_name && data.provider_name !== frm.doc.name) return;
-		const total = data.total || 0;
-		const done = data.done || 0;
-		const pct = total ? Math.round((done / total) * 100) : 0;
-		const market = data.market ? ` (${data.market})` : "";
-		const last = data.last_ticker ? ` — ${data.last_ticker}` : "";
-		frm.dashboard.set_headline_alert(
-			__(
-				"Refreshing prices{0}… {1}/{2} ({3}%){4}",
-				[market, done, total, pct, last]
-			),
-			"blue"
-		);
+		_update_price_refresh_progress(frm, data);
 	});
 
 	frappe.realtime.on("growie_price_refresh_done", (data) => {
 		if (data.provider_name && data.provider_name !== frm.doc.name) return;
 		frm._price_refresh_active = false;
-		frm.dashboard.clear_headline();
+		_clear_price_refresh_progress(frm);
 
 		if (data.success === false) {
 			frappe.msgprint({
@@ -281,7 +295,7 @@ function _bind_price_refresh_realtime(frm) {
 
 		frappe.show_alert({
 			message: __(
-				"Prices refreshed — NSE: {0}, Global: {1}",
+				"Prices refreshed — Kenya: {0}, Global: {1}",
 				[data.nse_updated || 0, data.global_updated || 0]
 			),
 			indicator: "green",
@@ -289,14 +303,55 @@ function _bind_price_refresh_realtime(frm) {
 		frappe.msgprint({
 			title: __("✅ Prices Refreshed"),
 			indicator: "green",
-			message:
-				`<b>NSE</b>: ${data.nse_updated || 0} ticker(s) updated<br>` +
-				`<b>Global</b>: ${data.global_updated || 0} ticker(s) updated<br>` +
-				(data.tickers_requested
-					? `<small>${__("Requested")}: ${data.tickers_requested}</small>`
-					: ""),
+			message: _format_price_refresh_summary(data),
 		});
 	});
+}
+
+function _clear_price_refresh_progress(frm) {
+	frm.$wrapper.find(".growie-price-refresh-progress").remove();
+	frm.dashboard.clear_headline();
+}
+
+function _update_price_refresh_progress(frm, data) {
+	const total = data.total || 0;
+	const done = data.done || 0;
+	const pct = total ? Math.min(100, Math.round((done / total) * 100)) : 0;
+	const market = data.market ? ` (${data.market})` : "";
+	const last = data.last_ticker || "";
+	const $wrapper = frm.$wrapper.find(".form-message");
+
+	let $bar = $wrapper.find(".growie-price-refresh-progress");
+	if (!$bar.length) {
+		frm.dashboard.clear_headline();
+		const html = `
+			<div class="growie-price-refresh-progress" style="width:100%;max-width:720px;padding:2px 0;">
+				<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px;font-size:12px;line-height:1.3;">
+					<span class="growie-price-refresh-label">${frappe.utils.escape_html(
+						__("Refreshing prices{0}…", [market])
+					)}</span>
+					<span class="growie-price-refresh-meta" style="white-space:nowrap;color:var(--text-muted);"></span>
+				</div>
+				<div style="height:8px;background:var(--gray-200,#e5e7eb);border-radius:4px;overflow:hidden;">
+					<div class="growie-price-refresh-fill" style="height:100%;width:0;background:var(--blue-500,#2563eb);border-radius:4px;transition:width 0.2s ease;"></div>
+				</div>
+			</div>`;
+		frm.dashboard.set_headline_alert(html, "blue", true);
+		$bar = $wrapper.find(".growie-price-refresh-progress");
+	}
+
+	const meta = total
+		? last
+			? `${done}/${total} (${pct}%) — ${frappe.utils.escape_html(last)}`
+			: `${done}/${total} (${pct}%)`
+		: __("Starting…");
+	$bar.find(".growie-price-refresh-meta").text(meta);
+	if (data.market) {
+		$bar.find(".growie-price-refresh-label").text(
+			__("Refreshing prices ({0})…", [data.market])
+		);
+	}
+	$bar.find(".growie-price-refresh-fill").css("width", `${pct}%`);
 }
 
 /**
@@ -310,7 +365,7 @@ function _set_provider_hints(frm) {
 			api_base_url: "https://www.mansaapi.com/api/v1",
 			endpoint_prices: "/stocks",
 			calls_per_month: 3000,
-			market_type: "NSE",
+			market_type: "Kenya",
 		},
 		"fcs api": {
 			api_base_url: "https://api-v4.fcsapi.com",
@@ -336,6 +391,12 @@ function _set_provider_hints(frm) {
 			calls_per_month: 60000, // free tier ~60/min; adjust if you upgrade
 			market_type: "Both",
 		},
+		eoddata: {
+			api_base_url: "https://api.eoddata.com",
+			endpoint_prices: "Quote/Get",
+			calls_per_month: 300000, // Bronze: 10k/day; adjust to your plan
+			market_type: "Global",
+		},
 		"goldman sachs": {
 			api_base_url: "https://api.gs.com",
 			endpoint_prices: "TREOD",
@@ -346,7 +407,7 @@ function _set_provider_hints(frm) {
 			api_base_url: "https://nairobi-stock-exchange-nse.p.rapidapi.com",
 			endpoint_prices: "/stocks",
 			calls_per_month: 3000,
-			market_type: "NSE",
+			market_type: "Kenya",
 		},
 	};
 

@@ -27,13 +27,14 @@ import {
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/lib/store'
 import { searchStocks, inferAssetClass } from '@/services/stack'
+import { MARKET_KENYA, MARKET_GLOBAL, MARKET_ETF } from '@/lib/market-labels'
 import type { GroweStock } from '@/services/portfolio'
 import type { AssetClass } from '@/types'
 
 const CLASS_TO_MARKET: Record<string, string | undefined> = {
-  'nse-stocks': 'NSE',
-  'global-stocks': 'Global',
-  etf: 'ETF',
+  'nse-stocks': MARKET_KENYA,
+  'global-stocks': MARKET_GLOBAL,
+  etf: MARKET_ETF,
 }
 
 interface StackStockPickerProps {
