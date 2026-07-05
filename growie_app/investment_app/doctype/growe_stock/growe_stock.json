@@ -46,13 +46,13 @@
    "reqd": 1
   },
   {
-   "default": "NSE",
+   "default": "Kenya",
    "fieldname": "market",
    "fieldtype": "Select",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Market",
-   "options": "NSE\nGlobal\nETF"
+   "options": "Kenya\nGlobal\nETF"
   },
   {
    "default": "Stock",

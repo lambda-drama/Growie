@@ -59,7 +59,7 @@
    "fieldname": "market_tag",
    "fieldtype": "Select",
    "label": "Market Tag",
-   "options": "\nNSE\nGlobal"
+   "options": "\nKenya\nGlobal"
   },
   {
    "fieldname": "currency",

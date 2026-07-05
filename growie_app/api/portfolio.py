@@ -7,6 +7,15 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, flt, get_datetime_str, get_first_day, getdate, now_datetime, today
 
+from growie_app.utils.market_labels import (
+	is_kenya_market,
+	KENYA,
+	GLOBAL,
+	ETF,
+	market_db_values,
+	coerce_market_input,
+)
+
 _USD_TO_KES_FALLBACK = 130.0
 
 
@@ -99,9 +108,9 @@ def _holding_asset_class_slug(asset_class_label: str, stock: dict | None = None)
 		return _ASSET_CLASS_MAP[raw]
 	if raw == "Stock":
 		market = ((stock or {}).get("market") or "").strip()
-		if market == "NSE":
+		if is_kenya_market(market):
 			return "nse-stocks"
-		if market == "ETF":
+		if market == ETF:
 			return "etf"
 		return "global-stocks"
 	if raw == "ETF":
@@ -165,12 +174,12 @@ def _load_growe_stock_meta(stock_name: str, ticker: str, asset_class_label: str 
 
 	if not stock and ticker:
 		filters = {"ticker": ticker, "is_active": 1}
-		if asset_class_label in ("NSE Stocks", "NSE", "Stock"):
-			filters["market"] = "NSE"
-		elif asset_class_label in ("Global Stocks", "Global"):
-			filters["market"] = "Global"
-		elif asset_class_label == "ETF":
-			filters["market"] = "ETF"
+		if asset_class_label in ("Kenya Stocks", "NSE Stocks", "NSE", KENYA, "Stock"):
+			filters["market"] = ["in", market_db_values(KENYA)]
+		elif asset_class_label in ("Global Stocks", GLOBAL):
+			filters["market"] = GLOBAL
+		elif asset_class_label == ETF:
+			filters["market"] = ETF
 		stock = frappe.db.get_value("Growe Stock", filters, fields, as_dict=True)
 		if not stock:
 			stock = frappe.db.get_value("Growe Stock", {"ticker": ticker, "is_active": 1}, fields, as_dict=True)
@@ -615,7 +624,8 @@ def search_stocks(
 	exchange = (exchange_platform or "").strip()
 	filters = {"is_active": 1, "verified": 1}
 	if market:
-		filters["market"] = market
+		values = market_db_values(market)
+		filters["market"] = values[0] if len(values) == 1 else ["in", values]
 	if category:
 		filters["instrument_type"] = category
 	if exchange:
@@ -623,12 +633,21 @@ def search_stocks(
 
 	if query:
 		clauses = []
+		sql_params: dict = {"q": f"%{query}%", "limit": int(limit)}
 		if market:
-			clauses.append("AND market = %(market)s")
+			values = market_db_values(market)
+			if len(values) == 1:
+				clauses.append("AND market = %(market)s")
+				sql_params["market"] = values[0]
+			else:
+				clauses.append("AND market IN %(markets)s")
+				sql_params["markets"] = tuple(values)
 		if category:
 			clauses.append("AND instrument_type = %(instrument_type)s")
+			sql_params["instrument_type"] = category
 		if exchange:
 			clauses.append("AND exchange_platform = %(exchange_platform)s")
+			sql_params["exchange_platform"] = exchange
 		results = frappe.db.sql(
 			"""
 			SELECT name, ticker, company_name, market, currency, region, exchange_platform, instrument_type
@@ -643,13 +662,7 @@ def search_stocks(
 			ORDER BY ticker ASC
 			LIMIT %(limit)s
 			""".format(extra_clauses=" ".join(clauses)),
-			{
-				"q": f"%{query}%",
-				"market": market,
-				"instrument_type": category,
-				"exchange_platform": exchange,
-				"limit": int(limit),
-			},
+			sql_params,
 			as_dict=True,
 		)
 	else:

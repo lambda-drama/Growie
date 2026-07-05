@@ -19,7 +19,7 @@ export function isInternalMarketRoutingLabel(label: string): boolean {
   if (!raw) return false
   if (LEGACY_TO_CATEGORY[raw]) return true
   const lower = raw.toLowerCase()
-  if (lower === 'nse' || lower === 'global') return true
+  if (lower === 'nse' || lower === 'kenya' || lower === 'global') return true
   if (lower === 'nse-stocks' || lower === 'global-stocks') return true
   if (lower.includes('nse') && lower.includes('stock')) return true
   if (lower.includes('global') && lower.includes('stock')) return true
@@ -49,7 +49,7 @@ export function normalizeAssetCategoryLabel(label: string): string {
   if (LEGACY_TO_CATEGORY[lower]) return LEGACY_TO_CATEGORY[lower]
   if (lower.includes('nse') && lower.includes('stock')) return 'Stock'
   if (lower.includes('global') && lower.includes('stock')) return 'Stock'
-  if (lower === 'nse' || lower === 'global') return 'Stock'
+  if (lower === 'nse' || lower === 'kenya' || lower === 'global') return 'Stock'
   return raw
 }
 
@@ -60,7 +60,7 @@ export function categoryToPickerSlug(category: string): 'nse-stocks' | 'global-s
 }
 
 /** Default market when creating a new Growe Stock from the + dialog. */
-export function categoryDefaultMarket(category: string): 'NSE' | 'Global' | 'ETF' {
+export function categoryDefaultMarket(category: string): 'Kenya' | 'Global' | 'ETF' {
   if (category === 'ETF') return 'ETF'
   if (category === 'Stock') return 'Global'
   return 'Global'

@@ -35,7 +35,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Market",
-   "options": "NSE\nGlobal",
+   "options": "Kenya\nGlobal",
    "reqd": 1
   },
   {

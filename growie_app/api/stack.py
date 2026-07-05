@@ -7,6 +7,15 @@ import frappe
 from frappe import _
 from frappe.utils import flt, getdate, now_datetime, today
 
+from growie_app.utils.market_labels import (
+	coerce_market_input,
+	is_global_market,
+	is_kenya_market,
+	KENYA,
+	GLOBAL,
+	ETF,
+)
+
 from growie_app.api.portfolio import (
 	_ASSET_CLASS_MAP,
 	_ASSET_CLASS_REVERSE,
@@ -73,13 +82,13 @@ def _member_holding_tickers_by_market(
 			continue
 		ac = (r.asset_class or "").strip()
 		market = ac
-		if ac not in ("NSE", "Global", "ETF") and r.asset_name:
+		if ac not in (KENYA, GLOBAL, ETF, "NSE") and r.asset_name:
 			market = frappe.db.get_value("Growe Stock", r.asset_name, "market") or ac
-		if market == "NSE":
+		if is_kenya_market(market):
 			if t not in seen_nse:
 				seen_nse.add(t)
 				nse.append(t)
-		elif market in ("Global", "ETF"):
+		elif is_global_market(market) or market == ETF:
 			if t not in seen_global:
 				seen_global.add(t)
 				global_.append(t)
@@ -88,12 +97,12 @@ def _member_holding_tickers_by_market(
 
 
 def _asset_class_from_market(market: str) -> str:
-	m = (market or "").strip()
-	if m == "NSE":
+	m = coerce_market_input(market)
+	if m == KENYA:
 		return "nse-stocks"
-	if m == "Global":
+	if m == GLOBAL:
 		return "global-stocks"
-	if m == "ETF":
+	if m == ETF:
 		return "etf"
 	return ""
 
@@ -105,12 +114,12 @@ def _instrument_type_for_market(market: str) -> str:
 
 def _market_tag_for_holding(holding_doc) -> str:
 	ac = holding_doc.asset_class or ""
-	if ac == "NSE":
-		return "NSE"
-	if ac == "Global":
-		return "Global"
-	if ac == "ETF":
-		return "ETF"
+	if ac in ("NSE", KENYA):
+		return KENYA
+	if ac == GLOBAL:
+		return GLOBAL
+	if ac == ETF:
+		return ETF
 	return ""
 
 
@@ -607,12 +616,12 @@ def create_stock(
 	clean = (ticker or "").strip().upper()
 	if not clean:
 		frappe.throw(_("Ticker is required."))
-	mkt = (market or "Global").strip()
-	if mkt not in ("NSE", "Global", "ETF"):
-		frappe.throw(_("Market must be NSE, Global, or ETF."))
-	if mkt == "NSE":
+	mkt = coerce_market_input(market or GLOBAL)
+	if mkt not in (KENYA, GLOBAL, ETF):
+		frappe.throw(_("Market must be Kenya, Global, or ETF."))
+	if mkt == KENYA:
 		region_val = (region or "Kenya").strip()
-	elif mkt == "ETF":
+	elif mkt == ETF:
 		region_val = (region or "USA").strip()
 	else:
 		region_val = (region or "Global").strip()
@@ -814,7 +823,7 @@ def _infer_region_exchange_for_stock(stock: dict) -> tuple[str, str]:
 	ticker = (stock.get("ticker") or "").strip().upper()
 	sector = (stock.get("sector") or "").strip().upper()
 
-	if market == "NSE":
+	if is_kenya_market(market):
 		return "Africa", "NSE"
 
 	instrument = (stock.get("instrument_type") or "").strip()

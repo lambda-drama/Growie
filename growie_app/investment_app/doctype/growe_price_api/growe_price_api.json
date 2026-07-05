@@ -15,6 +15,7 @@
   "api_section",
   "api_base_url",
   "api_key",
+  "api_secret",
   "column_break_cdlh",
   "endpoint_prices",
   "limits_section",
@@ -42,7 +43,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Market Type",
-   "options": "NSE\nGlobal\nBoth"
+   "options": "Kenya\nGlobal\nBoth"
   },
   {
    "default": "0",
@@ -66,6 +67,12 @@
    "fieldname": "api_key",
    "fieldtype": "Password",
    "label": "API Key"
+  },
+  {
+   "description": "OAuth client secret (Goldman Sachs only). EODData uses API Key only.",
+   "fieldname": "api_secret",
+   "fieldtype": "Password",
+   "label": "API Secret"
   },
   {
    "description": "e.g., /stock/price",
@@ -108,7 +115,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "API Provider",
-   "options": "\nMansa Markets\nFCS API\nFinnhub\nNSE Data API (Open Source)\nAfrimarket (Python)\nAlpha Vantage\nYahoo Finance\nTwelve Data\nIntrinio\nICE Data Services\nRapidApi\nGoldman Sachs\nNone (Manual Entry)"
+   "options": "\nMansa Markets\nFCS API\nFinnhub\nEODData\nNSE Data API (Open Source)\nAfrimarket (Python)\nAlpha Vantage\nYahoo Finance\nTwelve Data\nIntrinio\nICE Data Services\nRapidApi\nGoldman Sachs\nNone (Manual Entry)"
   },
   {
    "fieldname": "test_section",

@@ -18,14 +18,11 @@ import {
   type StockWithPrice, type StockPickRaw,
 } from '@/services/markets'
 import { refreshStackPrices } from '@/services/stack'
+import { MARKET_FILTER_OPTIONS, marketToFilterId } from '@/lib/market-labels'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const MARKET_TABS = [
-  { id: 'all',    label: 'All Markets' },
-  { id: 'NSE',    label: '🇰🇪 NSE Kenya' },
-  { id: 'Global', label: '🌍 Global' },
-]
+const MARKET_TABS = MARKET_FILTER_OPTIONS
 
 const SECTOR_COLORS: Record<string, string> = {
   Banking:       'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
@@ -177,7 +174,7 @@ export function MarketsView() {
       } else {
         const n = result.tickers_requested ?? (result.nse_tickers?.length ?? 0) + (result.global_tickers?.length ?? 0)
         setRefreshMsg(
-          `Updated ${result.nse_updated ?? 0} NSE · ${result.global_updated ?? 0} global`
+          `Updated ${result.nse_updated ?? 0} Kenya · ${result.global_updated ?? 0} global`
           + (n ? ` (${n} holding ticker${n === 1 ? '' : 's'})` : ''),
         )
       }
@@ -192,7 +189,9 @@ export function MarketsView() {
   // Filter stocks
   const filtered = useMemo(() => {
     let list = stocks
-    if (activeMarket !== 'all') list = list.filter((s) => s.market === activeMarket)
+    if (activeMarket !== 'all') {
+      list = list.filter((s) => marketToFilterId(s.market) === activeMarket)
+    }
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter(

@@ -34,12 +34,16 @@ import {
   parsePortfolioAnalysis,
   defaultInsightsFromPortfolio,
   mergeParsedWithDefaults,
+  extractFullSectionText,
+  isInsightSectionKey,
+  type InsightSectionKey,
 } from '@/lib/analysis-parse'
 import { BarbsAIBadge } from '@/components/analysis/barbs-ai-badge'
 import { AnalysisMetricsRow } from '@/components/analysis/analysis-metrics-row'
 import { AnalysisInsightCards } from '@/components/analysis/analysis-insight-cards'
 import { AnalysisRecommendations } from '@/components/analysis/analysis-recommendations'
 import { AnalysisFollowUps } from '@/components/analysis/analysis-follow-ups'
+import { AnalysisSectionDetail } from '@/components/analysis/analysis-section-detail'
 import { formatBarbsAIReply } from '@/lib/barbs-ai-text'
 
 function ChatBubble({ msg }: { msg: ChatMessage }) {
@@ -83,6 +87,7 @@ export function AnalysisView() {
   const [chatOpen, setChatOpen] = useState(false)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [isSending, setIsSending] = useState(false)
+  const [detailSection, setDetailSection] = useState<InsightSectionKey | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
   const metrics = useMemo(
@@ -230,12 +235,12 @@ export function AnalysisView() {
   }
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const seed = sessionStorage.getItem('growe_barbs_chat_seed')
-    if (!seed) return
-    sessionStorage.removeItem('growe_barbs_chat_seed')
-    void sendQuestion(seed)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    if (typeof window === 'undefined' || loadingSaved || !hasAnalysis) return
+    const raw = sessionStorage.getItem('growe_barbs_section')
+    if (!isInsightSectionKey(raw)) return
+    sessionStorage.removeItem('growe_barbs_section')
+    setDetailSection(raw)
+  }, [loadingSaved, hasAnalysis])
 
   const notConfigured = providerStatus !== null && !providerStatus.configured
   const showEmpty = !loadingSaved && !hasAnalysis && !isAnalysing
@@ -373,10 +378,7 @@ export function AnalysisView() {
             generatedAt={analysisGeneratedAt}
             onRefresh={runAnalysis}
             isRefreshing={isAnalysing}
-            onViewDetail={(prompt) => {
-              setChatOpen(true)
-              sendQuestion(prompt)
-            }}
+            onViewDetail={(section) => setDetailSection(section)}
           />
 
           <div className="grid gap-4 lg:grid-cols-2">
@@ -415,6 +417,12 @@ export function AnalysisView() {
           </CardContent>
         </Card>
       )}
+
+      <AnalysisSectionDetail
+        section={detailSection}
+        content={detailSection ? extractFullSectionText(analysisText, detailSection) : ''}
+        onClose={() => setDetailSection(null)}
+      />
 
       <p className="text-center text-xs text-muted-foreground">
         <strong>Barbs AI</strong> provides insights based on your portfolio data and market analysis. Always consult with a

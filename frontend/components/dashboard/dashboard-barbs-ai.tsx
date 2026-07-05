@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { AnalysisInsightCards } from '@/components/analysis/analysis-insight-cards'
 import { useBarbsInsights } from '@/hooks/use-barbs-insights'
 import { useAppStore } from '@/lib/store'
+import type { InsightSectionKey } from '@/lib/analysis-parse'
 
 export function DashboardBarbsAI() {
   const { setActiveTab } = useAppStore()
@@ -19,10 +20,10 @@ export function DashboardBarbsAI() {
     holdingsCount,
   } = useBarbsInsights()
 
-  const openAnalysis = (prompt?: string) => {
+  const openAnalysis = (section?: InsightSectionKey) => {
     setActiveTab('analysis')
-    if (prompt && typeof window !== 'undefined') {
-      sessionStorage.setItem('growe_barbs_chat_seed', prompt)
+    if (section && typeof window !== 'undefined') {
+      sessionStorage.setItem('growe_barbs_section', section)
     }
   }
 
@@ -77,7 +78,7 @@ export function DashboardBarbsAI() {
           generatedAt={generatedAt}
           onRefresh={() => void runAnalysis()}
           isRefreshing={isAnalysing}
-          onViewDetail={(prompt) => openAnalysis(prompt)}
+          onViewDetail={(section) => openAnalysis(section)}
         />
       )}
     </section>

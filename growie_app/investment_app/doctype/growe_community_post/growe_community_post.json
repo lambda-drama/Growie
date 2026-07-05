@@ -35,7 +35,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Category",
-   "options": "General\nNSE Stocks\nGlobal Stocks\nMMF\nQuestion\nWin"
+   "options": "General\nKenya Stocks\nGlobal Stocks\nMMF\nQuestion\nWin"
   },
   {
    "fieldname": "column_break_meta",

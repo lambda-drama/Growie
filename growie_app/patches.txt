@@ -7,3 +7,4 @@
 growie_app.patches.v1_0.fix_growe_holding_transaction_module
 growie_app.patches.v1_0.backfill_growe_stock_verified
 growie_app.patches.v1_0.dedupe_unverified_growe_stocks
+growie_app.patches.v1_0.rename_nse_market_to_kenya

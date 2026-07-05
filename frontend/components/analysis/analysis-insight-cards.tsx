@@ -11,11 +11,11 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import type { ParsedPortfolioAnalysis } from '@/lib/analysis-parse'
+import type { InsightSectionKey, ParsedPortfolioAnalysis } from '@/lib/analysis-parse'
 import { formatDateRelative } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
-type InsightKey = keyof Pick<ParsedPortfolioAnalysis, 'strengths' | 'risks' | 'opportunities' | 'watchlist'>
+type InsightKey = InsightSectionKey
 
 const INSIGHT_STYLES: {
   key: InsightKey
@@ -26,7 +26,6 @@ const INSIGHT_STYLES: {
   iconBg: string
   iconColor: string
   titleColor: string
-  detailPrompt: string
 }[] = [
   {
     key: 'strengths',
@@ -37,7 +36,6 @@ const INSIGHT_STYLES: {
     iconBg: 'bg-green-100 dark:bg-green-900/40',
     iconColor: 'text-green-700 dark:text-green-400',
     titleColor: 'text-green-800 dark:text-green-300',
-    detailPrompt: 'Tell me more about the strengths in my portfolio and what is working well.',
   },
   {
     key: 'risks',
@@ -48,7 +46,6 @@ const INSIGHT_STYLES: {
     iconBg: 'bg-red-100 dark:bg-red-900/40',
     iconColor: 'text-red-700 dark:text-red-400',
     titleColor: 'text-red-800 dark:text-red-300',
-    detailPrompt: 'Explain the top risks in my portfolio in more detail and how I can address them.',
   },
   {
     key: 'opportunities',
@@ -59,7 +56,6 @@ const INSIGHT_STYLES: {
     iconBg: 'bg-blue-100 dark:bg-blue-900/40',
     iconColor: 'text-blue-700 dark:text-blue-400',
     titleColor: 'text-blue-800 dark:text-blue-300',
-    detailPrompt: 'What opportunities should I consider for my portfolio to improve returns or diversification?',
   },
   {
     key: 'watchlist',
@@ -70,7 +66,6 @@ const INSIGHT_STYLES: {
     iconBg: 'bg-amber-100 dark:bg-amber-900/40',
     iconColor: 'text-amber-800 dark:text-amber-400',
     titleColor: 'text-amber-900 dark:text-amber-300',
-    detailPrompt: 'What holdings or themes should be on my watchlist based on my current portfolio?',
   },
 ]
 
@@ -79,7 +74,7 @@ interface AnalysisInsightCardsProps {
   generatedAt: string | null
   onRefresh: () => void
   isRefreshing: boolean
-  onViewDetail?: (prompt: string, section: string) => void
+  onViewDetail?: (section: InsightKey) => void
 }
 
 export function AnalysisInsightCards({
@@ -110,7 +105,7 @@ export function AnalysisInsightCards({
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {INSIGHT_STYLES.map(
-          ({ key, title, icon: Icon, border, bg, iconBg, iconColor, titleColor, detailPrompt }) => (
+          ({ key, title, icon: Icon, border, bg, iconBg, iconColor, titleColor }) => (
             <Card
               key={key}
               className={cn('flex flex-col overflow-hidden border-l-4 shadow-sm', border, bg)}
@@ -135,7 +130,7 @@ export function AnalysisInsightCards({
                     variant="link"
                     size="sm"
                     className={cn('mt-3 h-auto justify-start gap-1 p-0', titleColor)}
-                    onClick={() => onViewDetail(detailPrompt, title)}
+                    onClick={() => onViewDetail(key)}
                   >
                     View details
                     <ArrowRight className="h-3.5 w-3.5" />

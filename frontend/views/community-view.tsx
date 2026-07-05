@@ -28,7 +28,7 @@ import {
 const CATEGORIES: { id: PostCategory; label: string; color: string }[] = [
   { id: 'all',          label: 'All',          color: '' },
   { id: 'General',      label: 'General',      color: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' },
-  { id: 'NSE Stocks',   label: 'NSE Stocks',   color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
+  { id: 'Kenya Stocks',   label: 'Kenya Stocks',   color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
   { id: 'Global Stocks',label: 'Global',       color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
   { id: 'MMF',          label: 'MMF',          color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' },
   { id: 'Question',     label: 'Question',     color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' },
@@ -36,6 +36,9 @@ const CATEGORIES: { id: PostCategory; label: string; color: string }[] = [
 ]
 
 function categoryColor(cat: string) {
+  if (cat === 'NSE Stocks') {
+    return CATEGORIES.find((c) => c.id === 'Kenya Stocks')?.color ?? ''
+  }
   return CATEGORIES.find((c) => c.id === cat)?.color ?? ''
 }
 
