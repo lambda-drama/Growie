@@ -10,10 +10,12 @@ import {
   type ParsedPortfolioAnalysis,
 } from '@/lib/analysis-parse'
 import { computeDashboardMetrics, groupByAssetClass } from '@/lib/dashboard-data'
+import { useDisplayMoney } from '@/lib/store'
 import { formatBarbsAIReply } from '@/lib/barbs-ai-text'
 
 export function useBarbsInsights() {
   const { holdings, summary } = usePortfolio()
+  const { kesPerUsd } = useDisplayMoney()
   const [analysisText, setAnalysisText] = useState('')
   const [generatedAt, setGeneratedAt] = useState<string | null>(null)
   const [hasAnalysis, setHasAnalysis] = useState(false)
@@ -21,8 +23,8 @@ export function useBarbsInsights() {
   const [isAnalysing, setIsAnalysing] = useState(false)
 
   const metrics = useMemo(
-    () => computeDashboardMetrics(holdings, summary),
-    [holdings, summary]
+    () => computeDashboardMetrics(holdings, summary, kesPerUsd),
+    [holdings, summary, kesPerUsd]
   )
   const groups = useMemo(() => groupByAssetClass(holdings), [holdings])
 

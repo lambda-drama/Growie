@@ -433,34 +433,47 @@ def _save_conversation(
 
 def _build_portfolio_context(member_name: str) -> str:
 	"""Summarise all holdings for portfolio-level analysis."""
-	from growie_app.api.portfolio import open_holding_db_filters
+	from growie_app.api.portfolio import open_holding_db_filters, portfolio_return_totals
+	from growie_app.api.stack import _stack_holding_row
 
-	holdings = frappe.get_all(
+	rows = frappe.get_all(
 		"Growe Holding",
 		filters=open_holding_db_filters(member_name),
-		fields=["asset_name", "ticker", "quantity", "cost_basis_kes", "value_kes", "asset_class", "notes"],
+		fields=[
+			"asset_name",
+			"ticker",
+			"quantity",
+			"cost_basis_kes",
+			"value_kes",
+			"asset_class",
+			"notes",
+			"currency",
+			"date_added",
+			"buying_price",
+			"initial_investment_value",
+		],
 	)
-	if not holdings:
+	if not rows:
 		return ""
 
-	lines = []
-	total_cost = 0.0
-	total_value = 0.0
-	for h in holdings:
-		cost = float(h.cost_basis_kes or 0)
-		val  = float(h.value_kes or cost)
-		total_cost  += cost
-		total_value += val
-		pnl = val - cost
-		ticker_str = f" ({h.ticker})" if h.ticker else ""
-		lines.append(
-			f"  • {h.asset_name}{ticker_str} [{h.asset_class or 'Other'}]"
-			f" — Cost KES {cost:,.0f} | Value KES {val:,.0f}"
-			f" | P&L KES {pnl:+,.0f}"
-		)
+	holdings = [_stack_holding_row(r) for r in rows]
+	totals = portfolio_return_totals(holdings)
+	total_cost = totals["total_cost_kes"]
+	total_value = totals["total_value_kes"]
+	overall_pnl = totals["gain_kes"]
+	pnl_pct = totals["gain_percent"]
 
-	overall_pnl = total_value - total_cost
-	pnl_pct = (overall_pnl / total_cost * 100) if total_cost else 0
+	lines = []
+	for h in holdings:
+		cost = float(h.get("initialInvestmentValue") or h.get("costBasisKES") or 0)
+		val = float(h.get("valueNative") or h.get("valueKES") or cost)
+		pnl = val - cost
+		ticker_str = f" ({h.get('ticker')})" if h.get("ticker") else ""
+		lines.append(
+			f"  • {h.get('name')}{ticker_str} [{h.get('assetClass') or 'Other'}]"
+			f" — Cost {h.get('currency', 'USD')} {cost:,.0f} | Value {h.get('currency', 'USD')} {val:,.0f}"
+			f" | P&L {pnl:+,.0f}"
+		)
 
 	ctx = (
 		f"Portfolio Summary:\n"

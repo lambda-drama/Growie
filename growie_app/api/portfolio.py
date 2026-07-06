@@ -427,6 +427,88 @@ def _cost_at_avg_kes(
 	return flt(amount_native * kpu) if kpu > 0 else 0.0
 
 
+def _initial_investment_native(h: dict) -> float:
+	"""Total amount invested in the holding's currency (not KES)."""
+	qty = flt(h.get("quantity"))
+	avg = flt(h.get("avgBuyPrice"))
+	if qty > 0 and avg > 0:
+		return flt(qty * avg)
+	init = flt(h.get("initialInvestmentValue"))
+	if init > 0:
+		return init
+	return flt(h.get("costBasisKES") or h.get("costBasis") or 0)
+
+
+def _current_value_native(h: dict) -> float:
+	"""Current market value in the holding's currency."""
+	vn = flt(h.get("valueNative"))
+	if vn > 0:
+		return vn
+	qty = flt(h.get("quantity"))
+	cur = flt(h.get("currentPrice"))
+	if qty > 0 and cur > 0:
+		return flt(qty * cur)
+	return flt(h.get("valueKES") or h.get("value") or 0)
+
+
+def _native_to_kes_today(amount_native: float, currency: str, on_date: str = None) -> float:
+	"""Convert a native holding amount to KES using today's FX (same rate for cost and value)."""
+	currency = (currency or "USD").upper()
+	if amount_native <= 0:
+		return 0.0
+	if currency == "KES":
+		return flt(amount_native)
+	on_date = on_date or str(today())
+	kpu = kes_per_unit_foreign(currency, on_date, strict=False)
+	if kpu <= 0 and currency == "USD":
+		kpu = _growe_usd_to_kes_fallback()
+	return flt(amount_native * kpu) if kpu > 0 else 0.0
+
+
+def portfolio_return_totals(holdings: list[dict], on_date: str = None) -> dict:
+	"""
+	Weighted portfolio return: Σ current value and Σ initial investment per line,
+	converted to KES at a single FX date. Never average line-level gain %.
+
+	Return % = (Σ current − Σ initial) / Σ initial × 100
+	"""
+	on_date = on_date or str(today())
+	total_initial_kes = 0.0
+	total_current_kes = 0.0
+	total_value_kes = 0.0
+
+	for h in holdings:
+		ccy = (h.get("currency") or "USD").upper()
+		initial = _initial_investment_native(h)
+		current = _current_value_native(h)
+		if initial <= 0 and current <= 0:
+			continue
+
+		val_kes = flt(h.get("valueInKES") or 0)
+		if val_kes <= 0:
+			val_kes = _native_to_kes_today(current, ccy, on_date)
+		total_value_kes += val_kes
+
+		init_kes = _native_to_kes_today(initial, ccy, on_date)
+		curr_kes = _native_to_kes_today(current, ccy, on_date)
+		if init_kes <= 0:
+			init_kes = flt(h.get("costAtAvgKES") or h.get("costBasisKES") or 0)
+		if curr_kes <= 0:
+			curr_kes = val_kes
+		total_initial_kes += init_kes
+		total_current_kes += curr_kes
+
+	gain_kes = total_current_kes - total_initial_kes
+	gain_percent = (gain_kes / total_initial_kes * 100) if total_initial_kes > 0 else 0.0
+
+	return {
+		"total_value_kes": total_value_kes,
+		"total_cost_kes": total_initial_kes,
+		"gain_kes": gain_kes,
+		"gain_percent": gain_percent,
+	}
+
+
 def _growe_usd_to_kes_fallback() -> float:
 	"""Last-resort USD→KES when ERPNext has no row for the requested date."""
 	try:
@@ -812,8 +894,11 @@ def get_portfolio_summary():
 	)
 
 	holdings = [_stack_holding_row(r) for r in rows]
-	total_value = 0.0
-	total_cost = 0.0
+	totals = portfolio_return_totals(holdings)
+	total_value = totals["total_value_kes"]
+	total_cost = totals["total_cost_kes"]
+	gain = totals["gain_kes"]
+	gain_percent = totals["gain_percent"]
 	allocation: dict = {
 		"mmf": 0.0,
 		"real-estate": 0.0,
@@ -824,14 +909,8 @@ def get_portfolio_summary():
 
 	for h in holdings:
 		val = float(h.get("valueInKES") or h.get("valueKES") or 0)
-		cost = float(h.get("costAtAvgKES") or h.get("costBasisKES") or 0)
-		total_value += val
-		total_cost += cost
 		key = h.get("assetClass", "mmf")
 		allocation[key] += val
-
-	gain = total_value - total_cost
-	gain_percent = (gain / total_cost * 100) if total_cost > 0 else 0.0
 
 	alloc_pct = {
 		k: round(v / total_value * 100, 1) if total_value > 0 else 0

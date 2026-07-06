@@ -1,6 +1,7 @@
 import type { Holding, AssetClass } from '@/types'
 import type { PortfolioSummary } from '@/services/portfolio'
 import { assetCategoryLabelForHolding, bucketLabelForHolding } from '@/lib/stack-grouping'
+import { computeWeightedPortfolioReturn } from '@/lib/stack-holdings-summary'
 import type { StackHolding } from '@/services/stack'
 import {
   buildTimelineBuckets,
@@ -77,13 +78,10 @@ export function groupByAssetClass(holdings: Holding[]): AssetClassGroup[] {
 
   return ASSET_CLASS_ORDER.map((assetClass) => {
     const list = map.get(assetClass) ?? []
-    const totalValueKES = list.reduce((s, h) => s + (h.valueInKES ?? h.valueKES), 0)
-    const totalCostKES = list.reduce(
-      (s, h) => s + (h.costAtAvgKES ?? h.costBasisKES),
-      0
-    )
-    const gainPercent =
-      totalCostKES > 0 ? ((totalValueKES - totalCostKES) / totalCostKES) * 100 : 0
+    const weighted = computeWeightedPortfolioReturn(list)
+    const totalValueKES = weighted.totalValueInKES
+    const totalCostKES = weighted.totalCostInKES
+    const gainPercent = weighted.gainPercent
     const tickers = [...new Set(list.map((h) => h.ticker || h.name).filter(Boolean))]
     const tickersPreview =
       tickers.length === 0
@@ -129,10 +127,10 @@ export function groupByAssetCategory(holdings: Holding[]): AssetCategoryGroup[] 
   })
 
   return ordered.map(([category, list]) => {
-    const totalValueKES = list.reduce((s, h) => s + (h.valueInKES ?? h.valueKES), 0)
-    const totalCostKES = list.reduce((s, h) => s + (h.costAtAvgKES ?? h.costBasisKES), 0)
-    const gainPercent =
-      totalCostKES > 0 ? ((totalValueKES - totalCostKES) / totalCostKES) * 100 : 0
+    const weighted = computeWeightedPortfolioReturn(list)
+    const totalValueKES = weighted.totalValueInKES
+    const totalCostKES = weighted.totalCostInKES
+    const gainPercent = weighted.gainPercent
     return {
       category,
       name: category,
@@ -203,18 +201,14 @@ export function getNetPortfolioSeries(holdings: Holding[], monthCount = 6): NetP
 
 export function computeDashboardMetrics(
   holdings: Holding[],
-  summary: PortfolioSummary | null
+  summary: PortfolioSummary | null,
+  kesPerUsd = 0
 ): DashboardMetrics {
-  const totalValueKES =
-    summary?.totalValueKES ??
-    holdings.reduce((s, h) => s + (h.valueInKES ?? h.valueKES), 0)
-  const totalCostKES =
-    summary?.totalCostKES ??
-    holdings.reduce((s, h) => s + (h.costAtAvgKES ?? h.costBasisKES), 0)
-  const gainKES = summary?.gainKES ?? totalValueKES - totalCostKES
-  const gainPercent =
-    summary?.gainPercent ??
-    (totalCostKES > 0 ? (gainKES / totalCostKES) * 100 : 0)
+  const weighted = computeWeightedPortfolioReturn(holdings, kesPerUsd)
+  const totalValueKES = summary?.totalValueKES ?? weighted.totalValueInKES
+  const totalCostKES = summary?.totalCostKES ?? weighted.totalCostInKES
+  const gainKES = summary?.gainKES ?? weighted.deltaKES
+  const gainPercent = summary?.gainPercent ?? weighted.gainPercent
 
   const { monthlyGrowthKES, monthlyGrowthPercent } = computeMonthOverMonthGrowth(holdings, summary)
 

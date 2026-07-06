@@ -16,7 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
 import { usePortfolio } from '@/hooks/use-portfolio'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, useDisplayMoney } from '@/lib/store'
 import {
   getProviderStatus,
   chat,
@@ -90,9 +90,10 @@ export function AnalysisView() {
   const [detailSection, setDetailSection] = useState<InsightSectionKey | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
+  const { kesPerUsd } = useDisplayMoney()
   const metrics = useMemo(
-    () => computeDashboardMetrics(holdings, summary),
-    [holdings, summary]
+    () => computeDashboardMetrics(holdings, summary, kesPerUsd),
+    [holdings, summary, kesPerUsd]
   )
 
   const groups = useMemo(() => groupByAssetClass(holdings), [holdings])

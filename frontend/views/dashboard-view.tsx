@@ -16,7 +16,7 @@ import {
 import { usePortfolio } from '@/hooks/use-portfolio'
 import { useGoals } from '@/hooks/use-goals'
 import { useAuth } from '@/hooks/use-auth'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, useDisplayMoney } from '@/lib/store'
 import { computeDashboardMetrics } from '@/lib/dashboard-data'
 import { useFrappeCurrencySync } from '@/hooks/use-frappe-currency'
 import { cn } from '@/lib/utils'
@@ -28,9 +28,10 @@ export function DashboardView() {
   const { holdings, summary, isLoading, error, refresh } = usePortfolio()
   const { goals, isLoading: goalsLoading } = useGoals()
 
+  const { kesPerUsd } = useDisplayMoney()
   const metrics = useMemo(
-    () => computeDashboardMetrics(holdings, summary),
-    [holdings, summary]
+    () => computeDashboardMetrics(holdings, summary, kesPerUsd),
+    [holdings, summary, kesPerUsd]
   )
 
   if (!isAuthenticated) {

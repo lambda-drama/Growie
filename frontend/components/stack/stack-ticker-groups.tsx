@@ -19,6 +19,7 @@ import {
   type StackGroupingMode,
 } from '@/lib/stack-grouping'
 import { groupHoldingsByTicker, metricsFromTickerGroup, type StackTickerGroup } from '@/lib/stack-ticker-groups'
+import { computeWeightedPortfolioReturn } from '@/lib/stack-holdings-summary'
 import type { StackHolding } from '@/services/stack'
 import { cn } from '@/lib/utils'
 
@@ -126,18 +127,18 @@ export function StackTickerGroups({
   const bucketSummaries = useMemo(
     () =>
       bucketedGroups.map(([bucket, bucketGroups]) => {
-        const totalValue = bucketGroups.reduce((s, g) => s + g.totalValueInKES, 0)
-        const totalCost = bucketGroups.reduce((s, g) => s + g.totalCostInKES, 0)
+        const bucketHoldings = bucketGroups.flatMap((g) => g.holdings)
+        const weighted = computeWeightedPortfolioReturn(bucketHoldings, kesPerUsd)
         const totalLots = bucketGroups.reduce((s, g) => s + g.lotCount, 0)
         return {
           bucket,
           tickerCount: bucketGroups.length,
           lotCount: totalLots,
-          gainPercent: totalCost > 0 ? ((totalValue - totalCost) / totalCost) * 100 : 0,
-          totalValue,
+          gainPercent: weighted.gainPercent,
+          totalValue: weighted.totalValueInKES,
         }
       }),
-    [bucketedGroups]
+    [bucketedGroups, kesPerUsd]
   )
   const selectedGroup = useMemo(
     () => groups.find((g) => g.key === selectedGroupKey) ?? null,
