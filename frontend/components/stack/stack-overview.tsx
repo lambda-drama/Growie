@@ -20,6 +20,7 @@ import { usePortfolio } from '@/hooks/use-portfolio'
 import { useAuth } from '@/hooks/use-auth'
 import { useAppStore, useDisplayMoney } from '@/lib/store'
 import { computeDashboardMetrics, groupByAssetCategory } from '@/lib/dashboard-data'
+import { computeWeightedPortfolioReturn } from '@/lib/stack-holdings-summary'
 import {
   bucketIconKind,
   bucketLabelForHolding,
@@ -75,25 +76,26 @@ export function StackOverview({ onOpenClass: _onOpenClass }: StackOverviewProps)
 
   const groupedOverviewRows = useMemo(() => {
     if (!isBucketGroupingMode(stackGroupingMode)) return []
-    const map = new Map<string, { value: number; cost: number; positions: number }>()
+    const map = new Map<string, StackHolding[]>()
     for (const h of holdings) {
       if (!holdingMatchesGroupingMode(h, stackGroupingMode)) continue
       const key = bucketLabelForHolding(h, stackGroupingMode)
-      const row = map.get(key) ?? { value: 0, cost: 0, positions: 0 }
-      row.value += h.valueInKES ?? h.valueKES ?? 0
-      row.cost += h.costAtAvgKES ?? h.costBasisKES ?? 0
-      row.positions += 1
-      map.set(key, row)
+      const list = map.get(key) ?? []
+      list.push(h)
+      map.set(key, list)
     }
     return [...map.entries()]
-      .map(([label, row]) => ({
-        label,
-        value: row.value,
-        gainPercent: row.cost > 0 ? ((row.value - row.cost) / row.cost) * 100 : 0,
-        positions: row.positions,
-      }))
+      .map(([label, list]) => {
+        const weighted = computeWeightedPortfolioReturn(list, kesPerUsd)
+        return {
+          label,
+          value: weighted.totalValueInKES,
+          gainPercent: weighted.gainPercent,
+          positions: list.length,
+        }
+      })
       .sort((a, b) => a.label.localeCompare(b.label))
-  }, [holdings, stackGroupingMode])
+  }, [holdings, stackGroupingMode, kesPerUsd])
 
   const categoryGroups = useMemo(() => groupByAssetCategory(holdings), [holdings])
   const assetCategoryCount = categoryGroups.length
@@ -108,8 +110,8 @@ export function StackOverview({ onOpenClass: _onOpenClass }: StackOverviewProps)
   }, [holdings, selectedOverviewBucket, stackGroupingMode])
 
   const metrics = useMemo(
-    () => computeDashboardMetrics(holdings, summary),
-    [holdings, summary]
+    () => computeDashboardMetrics(holdings, summary, kesPerUsd),
+    [holdings, summary, kesPerUsd]
   )
 
   const totals = useMemo(

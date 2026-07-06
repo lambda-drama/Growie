@@ -28,6 +28,7 @@ from growie_app.api.portfolio import (
 	_member_name,
 	open_holding_db_filters,
 	_price_gain_percent,
+	portfolio_return_totals,
 	kes_per_unit_foreign,
 	_to_kes,
 	add_holding,
@@ -161,9 +162,11 @@ def _stack_holding_row(h) -> dict:
 	if isinstance(h, dict):
 		bp = flt(h.get("buying_price"))
 		stored_current = flt(h.get("current_price"))
+		init_inv = flt(h.get("initial_investment_value"))
 	else:
 		bp = flt(getattr(h, "buying_price", None))
 		stored_current = flt(getattr(h, "current_price", None))
+		init_inv = flt(getattr(h, "initial_investment_value", None))
 
 	avg_buy_native = (cost_native / qty) if qty > 0 else 0
 	if bp > 0:
@@ -224,6 +227,10 @@ def _stack_holding_row(h) -> dict:
 			"avgBuyPrice": round(avg_buy_native, 4),
 			"currentPrice": round(current_native, 4),
 			"valueNative": round(value_native, 2),
+			"initialInvestmentValue": round(
+				init_inv if init_inv > 0 else (avg_buy_native * qty if qty > 0 and avg_buy_native > 0 else 0),
+				2,
+			),
 			"valueInKES": round(value_in_kes, 2),
 			"valueKES": round(value_native, 2),
 			"costAtAvgKES": round(cost_at_avg, 2),
@@ -453,16 +460,17 @@ def get_stack_overview():
 		if ac not in classes:
 			continue
 		classes[ac]["positions"] += 1
-		classes[ac]["valueKES"] += flt(row.get("valueInKES") or row.get("valueKES"))
-		classes[ac]["costKES"] += flt(row.get("costAtAvgKES") or row.get("costBasisKES"))
+		classes[ac].setdefault("holdings", []).append(row)
 
 	out = []
 	for ac in ("nse-stocks", "global-stocks", "etf", "mmf", "real-estate"):
 		c = classes[ac]
-		cost = c["costKES"]
-		val = c["valueKES"]
-		c["gainKES"] = val - cost
-		c["gainPercent"] = round((c["gainKES"] / cost * 100), 2) if cost > 0 else 0
+		class_holdings = c.pop("holdings", [])
+		totals = portfolio_return_totals(class_holdings)
+		c["valueKES"] = totals["total_value_kes"]
+		c["costKES"] = totals["total_cost_kes"]
+		c["gainKES"] = totals["gain_kes"]
+		c["gainPercent"] = round(totals["gain_percent"], 2)
 		out.append(c)
 	return out
 
@@ -500,9 +508,10 @@ def get_stack_class(asset_class: str):
 		for r in rows
 		if (h := _stack_holding_row(r)).get("assetClass") == asset_class
 	]
-	total_value = sum(h.get("valueInKES") or h["valueKES"] for h in holdings)
-	total_cost = sum(h.get("costAtAvgKES") or h["costBasisKES"] for h in holdings)
-	gain = total_value - total_cost
+	totals = portfolio_return_totals(holdings)
+	total_value = totals["total_value_kes"]
+	total_cost = totals["total_cost_kes"]
+	gain = totals["gain_kes"]
 
 	return {
 		"assetClass": asset_class,
@@ -517,7 +526,7 @@ def get_stack_class(asset_class: str):
 			"totalValueKES": round(total_value, 2),
 			"totalCostKES": round(total_cost, 2),
 			"unrealizedGainKES": round(gain, 2),
-			"gainPercent": round((gain / total_cost * 100), 2) if total_cost > 0 else 0,
+			"gainPercent": round(totals["gain_percent"], 2),
 			"positions": len(holdings),
 		},
 		"holdings": holdings,
