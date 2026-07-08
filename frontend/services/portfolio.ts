@@ -205,6 +205,16 @@ export interface HoldingsBulkImportResult {
   pending_verification?: PendingVerificationTicker[]
   pending_verification_count?: number
   is_subscribed?: boolean
+  goals?: ImportedGoalSummary[]
+  goals_count?: number
+}
+
+export interface ImportedGoalSummary {
+  name: string
+  goal_name: string
+  created: boolean
+  current_amount: number
+  currency?: string
 }
 
 /** @deprecated Use HoldingsBulkImportResult */

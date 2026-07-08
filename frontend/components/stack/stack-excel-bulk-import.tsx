@@ -136,6 +136,11 @@ export function StackExcelBulkImport({
         `${pending.length} new ticker(s) pending verification (${tickers}). We will review and email you when they are available.`
       )
     }
+    const goals = result.goals ?? []
+    if (goals.length > 0) {
+      const goalNames = goals.map((g) => g.goal_name).filter(Boolean).join(', ')
+      lines.push(`Updated ${goals.length} goal(s) from the Goal column: ${goalNames}.`)
+    }
     if (errs.length && unsupported.length === 0) {
       lines.push(`Some rows were skipped: ${errs.slice(0, 5).join(' · ')}`)
     }
@@ -221,8 +226,8 @@ export function StackExcelBulkImport({
                 <DialogTitle>Bulk upload</DialogTitle>
               </DialogHeader>
               <p className="text-sm text-muted-foreground">
-                Do you need a sample template? It includes active positions (with a Currency
-                column per row) and a sold section.
+                Do you need a sample template? It has one row per purchase with columns for
+                Exchange, Ticker #, Broker, Shares Breakdown, Buying Price, Currency and Goal.
               </p>
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
                 {HOLDINGS_BULK_TEMPLATE_EXAMPLE_ROW_NOTE}
@@ -250,9 +255,9 @@ export function StackExcelBulkImport({
                 <DialogTitle>How do you want to upload?</DialogTitle>
               </DialogHeader>
               <p className="text-sm text-muted-foreground">
-                Import the stocks template (active and sold sections). Use the Currency column on
-                each row so amounts are imported in the correct currency. Same layout for Excel, CSV,
-                or Google Sheets.
+                Import the stocks template (one row per purchase). Use the Currency column on
+                each row so amounts are imported in the correct currency, and the Goal column to tag
+                each purchase to a goal. Same layout for Excel, CSV, or Google Sheets.
               </p>
               <button
                 type="button"

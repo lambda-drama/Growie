@@ -1,10 +1,10 @@
 /** Scope / stocks bulk import sample (shipped under growie_app/public/file/). */
-export const HOLDINGS_BULK_TEMPLATE_FILENAME = 'Sample Stocks Template with Data.xlsx'
+export const HOLDINGS_BULK_TEMPLATE_FILENAME = 'Final Web Data Import Template.xlsx'
 
 export const HOLDINGS_BULK_TEMPLATE_URL = `/assets/growie_app/file/${encodeURIComponent(HOLDINGS_BULK_TEMPLATE_FILENAME)}`
 
 export const HOLDINGS_BULK_TEMPLATE_EXAMPLE_ROW_NOTE =
-  'The template includes example rows for reference. Delete any rows you do not want imported, then upload. Each active row must include a Currency value that matches that row’s amounts (any supported code or symbol, e.g. EUR, GBP, $).'
+  'Columns: Purchase Dates, Exchange, Ticker #, Broker, Shares Breakdown, Buying Price, Currency, Goal. Delete any example rows you do not want imported, then upload. Each row must include a Currency value that matches that row’s amounts (e.g. USD, EUR, GBP, KES). The Goal column (e.g. Retirement) creates and updates a matching goal for you.'
 
 export function downloadHoldingsBulkTemplate(): void {
   const a = document.createElement('a')

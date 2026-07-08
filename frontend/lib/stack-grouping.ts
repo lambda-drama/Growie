@@ -70,8 +70,14 @@ function inferRegionFromHolding(h: StackHolding): string {
 }
 
 function inferExchangeFromHolding(h: StackHolding): string {
+  // exchange_platform is a curated Growe Exchange Platform link (e.g. NSE, NYSE) — trust it
+  // as-is. Real exchange codes like "NSE" must not be dropped by market-routing suppression,
+  // which only applies to the marketTag fallback below.
   const explicit = (h.exchangePlatform || '').trim()
-  if (explicit) return displayExchangeLabel(explicit)
+  if (explicit) {
+    const lower = explicit.toLowerCase()
+    if (lower !== 'global' && lower !== 'kenya' && lower !== 'both') return explicit
+  }
   const tag = (h.marketTag || '').trim()
   if (tag && !isInternalMarketRoutingLabel(tag)) return displayExchangeLabel(tag)
   return 'Unclassified'
