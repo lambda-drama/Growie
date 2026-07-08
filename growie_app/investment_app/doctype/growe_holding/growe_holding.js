@@ -10,7 +10,7 @@ frappe.ui.form.on('Growe Holding', {
 			}
 			frappe.confirm(
 				__(
-					'Import active and sold rows for {0} from Sample Stocks Template with Data (.xlsx)? Each active row needs a Currency value matching that row’s amounts. New Growe Stock records are created when the ticker is missing.',
+					'Import rows for {0} from the Final Web Data Import Template (.xlsx)? Each row needs a Currency value matching that row’s amounts, and the Goal column creates/updates a matching goal. New Growe Stock records are created when the ticker is missing.',
 					[frm.doc.investor]
 				),
 				() => {
@@ -41,6 +41,10 @@ frappe.ui.form.on('Growe Holding', {
 										__('Active rows: {0}', [m.active_rows ?? '—']),
 										__('Sold rows: {0}', [m.sold_rows ?? '—']),
 									];
+									const goals = (m.goals || []).map((g) => g.goal_name).filter(Boolean);
+									if (goals.length) {
+										parts.push(__('Goals updated: {0}', [goals.join(', ')]));
+									}
 									if (err.length) {
 										parts.push(__('Issues: {0}', [err.slice(0, 8).join(' · ')]));
 									}

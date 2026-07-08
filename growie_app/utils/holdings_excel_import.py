@@ -1,13 +1,17 @@
 # Copyright (c) 2026, Mania and contributors
 # For license information, please see license.txt
 """
-Parse Scope-style stocks Excel (Sample Stocks Template with Data) and create Growe Holding rows.
+Parse the Final Web Data Import Template (.xlsx/.csv) and create Growe Holding rows.
 
-Active sheet layout (row with headers containing Ticker # and Currency):
-- Purchase Dates, Investment, Ticker #, Broker, Shares Breakdown, Buying Price, Currency,
-  Initial Investment Value, Goal
+Current sheet layout (header row containing Ticker # and Currency):
+- Purchase Dates, Exchange, Ticker #, Broker, Shares Breakdown, Buying Price, Currency, Goal
 
-Sold block: first cell == "Sold Stocks", then header row, then sold rows.
+The trailing ``Goal`` column names the member's goal (e.g. "Retirement"). On import we
+create/refresh a matching Growe Goal for the member and seed its amounts from the value of
+the holdings tagged with that goal (see ``_sync_goal_from_holdings``).
+
+Older templates (Investment column, Initial Investment Value, and a
+"Sold Stocks" block) are still accepted for backward compatibility.
 """
 
 from __future__ import annotations
@@ -234,7 +238,9 @@ def _holding_meta_from_stock(stock_name: str) -> tuple[str, str]:
 	currency = (row.get("currency") or "").strip().upper()
 	asset_class = _asset_category_from_stock_row(row)
 	if not currency:
-		currency = "KES" if market == "NSE" else "USD"
+		from growie_app.utils.market_labels import is_kenya_market
+
+		currency = "KES" if is_kenya_market(market) else "USD"
 	return asset_class, currency
 
 
@@ -247,6 +253,7 @@ def _column_map_from_header(header_row: tuple) -> dict[str, int]:
 	aliases: dict[str, tuple[str, ...]] = {
 		"date": ("purchase dates", "purchase date", "purchase period"),
 		"sell_date": ("sell date",),
+		"exchange": ("exchange",),
 		"investment": ("investment",),
 		"ticker": ("ticker #", "ticker number", "ticker"),
 		"broker": ("broker",),
@@ -277,20 +284,39 @@ def _column_map_from_header(header_row: tuple) -> dict[str, int]:
 
 
 def _parse_currency_cell(val: Any) -> str:
-	"""Normalize template currency cells (US$, KES, USD, …) to ISO codes."""
-	s = _norm_cell(val).upper().replace("$", "").strip()
+	"""Normalize template currency cells (US$, Euro, KES, USD, £, …) to ISO codes."""
+	s = _norm_cell(val).upper().replace("$", "").replace(".", "").strip()
 	if not s:
 		return ""
-	if s in ("US", "USD", "U.S.", "U.S.D", "US$"):
-		return "USD"
-	if s in ("KES", "KSH", "KSHS", "KSH."):
-		return "KES"
-	if s in ("EUR", "€"):
-		return "EUR"
-	if s in ("GBP", "£"):
-		return "GBP"
-	if len(s) == 3 and s.isalpha():
-		return s
+	compact = s.replace(" ", "")
+	word_map = {
+		"US": "USD",
+		"USD": "USD",
+		"USDOLLAR": "USD",
+		"USDOLLARS": "USD",
+		"DOLLAR": "USD",
+		"DOLLARS": "USD",
+		"EUR": "EUR",
+		"EURO": "EUR",
+		"EUROS": "EUR",
+		"€": "EUR",
+		"GBP": "GBP",
+		"POUND": "GBP",
+		"POUNDS": "GBP",
+		"STERLING": "GBP",
+		"£": "GBP",
+		"KES": "KES",
+		"KSH": "KES",
+		"KSHS": "KES",
+		"SHILLING": "KES",
+		"SHILLINGS": "KES",
+		"KENYASHILLING": "KES",
+		"KENYASHILLINGS": "KES",
+	}
+	if compact in word_map:
+		return word_map[compact]
+	if len(compact) == 3 and compact.isalpha():
+		return compact
 	return ""
 
 
@@ -345,6 +371,41 @@ def _find_header_row_and_map(rows: list[tuple], end: int) -> tuple[int | None, d
 	return None, _legacy_active_column_map()
 
 
+def _resolve_exchange_platform(exchange_code: str) -> str | None:
+	"""Return a Growe Exchange Platform name for an exchange code, creating it if missing."""
+	code = (exchange_code or "").strip().upper()
+	if not code:
+		return None
+	existing = frappe.db.get_value("Growe Exchange Platform", {"exchange_code": code}, "name")
+	if existing:
+		return existing
+	try:
+		doc = frappe.get_doc(
+			{
+				"doctype": "Growe Exchange Platform",
+				"platform_name": code,
+				"exchange_code": code,
+			}
+		)
+		doc.flags.ignore_permissions = True
+		doc.insert()
+		return doc.name
+	except Exception:
+		return None
+
+
+def _market_from_exchange(exchange_code: str, currency: str) -> str:
+	"""Best-effort canonical market (Kenya/Global) from exchange code, falling back to currency."""
+	from growie_app.utils.market_labels import GLOBAL, KENYA
+
+	code = (exchange_code or "").strip().upper()
+	if code == "NSE":
+		return KENYA
+	if (currency or "").upper() == "KES":
+		return KENYA
+	return GLOBAL
+
+
 def _insert_background_stock(
 	raw_ticker: str,
 	investment_hint: str,
@@ -352,6 +413,7 @@ def _insert_background_stock(
 	api_raw: str,
 	*,
 	by_unsubscribed_member: bool,
+	exchange_hint: str = "",
 ) -> str | None:
 	"""Create an unverified Growe Stock row if none exists for this ticker. Returns doc name or None."""
 	clean = (raw_ticker or "").strip().upper()
@@ -369,9 +431,8 @@ def _insert_background_stock(
 
 	company = (investment_hint or "").strip() or clean
 	ccy = _parse_currency_cell(currency_hint) or "USD"
-	market = "NSE" if ccy == "KES" else "Global"
-	if ccy not in ("KES", "USD"):
-		market = "Global"
+	market = _market_from_exchange(exchange_hint, ccy)
+	platform = _resolve_exchange_platform(exchange_hint)
 
 	base = clean
 	name = base
@@ -393,6 +454,7 @@ def _insert_background_stock(
 			"is_active": 1,
 			"verified": 0,
 			"by_unsubscribed_member": 1 if by_unsubscribed_member else 0,
+			**({"exchange_platform": platform} if platform else {}),
 		}
 	)
 	doc.flags.ignore_permissions = True
@@ -405,6 +467,7 @@ def _get_or_create_stock(
 	investment_hint: str,
 	currency_hint: str = "",
 	investor: str | None = None,
+	exchange_hint: str = "",
 ) -> dict:
 	"""
 	Resolve or create Growe Stock for an import row.
@@ -453,13 +516,13 @@ def _get_or_create_stock(
 			currency_hint,
 			api_raw,
 			by_unsubscribed_member=True,
+			exchange_hint=exchange_hint,
 		)
 		raise UnsupportedImportTicker(clean)
 
 	ccy = _parse_currency_cell(currency_hint) or "USD"
-	market = "NSE" if ccy == "KES" else "Global"
-	if ccy not in ("KES", "USD"):
-		market = "Global"
+	market = _market_from_exchange(exchange_hint, ccy)
+	platform = _resolve_exchange_platform(exchange_hint)
 
 	base = clean
 	name = base
@@ -481,6 +544,7 @@ def _get_or_create_stock(
 			"is_active": 1,
 			"verified": 0,
 			"by_unsubscribed_member": 0,
+			**({"exchange_platform": platform} if platform else {}),
 		}
 	)
 	doc.flags.ignore_permissions = True
@@ -617,6 +681,10 @@ def _insert_holding(
 		value_kes = cur_px * qty
 	elif value_kes <= 0 and init_inv:
 		value_kes = init_inv
+	# Templates without Current Price/Value columns: seed current value from cost basis
+	# so the position is not zero before the first live-price refresh.
+	if value_kes <= 0 and cost_kes > 0:
+		value_kes = cost_kes
 
 	notes_parts = []
 	if owner:
@@ -678,6 +746,151 @@ def _assert_can_import_for_investor(investor: str) -> None:
 		)
 
 
+_GOAL_CATEGORY_OPTIONS = {
+	"retirement": "Retirement",
+	"home": "Home",
+	"house": "Home",
+	"education": "Education",
+	"school": "Education",
+	"emergency": "Emergency",
+	"travel": "Travel",
+	"wealth building": "Wealth Building",
+	"wealth": "Wealth Building",
+}
+
+
+def _goal_category_for_name(goal_name: str) -> str:
+	"""Map a free-text goal label to a valid Growe Goal category (defaults to Wealth Building)."""
+	return _GOAL_CATEGORY_OPTIONS.get((goal_name or "").strip().lower(), "Wealth Building")
+
+
+def _sum_open_holdings_value_kes(member: str, goal_name: str) -> float:
+	"""Total current value (in KES) of the member's open holdings tagged with this goal."""
+	from growie_app.api.portfolio import _to_kes
+
+	rows = frappe.get_all(
+		"Growe Holding",
+		filters={"investor": member, "goal": goal_name, "sold": 0},
+		fields=["value_kes", "currency"],
+	)
+	on_date = str(today())
+	total = 0.0
+	for r in rows:
+		native = float(r.get("value_kes") or 0)
+		if native <= 0:
+			continue
+		ccy = (r.get("currency") or "KES").upper()
+		total += native if ccy == "KES" else _to_kes(native, ccy, on_date, strict=False)
+	return total
+
+
+def _kes_to_currency(amount_kes: float, currency: str, on_date: str) -> float:
+	"""Convert a KES amount into ``currency`` using ERPNext exchange rates (hub: KES)."""
+	from growie_app.api.portfolio import _to_kes
+
+	ccy = (currency or "KES").upper()
+	if ccy == "KES" or not amount_kes:
+		return float(amount_kes or 0)
+	kes_per_unit = _to_kes(1, ccy, on_date, strict=False)
+	return amount_kes / kes_per_unit if kes_per_unit > 0 else float(amount_kes)
+
+
+def _convert_currency_amount(amount: float, from_ccy: str, to_ccy: str, on_date: str) -> float:
+	"""Convert an amount between two currencies via the KES hub."""
+	from growie_app.api.portfolio import _to_kes
+
+	src = (from_ccy or "KES").upper()
+	dst = (to_ccy or "KES").upper()
+	if not amount or src == dst:
+		return float(amount or 0)
+	return _kes_to_currency(_to_kes(amount, src, on_date, strict=False), dst, on_date)
+
+
+def _sync_goal_from_holdings(member: str, goal_name: str) -> dict | None:
+	"""
+	Create (or refresh) a Growe Goal for ``goal_name`` and seed its amounts from the
+	member's open holdings tagged with the same goal.
+
+	The goal is denominated in the member's preferred (display) currency so it matches
+	what they see elsewhere in the app. ``current_amount`` reflects the live value of the
+	goal's holdings; ``target_amount`` is seeded to that value on first creation so the
+	goal is valid — the member can adjust the real target in the UI.
+	"""
+	from frappe.utils import add_years
+
+	name = (goal_name or "").strip()
+	if not name:
+		return None
+
+	on_date = str(today())
+	total_kes = _sum_open_holdings_value_kes(member, name)
+	preferred_currency = (
+		frappe.db.get_value("Growe Member", member, "preferred_currency") or "USD"
+	).upper()
+	existing = frappe.db.get_value("Growe Goal", {"member": member, "goal_name": name}, "name")
+
+	if existing:
+		doc = frappe.get_doc("Growe Goal", existing)
+		# A goal with logged transactions owns its currency; leave it untouched. An
+		# import-seeded goal (no transactions) is re-denominated to the member's
+		# preferred (display) currency so it matches the rest of the app.
+		old_currency = (doc.currency or "USD").upper()
+		has_txns = frappe.db.count("Growe Goal Transaction", {"goal": doc.name, "docstatus": 1})
+		goal_currency = old_currency if has_txns else preferred_currency
+		total = round(_kes_to_currency(total_kes, goal_currency, on_date), 2)
+		# Preserve the target's real-world magnitude when re-denominating the goal.
+		old_target = float(doc.target_amount or 0)
+		if goal_currency != old_currency and old_target > 0:
+			new_target = round(_convert_currency_amount(old_target, old_currency, goal_currency, on_date), 2)
+		else:
+			new_target = old_target
+		if new_target <= 0 and total > 0:
+			new_target = total
+		doc.currency = goal_currency
+		doc.current_amount = total
+		doc.target_amount = new_target
+		doc.flags.ignore_permissions = True
+		doc.save()
+		return {
+			"name": doc.name,
+			"goal_name": name,
+			"created": False,
+			"current_amount": total,
+			"currency": goal_currency,
+		}
+
+	goal_currency = preferred_currency
+	total = round(_kes_to_currency(total_kes, goal_currency, on_date), 2)
+
+	if total <= 0:
+		# Nothing to seed and target_amount is mandatory (> 0) — skip creating an empty goal.
+		return None
+
+	doc = frappe.get_doc(
+		{
+			"doctype": "Growe Goal",
+			"member": member,
+			"goal_name": name,
+			"category": _goal_category_for_name(name),
+			"currency": goal_currency,
+			"target_amount": total,
+			"current_amount": total,
+			"target_date": getdate(add_years(today(), 5)),
+			"priority": "Medium",
+			"status": "Active",
+		}
+	)
+	doc.flags.ignore_permissions = True
+	doc.insert()
+	return {
+		"name": doc.name,
+		"goal_name": name,
+		"created": True,
+		"current_amount": total,
+		"currency": goal_currency,
+	}
+
+
 def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: str) -> dict:
 	"""Shared import for Excel, CSV, and Google Sheets (same Scope template columns)."""
 	from growie_app.utils.stock_verification import (
@@ -694,6 +907,7 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 	errors: list[str] = []
 	unsupported_tickers: list[str] = []
 	pending_map: dict[str, dict] = {}
+	goal_names: set[str] = set()
 	is_subscribed = member_is_subscribed(investor)
 
 	def _track_pending(stock_name: str) -> None:
@@ -723,8 +937,11 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 			raw_tk = _norm_cell(_row_val_by_map(row, active_col_map, "ticker"))
 			use_date = _parse_date_cell(_row_val_by_map(row, active_col_map, "date"))
 			sheet_ccy = _parse_currency_cell(_row_val_by_map(row, active_col_map, "currency"))
+			exchange_hint = _norm_cell(_row_val_by_map(row, active_col_map, "exchange"))
 
-			stock_info = _get_or_create_stock(raw_tk, investment, sheet_ccy, investor=investor)
+			stock_info = _get_or_create_stock(
+				raw_tk, investment, sheet_ccy, investor=investor, exchange_hint=exchange_hint
+			)
 			stock_doc = stock_info["name"]
 			if stock_info.get("created"):
 				_track_pending(stock_doc)
@@ -746,6 +963,9 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 				sold_date=None,
 			)
 			created += 1
+			goal_val = _norm_cell(_row_val_by_map(row, active_col_map, "goal"))
+			if goal_val:
+				goal_names.add(goal_val)
 		except Exception as e:
 			_handle_row_error(f"Active row {i + 1}", e)
 
@@ -782,10 +1002,24 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 				sold_date=sold_date,
 			)
 			created += 1
+			goal_val = _norm_cell(_row_val_by_map(row, sold_col_map, "goal"))
+			if goal_val:
+				goal_names.add(goal_val)
 		except Exception as e:
 			_handle_row_error(f"Sold row {j + 1}", e)
 
 	frappe.db.commit()
+
+	goals: list[dict] = []
+	for gname in sorted(goal_names):
+		try:
+			info = _sync_goal_from_holdings(investor, gname)
+			if info:
+				goals.append(info)
+		except Exception as e:
+			frappe.log_error(title="Holding import goal sync", message=f"{gname}\n{e!s}")
+	if goals:
+		frappe.db.commit()
 	pending_verification = sorted(
 		pending_map.values(),
 		key=lambda r: (r.get("ticker") or "").upper(),
@@ -801,13 +1035,15 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 		"pending_verification": pending_verification,
 		"pending_verification_count": len(pending_verification),
 		"is_subscribed": is_subscribed,
+		"goals": goals,
+		"goals_count": len(goals),
 	}
 
 
 @frappe.whitelist()
 def import_scope_template_excel(file_url: str, investor: str):
 	"""
-	Import Sample Stocks Template with Data (.xlsx) into Growe Holding.
+	Import the Final Web Data Import Template (.xlsx) into Growe Holding.
 
 	:param file_url: Uploaded File ``file_url`` (Desk attach or portal ``upload_file``).
 	:param investor: Growe Member name (must match the signed-in member unless System Manager).
