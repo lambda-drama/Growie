@@ -80,7 +80,7 @@ frappe.ui.form.on("Growe Price API", {
 				? __("This provider only updates <b>Kenya</b> tickers; Global symbols are skipped.")
 				: prov.includes("finnhub") || prov.includes("alpha") || prov.includes("eoddata")
 					? __("This provider only updates <b>Global</b> tickers; Kenya symbols are skipped.")
-					: prov.includes("twelve")
+					: prov.includes("twelve") || prov.includes("marketstack")
 						? __("Uses Growe Stock <b>Exchange platform</b> for Kenya and global tickers (batch API).")
 						: __("Updates tickers this provider supports (by market).");
 			frappe.confirm(
@@ -215,6 +215,19 @@ frappe.ui.form.on("Growe Price API", {
 				   + "Bulk refresh runs in the <b>background</b>; progress shows above. "
 				   + "Set <b>Exchange platform</b> on Growe Stock for Kenya/global routing. "
 				   + "<a href=\"https://twelvedata.com/docs\" target=\"_blank\">Docs</a>"),
+				"blue",
+				true
+			);
+		}
+
+		if (api_prov.includes("marketstack")) {
+			frm.dashboard.add_comment(
+				__("<b>Marketstack</b> — latest end-of-day prices via <code>/eod/latest</code>. "
+				   + "API Key = your <code>access_key</code> from "
+				   + "<a href=\"https://marketstack.com/dashboard\" target=\"_blank\">marketstack.com</a>. "
+				   + "Set <b>Exchange platform</b> on Growe Stock (NYSE→XNYS, NASDAQ→XNAS, NSE→XNAI, …). "
+				   + "Batch up to 100 symbols per request. Test with <code>AAPL</code> or <code>SCOM</code>. "
+				   + "<a href=\"https://docs.apilayer.com/marketstack/docs/marketstack-api-v2-v-2-0-0\" target=\"_blank\">Docs</a>"),
 				"blue",
 				true
 			);
@@ -377,6 +390,12 @@ function _set_provider_hints(frm) {
 			api_base_url: "https://api.twelvedata.com",
 			endpoint_prices: "/quote",
 			calls_per_month: 8000,
+			market_type: "Both",
+		},
+		marketstack: {
+			api_base_url: "https://api.marketstack.com/v2",
+			endpoint_prices: "eod/latest",
+			calls_per_month: 10000,
 			market_type: "Both",
 		},
 		"alpha vantage": {

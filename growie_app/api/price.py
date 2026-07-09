@@ -65,6 +65,14 @@ EODData (eoddata.com):
   Uses Growe Stock exchange_platform (NYSE, NASDAQ, LSE, …).
   Kenya (Nairobi NSE) tickers are skipped — EODData NSE is the Indian exchange.
 
+Marketstack (marketstack.com / APILayer):
+  Base: https://api.marketstack.com/v2
+  Auth: ?access_key={key}
+  Latest EOD: GET /eod/latest?symbols=AAPL,MSFT&exchange=XNAS&access_key={key}
+  Response: {"data":[{"symbol":"AAPL","close":…,"exchange":"XNAS",…}]}
+  Batch up to 100 symbols per request; optional exchange MIC filter.
+  Uses Growe Stock exchange_platform → MIC (XNYS, XNAS, XAMS, XPAR, XNAI for Nairobi NSE, …).
+
 Dispatch is determined by the "api_provider" Select field on the Growe Price API record.
 """
 
@@ -275,6 +283,7 @@ _PROVIDER_MARKETS: dict[str, frozenset] = {
 	"mansa markets": frozenset({"NSE"}),
 	"fcs api": frozenset({"NSE", "GLOBAL"}),
 	"twelve data": frozenset({"NSE", "GLOBAL"}),
+	"marketstack": frozenset({"NSE", "GLOBAL"}),
 	"finnhub": frozenset({"GLOBAL"}),
 	"eoddata": frozenset({"GLOBAL"}),
 	"goldman sachs": frozenset({"GLOBAL"}),
@@ -287,6 +296,7 @@ _PROVIDER_FETCH_ORDER = {
 	"mansa markets": 1,
 	"fcs api": 2,
 	"twelve data": 2,
+	"marketstack": 2,
 	"finnhub": 3,
 	"eoddata": 3,
 	"goldman sachs": 4,
@@ -917,6 +927,16 @@ def _fetch_from_provider(
 		return fetch_twelve_data_prices(
 			provider, symbols, market, symbol_override_map=symbol_override_map
 		)
+	if api_prov == "marketstack":
+		from growie_app.utils.marketstack_prices import fetch_marketstack_prices
+
+		return fetch_marketstack_prices(
+			provider,
+			symbols,
+			market,
+			symbol_override_map=symbol_override_map,
+			stock_meta=stock_meta,
+		)
 	if api_prov == "finnhub":
 		if _normalize_market_label(market) != "GLOBAL":
 			return {}
@@ -954,7 +974,8 @@ def _fetch_from_provider(
 		message=(
 			f"No parser for provider '{provider.get('provider_name')}' "
 			f"(api_provider='{provider.get('api_provider')}'). "
-			"Supported: Mansa Markets, RapidAPI, FCS API, Twelve Data, Finnhub, EODData, Goldman Sachs, Alpha Vantage."
+			"Supported: Mansa Markets, RapidAPI, FCS API, Twelve Data, Marketstack, "
+			"Finnhub, EODData, Goldman Sachs, Alpha Vantage."
 		),
 	)
 	return {}
@@ -1064,7 +1085,9 @@ def _upsert_cache(
 
 	_apply_stock_link_to_cache(cache, ticker, stock_meta)
 
-	cache.market = market
+	from growie_app.utils.market_labels import canonical_market_value
+
+	cache.market = canonical_market_value(market)
 	cache.price_kes = round(price_kes, 4)
 	cache.price_usd = round(price_usd, 6)
 	cache.change_percent = change_pct
@@ -1313,11 +1336,13 @@ def _publish_price_refresh_progress(
 ) -> None:
 	if not notify_user:
 		return
+	from growie_app.utils.market_labels import market_ui_label
+
 	frappe.publish_realtime(
 		"growie_price_refresh_progress",
 		{
 			"provider_name": provider_name,
-			"market": market,
+			"market": market_ui_label(market) if market else None,
 			"done": done,
 			"total": total,
 			"last_ticker": last_ticker,
