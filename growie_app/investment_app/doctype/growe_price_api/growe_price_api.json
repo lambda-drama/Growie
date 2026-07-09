@@ -115,7 +115,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "API Provider",
-   "options": "\nMansa Markets\nFCS API\nFinnhub\nEODData\nNSE Data API (Open Source)\nAfrimarket (Python)\nAlpha Vantage\nYahoo Finance\nTwelve Data\nIntrinio\nICE Data Services\nRapidApi\nGoldman Sachs\nNone (Manual Entry)"
+   "options": "\nMansa Markets\nFCS API\nFinnhub\nEODData\nMarketstack\nNSE Data API (Open Source)\nAfrimarket (Python)\nAlpha Vantage\nYahoo Finance\nTwelve Data\nIntrinio\nICE Data Services\nRapidApi\nGoldman Sachs\nNone (Manual Entry)"
   },
   {
    "fieldname": "test_section",
