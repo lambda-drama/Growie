@@ -2,12 +2,12 @@
 Price fetching service — Mansa Markets, FCS API, Finnhub, Alpha Vantage, RapidAPI (NSE).
 
 Mansa Markets (mansaapi.com):
-  Base: https://www.mansaapi.com/api/v1
-  Auth: ?api_key={key}
-  Bulk:   GET /stocks?exchange=NSE&api_key={key}
-  Single: GET /stocks/{ticker}?api_key={key}
-  Forex:  GET /forex/KES-USD?api_key={key}
-  Response: {"stocks":[{"ticker":"SCOM","price":19.50,"change_pct":0.77}],"count":56}
+  Base: https://mansaapi.com/api/v1  (do not use www — it returns 402/HTML)
+  Auth: Authorization: Bearer {mansa_live_sk_…}
+  Bulk:   GET /markets/exchanges/NSE/stocks
+  Single: GET /markets/exchanges/NSE/stocks/{ticker}
+  Forex:  GET /markets/forex  (USD/KES pair)
+  Response: {"success":true,"data":[{"ticker":"SCOM","price":33.45,"change_pct":1.52},…]}
 
 FCS API (fcsapi.com):
   Base: https://api-v4.fcsapi.com
@@ -233,20 +233,10 @@ def _price_api_key(provider: dict) -> str:
 
 
 def _mansa_kes_usd_rate(provider: dict) -> float | None:
-	"""Fetch live KES-USD rate from Mansa forex endpoint."""
-	try:
-		base = provider["api_base_url"].rstrip("/")
-		url = f"{base}/forex/KES-USD"
-		resp = _requests.get(url, params={"api_key": _price_api_key(provider)}, timeout=8)
-		if resp.ok:
-			data = resp.json()
-			# Mansa returns the pair rate
-			rate = data.get("rate") or data.get("close") or data.get("price")
-			if rate:
-				return 1.0 / float(rate)   # KES-USD rate → USD per KES → invert to get KES per USD
-	except Exception:
-		pass
-	return None
+	"""Fetch live KES per USD from Mansa forex endpoint."""
+	from growie_app.utils.mansa_prices import fetch_mansa_kes_per_usd
+
+	return fetch_mansa_kes_per_usd(provider)
 
 
 # ── Provider loader ───────────────────────────────────────────────────────────
@@ -410,72 +400,9 @@ def _get_providers(market_type: str, provider_name: str | None = None) -> list:
 # ── Mansa Markets ─────────────────────────────────────────────────────────────
 
 def _fetch_mansa(provider: dict, symbols: list, market: str = "NSE") -> dict:
-	"""
-	Fetch prices from Mansa Markets API.
-	Strategy:
-	  1. Bulk fetch all stocks for the exchange (one call, very efficient).
-	  2. Filter to the tickers we need.
-	"""
-	if _normalize_market_label(market) != "NSE":
-		return {}
+	from growie_app.utils.mansa_prices import fetch_mansa_prices
 
-	base = provider["api_base_url"].rstrip("/")
-	api_key = _price_api_key(provider)
-	results: dict = {}
-	if not api_key:
-		return results
-
-	# Map our internal market → Mansa exchange code
-	exchange_map = {"NSE": "NSE", "Global": None}
-	exchange = exchange_map.get(market)
-
-	try:
-		if exchange:
-			# Bulk fetch entire exchange
-			url = f"{base}/stocks"
-			params = {"exchange": exchange, "api_key": api_key}
-			resp = _requests.get(url, params=params, timeout=15)
-			if _http_response_rate_limited(resp, provider, "mansa markets"):
-				return results
-			resp.raise_for_status()
-			body = resp.json()
-
-			wanted = {s.upper() for s in symbols}
-			for item in body.get("stocks", []):
-				ticker = (item.get("ticker") or "").upper()
-				if ticker not in wanted:
-					continue
-				price = float(item.get("price", 0) or 0)
-				change_pct = float(item.get("change_pct", 0) or 0)
-				if ticker and price:
-					results[ticker] = {
-						"price": price,
-						"change_percent": change_pct,
-						"currency": "KES",
-					}
-		else:
-			# For non-NSE, try individual lookups
-			for symbol in symbols:
-				url = f"{base}/stocks/{symbol.upper()}"
-				params = {"api_key": api_key}
-				resp = _requests.get(url, params=params, timeout=10)
-				if not resp.ok:
-					continue
-				item = resp.json()
-				price = float(item.get("price", 0) or 0)
-				change_pct = float(item.get("change_pct", 0) or 0)
-				currency = item.get("currency", "USD") or "USD"
-				if price:
-					results[symbol.upper()] = {
-						"price": price,
-						"change_percent": change_pct,
-						"currency": currency,
-					}
-
-	except Exception as e:
-		frappe.log_error(title="Mansa price fetch error", message=str(e))
-
-	return results
+	return fetch_mansa_prices(provider, symbols, market)
 
 
 # ── RapidAPI — Nairobi Stock Exchange (NSE only) ─────────────────────────────
@@ -2227,14 +2154,20 @@ def get_nse_index():
 		if "mansa" not in api_prov and "mansa" not in (provider.provider_name or "").lower():
 			continue
 		try:
-			base = provider.api_base_url.rstrip("/")
-			resp = _requests.get(
-				f"{base}/index/NSE",
-				params={"api_key": _price_api_key(dict(provider))},
-				timeout=8,
-			)
-			if resp.ok:
-				return resp.json()
+			from growie_app.utils.mansa_prices import _service_base, _request_json
+
+			base = _service_base(dict(provider))
+			url = f"{base}/markets/exchanges/NSE"
+			body = _request_json(dict(provider), url)
+			if body and isinstance(body.get("data"), dict):
+				data = body["data"]
+				return {
+					"exchange": data.get("code") or "NSE",
+					"index_value": data.get("index_value") or data.get("value"),
+					"change_pct": data.get("change_pct"),
+					"currency": data.get("currency") or "KES",
+					"name": data.get("name"),
+				}
 		except Exception as e:
 			frappe.log_error(title="NSE index fetch error", message=str(e))
 

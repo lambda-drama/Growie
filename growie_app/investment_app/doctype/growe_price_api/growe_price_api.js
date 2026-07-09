@@ -233,6 +233,17 @@ frappe.ui.form.on("Growe Price API", {
 			);
 		}
 
+		if (api_prov.includes("mansa")) {
+			frm.dashboard.add_comment(
+				__("<b>Mansa Markets</b> — Nairobi NSE quotes via Bearer API key (<code>mansa_live_sk_…</code>). "
+				   + "Base URL must be <code>https://mansaapi.com/api/v1</code> (not <code>www</code>). "
+				   + "Test with <code>SCOM</code> and market <b>Kenya</b>. "
+				   + "<a href=\"https://mansaapi.com/docs\" target=\"_blank\">Docs</a>"),
+				"blue",
+				true
+			);
+		}
+
 		if (api_prov.includes("rapidapi")) {
 			frm.dashboard.add_comment(
 				__("<b>RapidAPI — Nairobi NSE only.</b> API Key = your <code>x-rapidapi-key</code>. " +
@@ -375,8 +386,8 @@ function _set_provider_hints(frm) {
 	const prov = (frm.doc.api_provider || "").toLowerCase();
 	const hints = {
 		"mansa markets": {
-			api_base_url: "https://www.mansaapi.com/api/v1",
-			endpoint_prices: "/stocks",
+			api_base_url: "https://mansaapi.com/api/v1",
+			endpoint_prices: "markets/exchanges/NSE/stocks",
 			calls_per_month: 3000,
 			market_type: "Kenya",
 		},
