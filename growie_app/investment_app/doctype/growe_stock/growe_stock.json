@@ -21,6 +21,7 @@
   "industry",
   "preferred_data_provider",
   "source",
+  "iso_mic",
   "api_section",
   "api_symbol",
   "column_break_ogtr",
@@ -163,12 +164,18 @@
    "fieldname": "by_unsubscribed_member",
    "fieldtype": "Check",
    "label": "By Unsubscribed Member"
+  },
+  {
+   "fieldname": "iso_mic",
+   "fieldtype": "Link",
+   "label": "ISO Mic",
+   "options": "ISO Mic Master"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-21 20:30:39.895716",
+ "modified": "2026-07-14 02:26:32.738327",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Stock",
