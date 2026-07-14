@@ -11,8 +11,9 @@
   "exchange_code",
   "country",
   "column_break_ivxg",
-  "full_name",
-  "region"
+  "region",
+  "code_classification",
+  "input_code"
  ],
  "fields": [
   {
@@ -25,11 +26,6 @@
    "unique": 1
   },
   {
-   "fieldname": "full_name",
-   "fieldtype": "Data",
-   "label": "Full Name"
-  },
-  {
    "fieldname": "column_break_ivxg",
    "fieldtype": "Column Break"
   },
@@ -37,7 +33,7 @@
    "fieldname": "exchange_code",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Exchange Code",
+   "label": "ISO Mic",
    "reqd": 1,
    "unique": 1
   },
@@ -52,12 +48,23 @@
    "fieldtype": "Link",
    "label": "Country",
    "options": "Country"
+  },
+  {
+   "fieldname": "code_classification",
+   "fieldtype": "Link",
+   "label": "Code Classification",
+   "options": "ISO MIC Code Classification"
+  },
+  {
+   "fieldname": "input_code",
+   "fieldtype": "Data",
+   "label": "Input Code"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-29 23:32:42.667290",
+ "modified": "2026-07-14 22:07:27.510346",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Exchange Platform",

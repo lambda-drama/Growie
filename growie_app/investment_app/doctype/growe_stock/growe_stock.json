@@ -21,7 +21,7 @@
   "industry",
   "preferred_data_provider",
   "source",
-  "iso_mic",
+  "us_ticker_number",
   "api_section",
   "api_symbol",
   "column_break_ogtr",
@@ -47,13 +47,13 @@
    "reqd": 1
   },
   {
-   "default": "Kenya",
+   "default": "Global",
    "fieldname": "market",
    "fieldtype": "Select",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Market",
-   "options": "Kenya\nGlobal\nETF"
+   "options": "\nGlobal\nKenya"
   },
   {
    "default": "Stock",
@@ -90,7 +90,7 @@
    "options": "Growe Sector"
   },
   {
-   "default": "KES",
+   "default": "USD",
    "fieldname": "currency",
    "fieldtype": "Link",
    "label": "Trading Currency",
@@ -166,16 +166,15 @@
    "label": "By Unsubscribed Member"
   },
   {
-   "fieldname": "iso_mic",
-   "fieldtype": "Link",
-   "label": "ISO Mic",
-   "options": "ISO Mic Master"
+   "fieldname": "us_ticker_number",
+   "fieldtype": "Data",
+   "label": "US Ticker Number"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-07-14 02:26:32.738327",
+ "modified": "2026-07-15 00:02:12.278287",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Stock",

@@ -340,6 +340,7 @@ def _get_provider_by_name(provider_name: str) -> dict | None:
 		[
 			"name", "provider_name", "api_provider", "market_type",
 			"api_base_url", "api_key", "endpoint_prices", "calls_per_month", "is_active",
+			"use_us_ticker",
 		],
 		as_dict=True,
 	)
@@ -390,6 +391,7 @@ def _get_providers(market_type: str, provider_name: str | None = None) -> list:
 		fields=[
 			"name", "provider_name", "api_provider", "market_type",
 			"api_base_url", "api_key", "endpoint_prices", "calls_per_month",
+			"use_us_ticker",
 		],
 		order_by="creation asc",
 	)
@@ -942,14 +944,17 @@ def _apply_stock_link_to_cache(cache, ticker: str, stock_meta: dict | None = Non
 
 
 def _stock_meta_for_tickers(tickers: list) -> dict[str, dict]:
-	"""Map ticker → {name, exchange_platform} from Growe Stock (prefer active)."""
+	"""Map ticker → {name, exchange_platform, us_ticker_number, api_symbol} from Growe Stock."""
 	uniq = list(dict.fromkeys((t or "").upper() for t in tickers if (t or "").strip()))
 	if not uniq:
 		return {}
 	rows = frappe.get_all(
 		"Growe Stock",
 		filters={"ticker": ["in", uniq]},
-		fields=["name", "ticker", "exchange_platform", "is_active"],
+		fields=[
+			"name", "ticker", "exchange_platform", "is_active",
+			"us_ticker_number", "api_symbol",
+		],
 		order_by="is_active desc, modified desc",
 	)
 	meta: dict[str, dict] = {}
@@ -959,8 +964,58 @@ def _stock_meta_for_tickers(tickers: list) -> dict[str, dict]:
 			meta[t] = {
 				"name": row.name,
 				"exchange_platform": row.get("exchange_platform"),
+				"us_ticker_number": (row.get("us_ticker_number") or "").strip(),
+				"api_symbol": (row.get("api_symbol") or "").strip(),
 			}
 	return meta
+
+
+def _provider_uses_us_ticker(provider: dict | None) -> bool:
+	"""True when Growe Price API Use US ticker is checked."""
+	return bool(int((provider or {}).get("use_us_ticker") or 0))
+
+
+def _symbol_map_for_provider(
+	provider: dict | None,
+	base_map: dict | None,
+	tickers: list,
+	stock_meta: dict | None = None,
+) -> dict:
+	"""
+	Resolve per-ticker API symbols for a provider.
+
+	If use_us_ticker is set: send Growe Stock.us_ticker_number (fallback to normal ticker).
+	Otherwise: keep existing api_symbol overrides from base_map.
+	"""
+	if not _provider_uses_us_ticker(provider):
+		return dict(base_map or {})
+
+	out: dict = {}
+	uniq = list(dict.fromkeys((t or "").upper() for t in tickers if (t or "").strip()))
+	if not uniq:
+		return out
+
+	meta = stock_meta or {}
+	need_db: list[str] = []
+	for t in uniq:
+		row = meta.get(t) or {}
+		us = (row.get("us_ticker_number") or "").strip()
+		if us:
+			out[t] = us.upper()
+		elif t not in meta:
+			need_db.append(t)
+
+	if need_db:
+		for s in frappe.get_all(
+			"Growe Stock",
+			filters={"ticker": ["in", need_db]},
+			fields=["ticker", "us_ticker_number"],
+		):
+			t = (s.ticker or "").upper()
+			us = (s.us_ticker_number or "").strip()
+			if t and us:
+				out[t] = us.upper()
+	return out
 
 
 def _backfill_price_cache_stock_links(tickers: list, stock_meta: dict | None = None) -> int:
@@ -1061,14 +1116,34 @@ def _update_holdings_for_ticker(ticker: str, price_kes: float):
 
 # ── Ticker ordering & cache completeness (Markets + multi-provider refresh) ───
 
+def _holding_is_stock_or_etf(asset_class: str | None, asset_name: str | None) -> bool:
+	"""True when a holding is a stock or ETF (not cash, bonds, funds, etc.)."""
+	from growie_app.utils.market_labels import ETF, is_global_market, is_kenya_market
+
+	ac = (asset_class or "").strip()
+	if is_kenya_market(ac) or is_global_market(ac) or ac == ETF or ac == "NSE":
+		return True
+	if asset_name and frappe.db.exists("Growe Stock", asset_name):
+		market = frappe.db.get_value("Growe Stock", asset_name, "market") or ""
+		return is_kenya_market(market) or is_global_market(market) or market == ETF
+	return False
+
+
 def _holding_ticker_set() -> set[str]:
-	"""Uppercase tickers that appear in any Growe Holding (for fetch priority)."""
+	"""Uppercase tickers from open stock/ETF holdings (for fetch priority)."""
 	rows = frappe.get_all(
 		"Growe Holding",
-		filters=[["ticker", "!=", ""]],
-		pluck="ticker",
+		filters={"sold": 0, "quantity": [">", 0]},
+		fields=["ticker", "asset_class", "asset_name"],
 	)
-	return {(t or "").upper() for t in rows if t}
+	out: set[str] = set()
+	for r in rows:
+		if not _holding_is_stock_or_etf(r.get("asset_class"), r.get("asset_name")):
+			continue
+		t = (r.ticker or "").upper().strip()
+		if t:
+			out.add(t)
+	return out
 
 
 def _sort_tickers_holdings_first(tickers: list) -> list:
@@ -1176,7 +1251,7 @@ def _fetch_and_store(
 	stock_meta = stock_meta or _stock_meta_for_tickers(tickers)
 
 	for provider in providers:
-		
+
 		if not remaining:
 			break
 		if not _provider_ready(provider):
@@ -1188,13 +1263,18 @@ def _fetch_and_store(
 			live_rate = _mansa_kes_usd_rate(provider)
 			if live_rate:
 				usd_to_kes = live_rate
+		eff_map = _symbol_map_for_provider(provider, sym_map, remaining, stock_meta)
 		if _provider_uses_alpha_vantage(provider):
 			fetched = _fetch_alpha_vantage(
-				provider, remaining, market, symbol_override_map=sym_map
+				provider, remaining, market, symbol_override_map=eff_map
 			)
 		else:
 			fetched = _fetch_from_provider(
-				provider, remaining, market, symbol_override_map=sym_map
+				provider,
+				remaining,
+				market,
+				symbol_override_map=eff_map,
+				stock_meta=stock_meta,
 			)
 
 		for ticker, data in fetched.items():
@@ -1208,7 +1288,7 @@ def _fetch_and_store(
 			price_kes = data["price"] if currency == "KES" else data["price"] * usd_to_kes
 			prices[tu] = price_kes
 			remaining.remove(tu)
-	
+
 	# One ticker at a time if batch did not return some symbols
 	if remaining and providers:
 		for provider in providers:
@@ -1222,13 +1302,18 @@ def _fetch_and_store(
 				if live_rate:
 					usd_to_kes = live_rate
 			for alone in list(remaining):
+				eff_map = _symbol_map_for_provider(provider, sym_map, [alone], stock_meta)
 				if _provider_uses_alpha_vantage(provider):
 					fetched = _fetch_alpha_vantage(
-						provider, [alone], market, symbol_override_map=sym_map
+						provider, [alone], market, symbol_override_map=eff_map
 					)
 				else:
 					fetched = _fetch_from_provider(
-						provider, [alone], market, symbol_override_map=sym_map
+						provider,
+						[alone],
+						market,
+						symbol_override_map=eff_map,
+						stock_meta=stock_meta,
 					)
 				for ticker, data in fetched.items():
 					tu = (ticker or "").upper()
@@ -1241,7 +1326,7 @@ def _fetch_and_store(
 					price_kes = data["price"] if currency == "KES" else data["price"] * usd_to_kes
 					prices[tu] = price_kes
 					remaining.remove(tu)
-    
+
 	return prices
 
 
@@ -1306,9 +1391,8 @@ def _execute_refresh_prices(
 	notify_user: str | None = None,
 ) -> dict:
 	"""
-	Fetch fresh prices for every active Growe Stock ticker (and any held ticker not in
-	the stock master), same universe as refresh_stock_prices. Holdings tickers are
-	fetched first. Upserts Growe Price Cache and recomputes holding values.
+	Fetch fresh prices for stock/ETF tickers that appear in open Growe Holdings
+	(not the full stock master). Upserts Growe Price Cache and recomputes holding values.
 
 	If provider_name is passed (e.g. Growe Price API name from Desk), only that row is used.
 	Otherwise all active providers for each market run in sequence.
@@ -1567,7 +1651,7 @@ def _run_refresh_stock_prices(notify_user: str = None) -> dict:
 @frappe.whitelist()
 def refresh_prices(provider_name: str = None, sync: int = 0):
 	"""
-	Enqueue a background job to fetch fresh prices for all active tickers.
+	Enqueue a background job to fetch fresh prices for open stock/ETF holdings only.
 
 	Pass sync=1 to run inline (tests / debugging only).
 	"""
@@ -1640,7 +1724,7 @@ def test_provider(provider_name: str, test_ticker: str = "SCOM", market: str = N
 		"Growe Price API",
 		provider_name,
 		["name", "provider_name", "api_provider", "market_type",
-		 "api_base_url", "api_key", "endpoint_prices"],
+		 "api_base_url", "api_key", "endpoint_prices", "use_us_ticker"],
 		as_dict=True,
 	)
 
@@ -1651,18 +1735,26 @@ def test_provider(provider_name: str, test_ticker: str = "SCOM", market: str = N
 		exchange = frappe.db.get_value("Growe Stock", {"ticker": ticker}, "exchange_platform")
 		market = "Kenya" if _is_nse_exchange(exchange) else "Global"
 
-	sym_for_test: dict = {}
-	row = frappe.db.get_value(
-		"Growe Stock",
-		{"ticker": ticker},
-		"api_symbol",
+	stock_meta = _stock_meta_for_tickers([ticker])
+	sym_for_test = _symbol_map_for_provider(
+		provider,
+		{},
+		[ticker],
+		stock_meta=stock_meta,
 	)
-	if row:
-		sym_for_test[ticker] = row
+	# Fall back to api_symbol when not using US ticker and Stock has one.
+	if not _provider_uses_us_ticker(provider):
+		api_sym = (stock_meta.get(ticker) or {}).get("api_symbol") or ""
+		if api_sym:
+			sym_for_test[ticker] = api_sym
 
 	try:
 		results = _fetch_from_provider(
-			dict(provider), [ticker], market, symbol_override_map=sym_for_test
+			dict(provider),
+			[ticker],
+			market,
+			symbol_override_map=sym_for_test,
+			stock_meta=stock_meta,
 		)
 
 	except Exception as e:
@@ -1803,73 +1895,84 @@ def _price_fetch_bucket(exchange_platform: str | None) -> str:
 
 def _collect_tickers_for_live_prices() -> tuple[list, list, dict, dict, dict]:
 	"""
-	Build NSE / Global ticker lists from Growe Stock exchange_platform:
-	- exchange_platform = NSE → Mansa / RapidAPI
-	- any other exchange (or unset) → Finnhub / Alpha Vantage / FCS
-	Also includes portfolio tickers not in the active stock master.
+	Build NSE / Global ticker lists from open stock & ETF holdings only.
 
-	Returns stock_meta: {TICKER: {name, exchange_platform}} for cache linking.
+	Refresh prices never pulls the full Growe Stock master — only tickers that
+	appear in open Growe Holding rows (sold=0, quantity>0) for stocks/ETFs.
+
+	Returns stock_meta: {TICKER: {name, exchange_platform, us_ticker_number, api_symbol}}.
 	"""
-	
 	nse: set = set()
 	global_: set = set()
 	nse_map: dict = {}
 	global_map: dict = {}
 	stock_meta: dict[str, dict] = {}
 
-	for s in frappe.get_all(
-		"Growe Stock",
-		filters={"is_active": 1},
-		fields=["name", "ticker", "api_symbol", "exchange_platform"],
-	):
-		t = (s.ticker or "").upper()
+	holdings = frappe.get_all(
+		"Growe Holding",
+		filters={"sold": 0, "quantity": [">", 0]},
+		fields=["ticker", "currency", "asset_class", "asset_name"],
+	)
+
+	tickers_needed: list[str] = []
+	holding_by_ticker: dict[str, dict] = {}
+	for h in holdings:
+		if not _holding_is_stock_or_etf(h.get("asset_class"), h.get("asset_name")):
+			continue
+		t = (h.ticker or "").upper().strip()
 		if not t:
 			continue
-		if t not in stock_meta:
+		tickers_needed.append(t)
+		holding_by_ticker.setdefault(t, h)
+
+	tickers_needed = list(dict.fromkeys(tickers_needed))
+	if not tickers_needed:
+		return list(nse), list(global_), nse_map, global_map, stock_meta
+
+	stock_rows = frappe.get_all(
+		"Growe Stock",
+		filters={"ticker": ["in", tickers_needed]},
+		fields=[
+			"name", "ticker", "api_symbol", "exchange_platform",
+			"us_ticker_number", "is_active",
+		],
+		order_by="is_active desc, modified desc",
+	)
+	stock_by_ticker: dict[str, dict] = {}
+	for s in stock_rows:
+		t = (s.ticker or "").upper()
+		if t and t not in stock_by_ticker:
+			stock_by_ticker[t] = s
+
+	for t in tickers_needed:
+		s = stock_by_ticker.get(t)
+		h = holding_by_ticker.get(t) or {}
+		if s:
 			stock_meta[t] = {
 				"name": s.name,
 				"exchange_platform": s.get("exchange_platform"),
+				"us_ticker_number": (s.get("us_ticker_number") or "").strip(),
+				"api_symbol": (s.get("api_symbol") or "").strip(),
 			}
-		bucket = _price_fetch_bucket(s.exchange_platform)
-		if bucket == "NSE":
-			nse.add(t)
-			if s.api_symbol:
-				nse_map[t] = s.api_symbol
+			bucket = _price_fetch_bucket(s.exchange_platform)
+			if bucket == "NSE":
+				nse.add(t)
+				if s.api_symbol:
+					nse_map[t] = s.api_symbol
+			else:
+				global_.add(t)
+				if s.api_symbol:
+					global_map[t] = s.api_symbol
 		else:
-			global_.add(t)
-			if s.api_symbol:
-				global_map[t] = s.api_symbol
+			# Orphan held ticker: bucket by currency / asset_class.
+			ac = (h.get("asset_class") or "").strip()
+			from growie_app.utils.market_labels import is_kenya_market
 
-	for h in frappe.get_all(
-		"Growe Holding",
-		filters=[["ticker", "!=", ""]],
-		fields=["ticker", "currency"],
-	):
-		t = (h.ticker or "").upper()
-		if not t:
-			continue
-		if t in nse or t in global_:
-			continue
-		# Prefer Growe Stock exchange even when the stock row is inactive.
-		stock = frappe.db.get_value(
-			"Growe Stock",
-			{"ticker": t},
-			["name", "exchange_platform"],
-			as_dict=True,
-		)
-		if stock:
-			if t not in stock_meta:
-				stock_meta[t] = {
-					"name": stock.name,
-					"exchange_platform": stock.get("exchange_platform"),
-				}
-			bucket = _price_fetch_bucket(stock.exchange_platform)
-		else:
-			bucket = "NSE" if (h.currency or "USD").upper() == "KES" else "GLOBAL"
-		if bucket == "NSE":
-			nse.add(t)
-		else:
-			global_.add(t)
+			if is_kenya_market(ac) or (h.get("currency") or "USD").upper() == "KES":
+				nse.add(t)
+			else:
+				# Global stocks and ETFs share the global provider path.
+				global_.add(t)
 
 	return list(nse), list(global_), nse_map, global_map, stock_meta
 
@@ -1900,17 +2003,18 @@ def _run_fetch_providers_round(
 				break
 			count_before = len(updated)
 			chunk = remaining[:REFRESH_FETCH_CHUNK]
+			eff_map = _symbol_map_for_provider(provider, sym_map, chunk, stock_meta)
 
 			if _provider_uses_alpha_vantage(provider):
 				fetched = _fetch_alpha_vantage(
-					provider, chunk, market, symbol_override_map=sym_map
+					provider, chunk, market, symbol_override_map=eff_map
 				)
 			else:
 				fetched = _fetch_from_provider(
 					provider,
 					chunk,
 					market,
-					symbol_override_map=sym_map,
+					symbol_override_map=eff_map,
 					stock_meta=stock_meta,
 				)
 
@@ -1930,16 +2034,17 @@ def _run_fetch_providers_round(
 				for lone in chunk:
 					if lone not in remaining:
 						continue
+					lone_map = _symbol_map_for_provider(provider, sym_map, [lone], stock_meta)
 					if _provider_uses_alpha_vantage(provider):
 						fetched_one = _fetch_alpha_vantage(
-							provider, [lone], market, symbol_override_map=sym_map
+							provider, [lone], market, symbol_override_map=lone_map
 						)
 					else:
 						fetched_one = _fetch_from_provider(
 							provider,
 							[lone],
 							market,
-							symbol_override_map=sym_map,
+							symbol_override_map=lone_map,
 							stock_meta=stock_meta,
 						)
 					for tk, data in list(fetched_one.items()):
@@ -1983,16 +2088,17 @@ def _run_fetch_providers_round(
 			if not _provider_ready(provider):
 				continue
 			for lone in list(remaining):
+				lone_map = _symbol_map_for_provider(provider, sym_map, [lone], stock_meta)
 				if _provider_uses_alpha_vantage(provider):
 					fetched = _fetch_alpha_vantage(
-						provider, [lone], market, symbol_override_map=sym_map
+						provider, [lone], market, symbol_override_map=lone_map
 					)
 				else:
 					fetched = _fetch_from_provider(
 						provider,
 						[lone],
 						market,
-						symbol_override_map=sym_map,
+						symbol_override_map=lone_map,
 						stock_meta=stock_meta,
 					)
 				_usd = _get_usd_to_kes()
@@ -2114,8 +2220,7 @@ def _fetch_market_for_refresh(
 @frappe.whitelist()
 def refresh_stock_prices(sync: int = 0):
 	"""
-	Enqueue a background job to fetch live prices for every active Growe Stock ticker
-	and any held ticker not in the stock master.
+	Enqueue a background job to fetch live prices for stock/ETF tickers in open holdings.
 
 	Pass sync=1 to run inline (tests / debugging only).
 	"""

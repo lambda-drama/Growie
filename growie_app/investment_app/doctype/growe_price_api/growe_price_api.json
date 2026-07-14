@@ -18,6 +18,7 @@
   "api_secret",
   "column_break_cdlh",
   "endpoint_prices",
+  "use_us_ticker",
   "limits_section",
   "calls_per_month",
   "column_break_rzna",
@@ -137,12 +138,18 @@
    "fieldtype": "Datetime",
    "label": "Tested At",
    "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "use_us_ticker",
+   "fieldtype": "Check",
+   "label": "Use US ticker"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-24 01:08:29.909115",
+ "modified": "2026-07-14 23:17:35.210352",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Price API",

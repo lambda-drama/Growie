@@ -25,6 +25,7 @@
   "column_break_pakd",
   "paystack_secret_key",
   "maintenance_section",
+  "holdings_import_help",
   "exchange_platform_migration_help",
   "last_exchange_platform_migration",
   "stock_naming_migration_help",
@@ -134,6 +135,12 @@
    "fieldname": "maintenance_section",
    "fieldtype": "Section Break",
    "label": "Maintenance"
+  },
+  {
+   "fieldname": "holdings_import_help",
+   "fieldtype": "HTML",
+   "label": "Stock holdings import",
+   "options": "<p class=\"text-muted\">Use <b>Holdings → Upload stock holdings</b> to import an Excel file for a Growe Member. Expected columns: Purchase Dates, Investment, Ticker Number, <b>API Ticker Number</b> (stored as US Ticker Number), ISO MIC Exchange, Broker, Shares Breakdown, Buying Price, Goal.</p>"
   },
   {
    "fieldname": "exchange_platform_migration_help",
