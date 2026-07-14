@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_bulk_edit": 1,
  "allow_rename": 1,
  "autoname": "GH-.#####",
  "creation": "2026-04-24 14:15:01.894424",
@@ -19,6 +20,7 @@
   "date_added",
   "notes",
   "broker",
+  "us_ticker_number",
   "section_break_ywee",
   "share_breakdown",
   "buying_price",
@@ -63,8 +65,7 @@
    "fieldtype": "Currency",
    "in_list_view": 1,
    "label": "Current Price",
-   "options": "currency",
-   "reqd": 1
+   "options": "currency"
   },
   {
    "default": "Today",
@@ -135,7 +136,8 @@
   {
    "fieldname": "initial_investment_value",
    "fieldtype": "Currency",
-   "label": "Initial Investment Value"
+   "label": "Initial Investment Value",
+   "precision": "4"
   },
   {
    "fieldname": "section_break_ywee",
@@ -185,6 +187,11 @@
    "fieldname": "sold_date",
    "fieldtype": "Date",
    "label": "Sold Date"
+  },
+  {
+   "fieldname": "us_ticker_number",
+   "fieldtype": "Data",
+   "label": "US Ticker Number"
   }
  ],
  "grid_page_length": 50,
@@ -196,7 +203,7 @@
    "link_fieldname": "holding"
   }
  ],
- "modified": "2026-06-04 00:39:04.365215",
+ "modified": "2026-07-14 23:56:30.271042",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Holding",

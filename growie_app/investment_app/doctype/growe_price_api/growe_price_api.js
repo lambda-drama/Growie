@@ -73,20 +73,23 @@ frappe.ui.form.on("Growe Price API", {
 			);
 		}, __("Actions"));
 
-		// ── Fetch All Prices Now button ───────────────────────────────────────────
+		// ── Fetch holdings prices Now button ──────────────────────────────────────
 		frm.add_custom_button(__("Refresh All Prices Now"), function () {
 			const prov = (frm.doc.api_provider || "").toLowerCase();
 			const scopeHint = prov.includes("rapidapi") || prov.includes("mansa")
-				? __("This provider only updates <b>Kenya</b> tickers; Global symbols are skipped.")
+				? __("This provider only updates <b>Kenya</b> holdings; Global symbols are skipped.")
 				: prov.includes("finnhub") || prov.includes("alpha") || prov.includes("eoddata")
-					? __("This provider only updates <b>Global</b> tickers; Kenya symbols are skipped.")
+					? __("This provider only updates <b>Global</b> holdings; Kenya symbols are skipped.")
 					: prov.includes("twelve") || prov.includes("marketstack")
-						? __("Uses Growe Stock <b>Exchange platform</b> for Kenya and global tickers (batch API).")
-						: __("Updates tickers this provider supports (by market).");
+						? __("Uses Growe Stock <b>Exchange platform</b> (ISO Mic) for Kenya and global holdings (batch API).")
+						: __("Updates held tickers this provider supports (by market).");
+			const usHint = cint(frm.doc.use_us_ticker)
+				? __(" <b>Use US ticker</b> is on — API calls use Growe Stock <b>US Ticker Number</b>.")
+				: "";
 			frappe.confirm(
 				__(
-					"This will fetch live prices for active tickers (portfolio first) using <b>{0}</b> only. {1} Continue?",
-					[frm.doc.provider_name || frm.doc.name, scopeHint]
+					"This will fetch live prices for <b>open stock &amp; ETF holdings only</b> using <b>{0}</b>. {1}{2} Continue?",
+					[frm.doc.provider_name || frm.doc.name, scopeHint, usHint]
 				),
 				function () {
 					frm._price_refresh_active = true;
@@ -225,7 +228,8 @@ frappe.ui.form.on("Growe Price API", {
 				__("<b>Marketstack</b> — latest end-of-day prices via <code>/eod/latest</code>. "
 				   + "API Key = your <code>access_key</code> from "
 				   + "<a href=\"https://marketstack.com/dashboard\" target=\"_blank\">marketstack.com</a>. "
-				   + "Set <b>Exchange platform</b> on Growe Stock (NYSE→XNYS, NASDAQ→XNAS, NSE→XNAI, …). "
+				   + "Sends <b>ISO Mic</b> as <code>exchange</code> from Growe Stock exchange platform. "
+				   + "With <b>Use US ticker</b>, symbols come from Growe Stock <b>US Ticker Number</b>. "
 				   + "Batch up to 100 symbols per request. Test with <code>AAPL</code> or <code>SCOM</code>. "
 				   + "<a href=\"https://docs.apilayer.com/marketstack/docs/marketstack-api-v2-v-2-0-0\" target=\"_blank\">Docs</a>"),
 				"blue",

@@ -8,10 +8,11 @@ Configure Growe Price API:
   - api_key: access_key from https://marketstack.com/dashboard
   - api_base_url: https://api.marketstack.com/v2 (optional)
   - endpoint_prices: eod/latest (optional; default latest EOD per symbol)
+  - use_us_ticker: when checked, send Growe Stock.us_ticker_number instead of ticker
 
 Auth: access_key query param on every request.
 
-Uses Growe Stock exchange_platform → Marketstack exchange MIC (XNAS, XNYS, XAMS, …).
+Sends Growe Exchange Platform ISO Mic as ``exchange`` on every request.
 Nairobi NSE (Kenya) maps to MIC XNAI — not the Indian NSE (XNSE).
 """
 
@@ -129,7 +130,12 @@ def _mark_marketstack_rate_limited(provider: dict, message: str) -> None:
 
 
 def marketstack_mic(exchange_platform: str | None, market: str = "Global") -> str | None:
-	"""Map Growe Stock exchange_platform to a Marketstack exchange MIC."""
+	"""
+	Resolve Marketstack ``exchange`` (ISO MIC) from Growe Stock.exchange_platform.
+
+	Prefers Growe Exchange Platform.exchange_code (ISO Mic). Falls back to a
+	known alias map, then 4-char MIC passthrough (platform docs are often named by MIC).
+	"""
 	from growie_app.api.price import _is_nse_exchange, _normalize_market_label
 
 	raw = (exchange_platform or "").strip()
@@ -137,6 +143,15 @@ def marketstack_mic(exchange_platform: str | None, market: str = "Global") -> st
 		key = raw.upper()
 		if key in ("KENYA_FUNDS", "PRIVATE"):
 			return None
+
+		# Growe Exchange Platform is autonamed by ISO Mic (exchange_code).
+		if frappe.db.exists("Growe Exchange Platform", raw):
+			code = (
+				frappe.db.get_value("Growe Exchange Platform", raw, "exchange_code") or ""
+			).strip().upper()
+			if code:
+				return code
+
 		if key in _MARKETSTACK_MIC:
 			return _MARKETSTACK_MIC[key]
 		# Already a MIC (e.g. XNAS) or unknown code — pass through uppercase.

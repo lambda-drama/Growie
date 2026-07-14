@@ -3,15 +3,19 @@
 """
 Parse the Final Web Data Import Template (.xlsx/.csv) and create Growe Holding rows.
 
-Current sheet layout (header row containing Ticker # and Currency):
-- Purchase Dates, Exchange, Ticker #, Broker, Shares Breakdown, Buying Price, Currency, Goal
+Current sheet layout (header row):
+- Purchase Dates, Investment, Ticker Number, API Ticker Number, ISO MIC Exchange,
+  Broker, Shares Breakdown, Buying Price, Goal
+
+``API Ticker Number`` is the US ticker — stored on Growe Stock / Growe Holding as
+``us_ticker_number`` (used when a price API has Use US ticker enabled).
+
+Legacy columns (Exchange, Currency, Current Price/Value, Sold Stocks block) are still
+accepted for backward compatibility.
 
 The trailing ``Goal`` column names the member's goal (e.g. "Retirement"). On import we
 create/refresh a matching Growe Goal for the member and seed its amounts from the value of
 the holdings tagged with that goal (see ``_sync_goal_from_holdings``).
-
-Older templates (Investment column, Initial Investment Value, and a
-"Sold Stocks" block) are still accepted for backward compatibility.
 """
 
 from __future__ import annotations
@@ -66,19 +70,32 @@ def _to_float(val: Any) -> float | None:
 
 def _normalize_ticker(raw: str) -> tuple[str, str]:
 	"""
-	Return (clean_ticker, api_symbol).
-	Strips NASDAQ:/NYSE:/AMEX: prefixes for the canonical ticker used in Growe Stock.
+	Return (clean_ticker, stripped_hint).
+
+	Strips ``EXCHANGE:TICKER`` prefixes (``AMS:ADYEN``, ``NASDAQ:AAPL``) for the
+	canonical ticker used in Growe Stock. US ticker comes from the separate
+	``API Ticker Number`` column → ``us_ticker_number``.
 	"""
 	s = (raw or "").strip().upper()
 	if not s:
 		return "", ""
-	api_symbol = s
-	for prefix in ("NASDAQ:", "NYSE:", "AMEX:", "OTC:", "ARCA:"):
-		if s.startswith(prefix):
-			s = s[len(prefix) :].strip()
-			break
-	s = re.sub(r"[^A-Z0-9.\-]", "", s) or api_symbol
-	return s[:40], api_symbol[:140]
+	hint = s
+	if ":" in s:
+		left, right = s.split(":", 1)
+		left, right = left.strip(), right.strip()
+		# EXCHANGE:TICKER (MIC alias or venue code on the left)
+		if left and right and 1 <= len(left) <= 12 and re.match(r"^[A-Z0-9]+$", left):
+			s = right
+			hint = right
+	s = re.sub(r"[^A-Z0-9.\-]", "", s) or hint
+	return s[:40], hint[:140]
+
+
+def _us_ticker_from_sheet(api_ticker_number: str) -> str:
+	"""
+	Excel ``API Ticker Number`` is the US ticker number — store as-is (normalized).
+	"""
+	return (api_ticker_number or "").strip().upper()[:140]
 
 
 def _get_uploaded_file_path(file_url: str) -> str:
@@ -99,9 +116,33 @@ def _parse_date_cell(val: Any) -> str:
 		return val.date().isoformat()
 	if isinstance(val, date):
 		return val.isoformat()
+	# Excel serial date (e.g. 45502) when openpyxl returns a bare number
+	if isinstance(val, (int, float)) and not isinstance(val, bool):
+		try:
+			from openpyxl.utils.datetime import from_excel
+
+			parsed = from_excel(val)
+			if isinstance(parsed, datetime):
+				return parsed.date().isoformat()
+			if isinstance(parsed, date):
+				return parsed.isoformat()
+		except Exception:
+			pass
 	s = _norm_cell(val)
 	if not s:
 		return str(today())
+	# Numeric string serials
+	if re.fullmatch(r"\d+(\.\d+)?", s):
+		try:
+			from openpyxl.utils.datetime import from_excel
+
+			parsed = from_excel(float(s))
+			if isinstance(parsed, datetime):
+				return parsed.date().isoformat()
+			if isinstance(parsed, date):
+				return parsed.isoformat()
+		except Exception:
+			pass
 	try:
 		return str(getdate(s))
 	except Exception:
@@ -253,8 +294,20 @@ def _column_map_from_header(header_row: tuple) -> dict[str, int]:
 	aliases: dict[str, tuple[str, ...]] = {
 		"date": ("purchase dates", "purchase date", "purchase period"),
 		"sell_date": ("sell date",),
-		"exchange": ("exchange",),
+		"exchange": (
+			"iso mic exchange",
+			"iso mic",
+			"exchange platform",
+			"exchange",
+		),
 		"investment": ("investment",),
+		# Excel "API Ticker Number" == Growe Stock / Holding us_ticker_number
+		"us_ticker": (
+			"api ticker number",
+			"api ticker",
+			"us ticker number",
+			"us ticker",
+		),
 		"ticker": ("ticker #", "ticker number", "ticker"),
 		"broker": ("broker",),
 		"shares": ("shares breakdown", "shares"),
@@ -269,7 +322,28 @@ def _column_map_from_header(header_row: tuple) -> dict[str, int]:
 		"goal": ("goal",),
 	}
 	col_map: dict[str, int] = {}
+	used_idxs: set[int] = set()
+
+	def _assign(field: str, idx: int) -> None:
+		if field in col_map or idx in used_idxs:
+			return
+		col_map[field] = idx
+		used_idxs.add(idx)
+
+	# Exact header match first (avoids "API Ticker Number" matching "Ticker Number").
 	for idx, cell in enumerate(header_row):
+		h = _normalize_header(cell)
+		if not h:
+			continue
+		for field, variants in aliases.items():
+			if h in variants:
+				_assign(field, idx)
+				break
+
+	# Substring fallback for remaining headers.
+	for idx, cell in enumerate(header_row):
+		if idx in used_idxs:
+			continue
 		h = _normalize_header(cell)
 		if not h:
 			continue
@@ -277,9 +351,12 @@ def _column_map_from_header(header_row: tuple) -> dict[str, int]:
 			if field in col_map:
 				continue
 			for v in variants:
-				if h == v or v in h:
-					col_map[field] = idx
-					break
+				if v not in h:
+					continue
+				if field == "ticker" and ("api" in h or h.startswith("us ")):
+					continue
+				_assign(field, idx)
+				break
 	return col_map
 
 
@@ -399,47 +476,91 @@ def _market_from_exchange(exchange_code: str, currency: str) -> str:
 	from growie_app.utils.market_labels import GLOBAL, KENYA
 
 	code = (exchange_code or "").strip().upper()
-	if code == "NSE":
+	if code in ("NSE", "XNAI"):
 		return KENYA
 	if (currency or "").upper() == "KES":
 		return KENYA
 	return GLOBAL
 
 
+def _pick_stock_for_import(ticker: str, exchange_hint: str = "", currency_hint: str = "") -> str | None:
+	"""Prefer Growe Stock matching ticker + ISO Mic exchange platform when possible."""
+	clean = (ticker or "").strip().upper()
+	if not clean:
+		return None
+	platform = _resolve_exchange_platform(exchange_hint) if exchange_hint else None
+	if platform:
+		exact = frappe.db.get_value(
+			"Growe Stock",
+			{"ticker": clean, "exchange_platform": platform},
+			"name",
+		)
+		if exact:
+			return exact
+		# Document name is usually ticker-exchange_code
+		named = f"{clean}-{platform}"
+		if frappe.db.exists("Growe Stock", named):
+			return named
+
+	from growie_app.utils.stock_verification import pick_best_stock_for_ticker
+
+	return pick_best_stock_for_ticker(clean, currency_hint)
+
+
+def _apply_import_stock_symbols(
+	stock_name: str,
+	*,
+	us_ticker: str = "",
+	exchange_hint: str = "",
+) -> None:
+	"""Fill missing us_ticker_number / exchange_platform from the sheet."""
+	if not stock_name or not frappe.db.exists("Growe Stock", stock_name):
+		return
+	doc = frappe.get_doc("Growe Stock", stock_name)
+	changed = False
+	us = _us_ticker_from_sheet(us_ticker)
+	# Excel API Ticker Number is the US ticker — always keep sheet value when present.
+	if us and (doc.us_ticker_number or "").strip().upper() != us:
+		doc.us_ticker_number = us
+		changed = True
+	if exchange_hint and not (doc.exchange_platform or "").strip():
+		platform = _resolve_exchange_platform(exchange_hint)
+		if platform:
+			doc.exchange_platform = platform
+			changed = True
+	if changed:
+		doc.flags.ignore_permissions = True
+		doc.save()
+
+
 def _insert_background_stock(
 	raw_ticker: str,
 	investment_hint: str,
 	currency_hint: str,
-	api_raw: str,
 	*,
 	by_unsubscribed_member: bool,
 	exchange_hint: str = "",
+	us_ticker: str = "",
 ) -> str | None:
 	"""Create an unverified Growe Stock row if none exists for this ticker. Returns doc name or None."""
 	clean = (raw_ticker or "").strip().upper()
 	if not clean:
 		return None
 
-	existing = frappe.get_all(
-		"Growe Stock",
-		filters={"ticker": clean},
-		pluck="name",
-		limit=1,
-	)
+	existing = _pick_stock_for_import(clean, exchange_hint, currency_hint)
 	if existing:
-		return existing[0]
+		_apply_import_stock_symbols(
+			existing,
+			us_ticker=us_ticker,
+			exchange_hint=exchange_hint,
+		)
+		return existing
 
 	company = (investment_hint or "").strip() or clean
 	ccy = _parse_currency_cell(currency_hint) or "USD"
 	market = _market_from_exchange(exchange_hint, ccy)
 	platform = _resolve_exchange_platform(exchange_hint)
-
-	base = clean
-	name = base
-	n = 0
-	while frappe.db.exists("Growe Stock", name):
-		n += 1
-		name = f"{base}-{n}"
+	us = _us_ticker_from_sheet(us_ticker)
 
 	instrument_type = "ETF" if market == "ETF" else "Stock"
 	doc = frappe.get_doc(
@@ -450,7 +571,7 @@ def _insert_background_stock(
 			"market": market,
 			"instrument_type": instrument_type,
 			"currency": ccy,
-			"api_symbol": api_raw or clean,
+			"us_ticker_number": us,
 			"is_active": 1,
 			"verified": 0,
 			"by_unsubscribed_member": 1 if by_unsubscribed_member else 0,
@@ -458,7 +579,7 @@ def _insert_background_stock(
 		}
 	)
 	doc.flags.ignore_permissions = True
-	doc.insert(set_name=name)
+	doc.insert()
 	return doc.name
 
 
@@ -468,45 +589,55 @@ def _get_or_create_stock(
 	currency_hint: str = "",
 	investor: str | None = None,
 	exchange_hint: str = "",
+	us_ticker: str = "",
+	*,
+	admin_import: bool = False,
 ) -> dict:
 	"""
 	Resolve or create Growe Stock for an import row.
 
+	``us_ticker`` comes from Excel ``API Ticker Number`` → Growe Stock.us_ticker_number.
+
 	Free members: holdings only for verified master tickers. Missing tickers are still
 	recorded on Growe Stock (unverified, by_unsubscribed_member) then skipped for holdings.
 	Subscribed members: may create unverified listings and holdings (System Manager ToDos).
-	Returns {name, created, ticker, company_name}.
+	Desk System Manager imports (admin_import=True) always create/attach holdings.
+	Returns {name, created, ticker, company_name, us_ticker_number}.
 	"""
 	from growie_app.utils.stock_verification import (
 		UnsupportedImportTicker,
 		create_stock_verification_todos,
 		member_is_subscribed,
-		pick_best_stock_for_ticker,
 	)
 
-	clean, api_raw = _normalize_ticker(raw_ticker)
+	clean, _hint = _normalize_ticker(raw_ticker)
 	if not clean:
 		frappe.throw(_("Missing ticker in row."))
 
-	subscribed = member_is_subscribed(investor) if investor else False
-	existing_name = pick_best_stock_for_ticker(clean, currency_hint)
+	us_raw = _us_ticker_from_sheet(us_ticker)
+
+	subscribed = True if admin_import else (member_is_subscribed(investor) if investor else False)
+	existing_name = _pick_stock_for_import(clean, exchange_hint, currency_hint)
 	if existing_name:
+		_apply_import_stock_symbols(
+			existing_name,
+			us_ticker=us_raw,
+			exchange_hint=exchange_hint,
+		)
 		is_verified = int(frappe.db.get_value("Growe Stock", existing_name, "verified") or 0)
-		if is_verified:
+		stored_us = (
+			frappe.db.get_value("Growe Stock", existing_name, "us_ticker_number") or us_raw
+		)
+		if is_verified or subscribed:
 			return {
 				"name": existing_name,
 				"created": False,
 				"ticker": clean,
-				"company_name": frappe.db.get_value("Growe Stock", existing_name, "company_name") or "",
+				"company_name": frappe.db.get_value("Growe Stock", existing_name, "company_name")
+				or "",
+				"us_ticker_number": stored_us,
 			}
-		if not subscribed:
-			raise UnsupportedImportTicker(clean)
-		return {
-			"name": existing_name,
-			"created": False,
-			"ticker": clean,
-			"company_name": frappe.db.get_value("Growe Stock", existing_name, "company_name") or "",
-		}
+		raise UnsupportedImportTicker(clean)
 
 	company = (investment_hint or "").strip() or clean
 	if not subscribed:
@@ -514,22 +645,15 @@ def _get_or_create_stock(
 			clean,
 			company,
 			currency_hint,
-			api_raw,
 			by_unsubscribed_member=True,
 			exchange_hint=exchange_hint,
+			us_ticker=us_raw,
 		)
 		raise UnsupportedImportTicker(clean)
 
 	ccy = _parse_currency_cell(currency_hint) or "USD"
 	market = _market_from_exchange(exchange_hint, ccy)
 	platform = _resolve_exchange_platform(exchange_hint)
-
-	base = clean
-	name = base
-	n = 0
-	while frappe.db.exists("Growe Stock", name):
-		n += 1
-		name = f"{base}-{n}"
 
 	instrument_type = "ETF" if market == "ETF" else "Stock"
 	doc = frappe.get_doc(
@@ -540,29 +664,31 @@ def _get_or_create_stock(
 			"market": market,
 			"instrument_type": instrument_type,
 			"currency": ccy,
-			"api_symbol": api_raw or clean,
+			"us_ticker_number": us_raw,
 			"is_active": 1,
-			"verified": 0,
+			"verified": 1 if admin_import else 0,
 			"by_unsubscribed_member": 0,
 			**({"exchange_platform": platform} if platform else {}),
 		}
 	)
 	doc.flags.ignore_permissions = True
-	doc.insert(set_name=name)
+	doc.insert()
 
-	create_stock_verification_todos(
-		doc.name,
-		clean,
-		company,
-		investor,
-		from_unsubscribed=False,
-	)
+	if not admin_import:
+		create_stock_verification_todos(
+			doc.name,
+			clean,
+			company,
+			investor,
+			from_unsubscribed=False,
+		)
 
 	return {
 		"name": doc.name,
 		"created": True,
 		"ticker": clean,
 		"company_name": company[:240],
+		"us_ticker_number": us_raw,
 	}
 
 
@@ -652,6 +778,7 @@ def _insert_holding(
 	sold: bool,
 	use_date: str,
 	sold_date: str | None,
+	us_ticker_number: str = "",
 ) -> None:
 	broker = _norm_cell(_row_val_by_map(row, col_map, "broker"))
 	shares = _to_float(_row_val_by_map(row, col_map, "shares"))
@@ -694,6 +821,11 @@ def _insert_holding(
 	notes_parts.append("Imported from Excel")
 	notes = " | ".join(notes_parts)
 
+	us_from_sheet = _us_ticker_from_sheet(
+		_norm_cell(_row_val_by_map(row, col_map, "us_ticker"))
+	)
+	us_val = us_from_sheet or (us_ticker_number or "").strip().upper()
+
 	doc_dict: dict = {
 		"doctype": "Growe Holding",
 		"investor": investor,
@@ -715,6 +847,7 @@ def _insert_holding(
 		"notes": notes[:240],
 		"sold": 1 if sold else 0,
 		"last_updated": now_datetime(),
+		"us_ticker_number": us_val[:140] if us_val else "",
 	}
 	if pct is not None:
 		doc_dict["percentage"] = pct
@@ -891,7 +1024,13 @@ def _sync_goal_from_holdings(member: str, goal_name: str) -> dict | None:
 	}
 
 
-def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: str) -> dict:
+def _import_scope_template_rows(
+	rows: list[tuple],
+	investor: str,
+	source_label: str,
+	*,
+	admin_import: bool = False,
+) -> dict:
 	"""Shared import for Excel, CSV, and Google Sheets (same Scope template columns)."""
 	from growie_app.utils.stock_verification import (
 		UnsupportedImportTicker,
@@ -908,7 +1047,7 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 	unsupported_tickers: list[str] = []
 	pending_map: dict[str, dict] = {}
 	goal_names: set[str] = set()
-	is_subscribed = member_is_subscribed(investor)
+	is_subscribed = True if admin_import else member_is_subscribed(investor)
 
 	def _track_pending(stock_name: str) -> None:
 		row = pending_verification_row(stock_name)
@@ -935,15 +1074,24 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 				_row_val_by_map(row, active_col_map, "ticker")
 			)
 			raw_tk = _norm_cell(_row_val_by_map(row, active_col_map, "ticker"))
+			us_tk = _us_ticker_from_sheet(
+				_norm_cell(_row_val_by_map(row, active_col_map, "us_ticker"))
+			)
 			use_date = _parse_date_cell(_row_val_by_map(row, active_col_map, "date"))
 			sheet_ccy = _parse_currency_cell(_row_val_by_map(row, active_col_map, "currency"))
 			exchange_hint = _norm_cell(_row_val_by_map(row, active_col_map, "exchange"))
 
 			stock_info = _get_or_create_stock(
-				raw_tk, investment, sheet_ccy, investor=investor, exchange_hint=exchange_hint
+				raw_tk,
+				investment,
+				sheet_ccy,
+				investor=investor,
+				exchange_hint=exchange_hint,
+				us_ticker=us_tk,
+				admin_import=admin_import,
 			)
 			stock_doc = stock_info["name"]
-			if stock_info.get("created"):
+			if stock_info.get("created") and not admin_import:
 				_track_pending(stock_doc)
 			ticker_sym = frappe.db.get_value("Growe Stock", stock_doc, "ticker") or raw_tk
 			asset_class, currency = _holding_meta_from_stock(stock_doc)
@@ -961,6 +1109,7 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 				sold=False,
 				use_date=use_date,
 				sold_date=None,
+				us_ticker_number=stock_info.get("us_ticker_number") or "",
 			)
 			created += 1
 			goal_val = _norm_cell(_row_val_by_map(row, active_col_map, "goal"))
@@ -972,6 +1121,9 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 	for j, row in enumerate(sold_rows):
 		try:
 			raw_tk = _norm_cell(_row_val_by_map(row, sold_col_map, "ticker"))
+			us_tk = _us_ticker_from_sheet(
+				_norm_cell(_row_val_by_map(row, sold_col_map, "us_ticker"))
+			)
 			use_date = _parse_date_cell(_row_val_by_map(row, sold_col_map, "date"))
 			sell_raw = _row_val_by_map(row, sold_col_map, "sell_date")
 			if isinstance(sell_raw, datetime):
@@ -982,9 +1134,16 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 				s = _norm_cell(sell_raw)
 				sold_date = str(getdate(s)) if s else None
 
-			stock_info = _get_or_create_stock(raw_tk, "", "", investor=investor)
+			stock_info = _get_or_create_stock(
+				raw_tk,
+				"",
+				"",
+				investor=investor,
+				us_ticker=us_tk,
+				admin_import=admin_import,
+			)
 			stock_doc = stock_info["name"]
-			if stock_info.get("created"):
+			if stock_info.get("created") and not admin_import:
 				_track_pending(stock_doc)
 			ticker_sym = frappe.db.get_value("Growe Stock", stock_doc, "ticker") or raw_tk
 			asset_class, currency = _holding_meta_from_stock(stock_doc)
@@ -1000,6 +1159,7 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 				sold=True,
 				use_date=use_date,
 				sold_date=sold_date,
+				us_ticker_number=stock_info.get("us_ticker_number") or "",
 			)
 			created += 1
 			goal_val = _norm_cell(_row_val_by_map(row, sold_col_map, "goal"))
@@ -1023,7 +1183,7 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 	pending_verification = sorted(
 		pending_map.values(),
 		key=lambda r: (r.get("ticker") or "").upper(),
-	) if is_subscribed else []
+	) if is_subscribed and not admin_import else []
 	return {
 		"created": created,
 		"skipped": skipped,
@@ -1041,16 +1201,22 @@ def _import_scope_template_rows(rows: list[tuple], investor: str, source_label: 
 
 
 @frappe.whitelist()
-def import_scope_template_excel(file_url: str, investor: str):
+def import_scope_template_excel(file_url: str, investor: str, admin_import: int = 0):
 	"""
 	Import the Final Web Data Import Template (.xlsx) into Growe Holding.
 
 	:param file_url: Uploaded File ``file_url`` (Desk attach or portal ``upload_file``).
 	:param investor: Growe Member name (must match the signed-in member unless System Manager).
+	:param admin_import: When 1 (Desk System Manager), create/verify stocks as needed.
 	"""
 	path = _get_uploaded_file_path(file_url)
 	rows = _rows_from_excel_path(path)
-	return _import_scope_template_rows(rows, investor, "Excel")
+	return _import_scope_template_rows(
+		rows,
+		investor,
+		"Excel",
+		admin_import=bool(int(admin_import or 0)),
+	)
 
 
 @frappe.whitelist()
