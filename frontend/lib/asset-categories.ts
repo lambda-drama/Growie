@@ -33,12 +33,18 @@ export function displayMarketTagForUser(tag: string | undefined | null): string 
   return trimmed
 }
 
-/** Exchange bucket label — never surface bare NSE/Global routing. */
-export function displayExchangeLabel(exchange: string): string {
+/** Exchange bucket label — prefer platform name over MIC symbols (XAMS, ARCX, …). */
+export function displayExchangeLabel(
+  exchange: string,
+  exchangeName?: string | null
+): string {
+  const name = (exchangeName || '').trim()
+  if (name) return name
   const trimmed = (exchange || '').trim()
   if (!trimmed || isInternalMarketRoutingLabel(trimmed)) return 'Unclassified'
   return trimmed
 }
+
 
 /** Never show NSE/Global routing labels as user-facing asset categories. */
 export function normalizeAssetCategoryLabel(label: string): string {

@@ -145,6 +145,49 @@ def is_open_holding(doc) -> bool:
 	return sold == 0 and qty > 0
 
 
+def _exchange_platform_display_name(exchange_platform: str) -> str:
+	"""
+	Human label for Growe Exchange Platform.
+
+	Doc name / link is usually the ISO MIC (XAMS, ARCX). UI should show platform_name
+	(e.g. Euronext Amsterdam, NYSE Arca).
+	"""
+	code = (exchange_platform or "").strip()
+	if not code:
+		return ""
+	cache = getattr(frappe.local, "_growie_exchange_name_cache", None)
+	if cache is None:
+		cache = {}
+		frappe.local._growie_exchange_name_cache = cache
+	if code in cache:
+		return cache[code]
+
+	label = ""
+	try:
+		if frappe.db.exists("Growe Exchange Platform", code):
+			label = (
+				frappe.db.get_value("Growe Exchange Platform", code, "platform_name") or ""
+			).strip()
+		if not label:
+			# Rare: link stores platform_name instead of MIC
+			row = frappe.db.get_value(
+				"Growe Exchange Platform",
+				{"platform_name": code},
+				["name", "platform_name"],
+				as_dict=True,
+			)
+			if row:
+				label = (row.platform_name or "").strip() or code
+	except Exception:
+		label = ""
+
+	if not label:
+		label = code
+	# If platform_name equals the MIC and we know a nicer alias, keep as-is.
+	cache[code] = label
+	return label
+
+
 def _load_growe_stock_meta(stock_name: str, ticker: str, asset_class_label: str = None) -> dict:
 	"""
 	Load Growe Stock metadata for a holding.
@@ -410,6 +453,9 @@ def _holding_to_dict(h) -> dict:
 		"region": (stock.get("region") if stock else "") or "",
 		"country": (stock.get("country") if stock else "") or "",
 		"exchangePlatform": (stock.get("exchange_platform") if stock else "") or "",
+		"exchangePlatformName": _exchange_platform_display_name(
+			(stock.get("exchange_platform") if stock else "") or ""
+		),
 		"sector": (stock.get("sector") if stock else "") or "",
 		"industry": (stock.get("industry") if stock else "") or "",
 		"assetCategory": _normalize_asset_category_display(
@@ -886,6 +932,10 @@ def search_stocks(
 			limit=int(limit),
 		)
 
+	for row in results:
+		row["exchange_platform_name"] = _exchange_platform_display_name(
+			row.get("exchange_platform") or ""
+		)
 	return results
 
 

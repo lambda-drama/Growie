@@ -44,11 +44,14 @@ export interface StackHolding extends Holding {
   marketTag: string
   region?: string
   exchangePlatform?: string
+  /** Human-readable exchange name from Growe Exchange Platform.platform_name. */
+  exchangePlatformName?: string
   avgBuyPrice: number
   currentPrice: number
   gainPercent: number
   unrealizedGainKES: number
 }
+
 
 export interface StackClassDetail {
   assetClass: AssetClass
@@ -223,7 +226,12 @@ export async function getRegions(query = '', limit = 100): Promise<string[]> {
   throw new Error(extractError(data))
 }
 
-export async function getExchangePlatforms(query = '', limit = 100): Promise<string[]> {
+export interface ExchangePlatformOption {
+  value: string
+  label: string
+}
+
+export async function getExchangePlatforms(query = '', limit = 100): Promise<ExchangePlatformOption[]> {
   const params = new URLSearchParams()
   if (query.trim()) params.set('query', query.trim())
   params.set('limit', String(limit))
@@ -237,11 +245,16 @@ export async function getExchangePlatforms(query = '', limit = 100): Promise<str
   const data = await res.json()
   if (Array.isArray(data?.message)) {
     return data.message
-      .map((row: Record<string, unknown>) => String(row.name || '').trim())
-      .filter(Boolean)
+      .map((row: Record<string, unknown>) => {
+        const value = String(row.name || '').trim()
+        const label = String(row.label || row.platform_name || row.name || '').trim() || value
+        return value ? { value, label } : null
+      })
+      .filter((row): row is ExchangePlatformOption => Boolean(row))
   }
   throw new Error(extractError(data))
 }
+
 
 export interface RecordTradePayload {
   quantity: number
@@ -254,6 +267,8 @@ export interface RecordTradePayload {
   transactionDate?: string
   notes?: string
   reference?: string
+  /** Broker / brokerage account name on the holding. */
+  broker?: string
 }
 
 export async function recordBuy(payload: RecordTradePayload) {
@@ -271,6 +286,7 @@ export async function recordBuy(payload: RecordTradePayload) {
       transaction_date: payload.transactionDate,
       notes: payload.notes,
       reference: payload.reference,
+      broker: payload.broker,
     }),
   })
   const data = await res.json()

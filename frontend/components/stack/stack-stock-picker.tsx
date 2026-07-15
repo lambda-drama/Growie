@@ -179,9 +179,9 @@ export function StackStockPicker({
                         />
                         <span className="font-medium">{s.ticker}</span>
                         <span className="ml-2 truncate text-muted-foreground">{s.company_name}</span>
-                        {s.exchange_platform ? (
+                        {s.exchange_platform_name || s.exchange_platform ? (
                           <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
-                            {s.exchange_platform}
+                            {s.exchange_platform_name || s.exchange_platform}
                           </span>
                         ) : null}
                       </CommandItem>
