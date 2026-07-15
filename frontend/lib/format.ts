@@ -166,14 +166,16 @@ export function effectiveAvgBuyNative(holding: {
 
 /** Total position value in the holding's native currency (not KES). */
 export function holdingPositionValueNative(holding: {
+  currentValue?: number
   valueNative?: number
+  value?: number
   valueKES?: number
   quantity?: number
   currentPrice?: number
   avgBuyPrice?: number
   costBasisKES?: number
 }): number {
-  const native = Number(holding.valueNative)
+  const native = Number(holding.currentValue ?? holding.valueNative ?? holding.value)
   if (Number.isFinite(native) && native > 0) return native
   const legacy = Number(holding.valueKES)
   if (Number.isFinite(legacy) && legacy > 0) return legacy

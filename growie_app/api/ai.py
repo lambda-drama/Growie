@@ -444,7 +444,7 @@ def _build_portfolio_context(member_name: str) -> str:
 			"ticker",
 			"quantity",
 			"cost_basis_kes",
-			"value_kes",
+			"current_value",
 			"asset_class",
 			"notes",
 			"currency",
@@ -666,21 +666,23 @@ def analyse_holding(holding_name: str):
 
 	ticker = holding.ticker or holding.asset_name
 	cost   = float(holding.cost_basis_kes or 0)
-	val    = float(holding.value_kes or cost)
+	val    = float(holding.current_value or cost)
 	pnl    = val - cost
 
 	# Try to fetch cached price
 	price_info = ""
 	if ticker:
-		cache = frappe.db.get_value(
-			"Growe Price Cache", ticker,
-			["price_kes", "change_percent", "source"], as_dict=True
-		)
+		from growie_app.api.price import _get_price_cache_row
+
+		cache = _get_price_cache_row(ticker)
 		if cache:
+			from growie_app.api.price import _native_quote_from_cache_row
+
+			px, ccy = _native_quote_from_cache_row(cache)
 			price_info = (
-				f"\nLive Price: KES {float(cache.price_kes or 0):,.2f}"
-				f" | Change: {float(cache.change_percent or 0):.2f}%"
-				f" | Source: {cache.source}"
+				f"\nLive Price: {ccy} {float(px or 0):,.2f}"
+				f" | Change: {float(cache.get('change_percent') or 0):.2f}%"
+				f" | Source: {cache.get('source') or ''}"
 			)
 
 	ctx = (

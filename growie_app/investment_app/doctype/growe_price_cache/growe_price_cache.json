@@ -1,7 +1,7 @@
 {
  "actions": [],
- "autoname": "field:ticker",
- "creation": "2026-04-23 00:00:00",
+ "autoname": "field:stock",
+ "creation": "2026-07-16 00:07:22.551665",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -10,13 +10,15 @@
   "exchange_platform",
   "market",
   "column_break_1",
-  "price_kes",
-  "price_usd",
+  "currency",
+  "price",
   "change_percent",
   "meta_section",
   "source",
   "column_break_qstu",
-  "fetched_at"
+  "fetched_at",
+  "historical_data_section",
+  "growe_historical_price"
  ],
  "fields": [
   {
@@ -25,7 +27,6 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Ticker",
-   "reqd": 1,
    "unique": 1
   },
   {
@@ -49,17 +50,22 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "price_kes",
-   "fieldtype": "Float",
+   "description": "Currency of the live Price field (whatever the provider returned)",
+   "fieldname": "currency",
+   "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Price (KES)",
-   "precision": "4"
+   "label": "Currency",
+   "options": "Currency",
+   "reqd": 1
   },
   {
-   "fieldname": "price_usd",
+   "description": "Live unit price in Currency (provider quote, no forced KES/USD)",
+   "fieldname": "price",
    "fieldtype": "Float",
-   "label": "Price (USD)",
-   "precision": "6"
+   "in_list_view": 1,
+   "label": "Price",
+   "precision": "6",
+   "reqd": 1
   },
   {
    "fieldname": "change_percent",
@@ -89,15 +95,27 @@
    "fieldname": "stock",
    "fieldtype": "Link",
    "label": "Growe Stock",
-   "options": "Growe Stock"
+   "options": "Growe Stock",
+   "unique": 1
   },
   {
    "fieldname": "column_break_qstu",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "historical_data_section",
+   "fieldtype": "Section Break",
+   "label": "Historical Data"
+  },
+  {
+   "fieldname": "growe_historical_price",
+   "fieldtype": "Table",
+   "label": "Growe Historical Price",
+   "options": "Growe Historical Price"
   }
  ],
  "links": [],
- "modified": "2026-04-27 00:07:13.403471",
+ "modified": "2026-07-16 00:25:00.000000",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Price Cache",

@@ -834,7 +834,7 @@ def _insert_holding(
 		"ticker": ticker_symbol,
 		"currency": currency,
 		"quantity": qty,
-		"value_kes": value_kes,
+		"current_value": value_kes,
 		"cost_basis_kes": cost_kes,
 		"date_added": getdate(use_date),
 		"broker": broker[:140] if broker else "",
@@ -904,12 +904,12 @@ def _sum_open_holdings_value_kes(member: str, goal_name: str) -> float:
 	rows = frappe.get_all(
 		"Growe Holding",
 		filters={"investor": member, "goal": goal_name, "sold": 0},
-		fields=["value_kes", "currency"],
+		fields=["current_value", "currency"],
 	)
 	on_date = str(today())
 	total = 0.0
 	for r in rows:
-		native = float(r.get("value_kes") or 0)
+		native = float(r.get("current_value") or 0)
 		if native <= 0:
 			continue
 		ccy = (r.get("currency") or "KES").upper()

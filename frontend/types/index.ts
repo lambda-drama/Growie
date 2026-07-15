@@ -7,6 +7,9 @@ export interface Holding {
   name: string          // display name (company name from Growe Stock)
   stockName?: string    // Growe Stock document name (Link field value)
   assetClass: AssetClass
+  /** Position value in holding.currency (Growe Holding.current_value). */
+  currentValue?: number
+  /** @deprecated Prefer currentValue; still populated as KES-converted for charts. */
   valueKES: number
   costBasisKES: number
   quantity: number
@@ -28,15 +31,22 @@ export interface Holding {
   dateAdded: string
   lastUpdated: string
   notes?: string
+  /** @deprecated Prefer cachePrice + cacheCurrency / currentPrice. */
   currentPriceKES?: number
   changePercent?: number
   avgBuyPrice?: number
+  /** Unit price in holding.currency. */
   currentPrice?: number
-  /** Position value in holding.currency (legacy column value_kes). */
+  /** Provider quote from Growe Price Cache. */
+  cachePrice?: number
+  cacheCurrency?: string
+  /** Position value in holding.currency (same as currentValue). */
   valueNative?: number
+  /** Alias of currentValue for generic consumers. */
+  value?: number
   /** buying_price × quantity in holding.currency. */
   initialInvestmentValue?: number
-  /** Position value converted to KES for totals. */
+  /** Position value converted to KES for portfolio totals. */
   valueInKES?: number
   costAtAvgKES?: number
   gainPercent?: number

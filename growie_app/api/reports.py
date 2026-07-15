@@ -169,7 +169,7 @@ def _fetch_sold_holding_rows(member: str) -> list:
 			"asset_class",
 			"asset_name",
 			"ticker",
-			"value_kes",
+			"current_value",
 			"cost_basis_kes",
 			"quantity",
 			"share_breakdown",
@@ -197,7 +197,7 @@ def _serialize_sold_holding(r) -> dict:
 	unit = flt(r.buying_price) or flt(d.get("avgBuyPrice"))
 	proceeds_kes = flt(d.get("valueInKES"))
 	if proceeds_kes <= 0:
-		val_native = flt(r.value_kes)
+		val_native = flt(r.current_value)
 		if ccy == "KES":
 			proceeds_kes = val_native
 		elif val_native > 0:
@@ -340,7 +340,7 @@ def _exchange_allocation_rows(member: str, ctx: dict) -> str:
 			"name",
 			"asset_class",
 			"asset_name",
-			"value_kes",
+			"current_value",
 			"cost_basis_kes",
 			"quantity",
 			"ticker",
@@ -395,8 +395,8 @@ def _build_dashboard_html(member: str, ctx: dict) -> str:
 	holdings = frappe.get_all(
 		"Growe Holding",
 		filters=open_holding_db_filters(member),
-		fields=["name", "asset_class", "asset_name", "value_kes", "cost_basis_kes", "ticker"],
-		order_by="value_kes desc",
+		fields=["name", "asset_class", "asset_name", "current_value", "cost_basis_kes", "ticker"],
+		order_by="current_value desc",
 		limit=10,
 	)
 	goals = get_goals() or []
@@ -406,7 +406,7 @@ def _build_dashboard_html(member: str, ctx: dict) -> str:
 
 	hold_rows = ""
 	for h in holdings:
-		val = flt(h.value_kes)
+		val = flt(h.current_value)
 		cost = flt(h.cost_basis_kes)
 		gain = val - cost
 		hold_rows += f"""<tr>
@@ -449,7 +449,7 @@ def _build_portfolio_html(member: str, ctx: dict) -> str:
 			"name",
 			"asset_class",
 			"asset_name",
-			"value_kes",
+			"current_value",
 			"cost_basis_kes",
 			"quantity",
 			"ticker",
@@ -457,7 +457,7 @@ def _build_portfolio_html(member: str, ctx: dict) -> str:
 			"date_added",
 			"buying_price",
 		],
-		order_by="value_kes desc",
+		order_by="current_value desc",
 	)
 	summary = get_portfolio_summary()
 	table_rows = ""
@@ -537,13 +537,13 @@ def _build_tax_html(member: str, ctx: dict) -> str:
 	rows = frappe.get_all(
 		"Growe Holding",
 		filters=open_holding_db_filters(member),
-		fields=["asset_name", "ticker", "value_kes", "cost_basis_kes", "asset_class"],
+		fields=["asset_name", "ticker", "current_value", "cost_basis_kes", "asset_class"],
 	)
 	total_gain = 0.0
 	total_loss = 0.0
 	table_rows = ""
 	for r in rows:
-		val = flt(r.value_kes)
+		val = flt(r.current_value)
 		cost = flt(r.cost_basis_kes)
 		gain = val - cost
 		if gain >= 0:

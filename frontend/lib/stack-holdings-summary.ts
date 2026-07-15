@@ -28,7 +28,7 @@ export function holdingInitialInvestmentNative(holding: Holding): number {
 export function holdingCurrentValueNative(holding: Holding): number {
   const fromNative = holdingPositionValueNative(holding)
   if (fromNative > 0) return fromNative
-  return holding.valueNative ?? holding.valueKES ?? 0
+  return holding.currentValue ?? holding.valueNative ?? holding.valueKES ?? 0
 }
 
 /**

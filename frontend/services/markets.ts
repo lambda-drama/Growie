@@ -6,8 +6,12 @@ export interface StockWithPrice {
   companyName: string
   market: string
   sector: string
+  /** Quote currency from Growe Price Cache (provider currency). */
   currency: string
   apiSymbol: string
+  /** Live unit price in `currency`. */
+  price?: number
+  /** Derived helpers for display (converted via KES hub). */
   priceKES: number
   priceUSD: number
   changePercent: number
@@ -20,12 +24,16 @@ export interface StockWithPrice {
 
 export interface PriceCacheRow {
   ticker: string
+  stock?: string
   market: 'Kenya' | 'Global'
-  price_kes: number
-  price_usd: number
+  price: number
+  currency: string
   change_percent: number
   source: string
   fetched_at: string
+  /** @deprecated Legacy columns — may be absent after schema migration. */
+  price_kes?: number
+  price_usd?: number
 }
 
 export interface RefreshResult {

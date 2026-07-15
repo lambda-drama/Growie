@@ -161,7 +161,7 @@ def _load_growe_stock_meta(stock_name: str, ticker: str, asset_class_label: str 
 		"exchange_platform",
 		"sector",
 		"industry",
-		"instrument_type",
+		"us_ticker_number",
 	]
 	stock_name = (stock_name or "").strip()
 	ticker = (ticker or "").strip().upper()
@@ -209,7 +209,21 @@ def previous_calendar_month_end(on_date=None) -> str:
 
 
 def _holding_value_kes(h: dict) -> float:
-	return float(h.get("valueInKES") or h.get("valueKES") or 0)
+	"""Comparable KES value for charts/snapshots (derived — not stored as KES)."""
+	vin = float(h.get("valueInKES") or 0)
+	if vin > 0:
+		return vin
+	vk = float(h.get("valueKES") or 0)
+	# valueKES may already be KES from _holding_to_dict; prefer it when no valueInKES.
+	if vk > 0 and not h.get("currentValue") and not h.get("valueNative"):
+		return vk
+	native = float(h.get("currentValue") or h.get("valueNative") or h.get("value") or 0)
+	if native <= 0:
+		return vk
+	ccy = (h.get("currency") or "USD").upper()
+	if ccy == "KES":
+		return native
+	return float(_to_kes(native, ccy, str(today()), strict=False) or 0)
 
 
 def _holding_cost_kes(h: dict) -> float:
@@ -327,7 +341,7 @@ def record_all_member_portfolio_snapshots():
 				"name",
 				"asset_class",
 				"asset_name",
-				"value_kes",
+				"current_value",
 				"cost_basis_kes",
 				"quantity",
 				"ticker",
@@ -353,19 +367,27 @@ def _holding_to_dict(h) -> dict:
 		display_name = stock.get("company_name") or stock_name
 		ticker = ticker or stock.get("ticker") or ""
 
-	# Latest cached price for this ticker
+	# Latest cached quote (provider currency — convert for display aliases)
+	price_native = None
+	price_currency = None
 	price_kes = None
 	change_percent = None
-	if ticker:
-		cache = frappe.db.get_value(
-			"Growe Price Cache",
+	if ticker or stock_name:
+		from growie_app.api.price import _lookup_price_cache, _native_quote_from_cache_row, _convert_price_amount
+
+		cache = _lookup_price_cache(
 			ticker,
-			["price_kes", "change_percent"],
-			as_dict=True,
+			stock_name=stock_name,
+			us_ticker_number=(stock.get("us_ticker_number") if stock else "") or "",
 		)
 		if cache:
-			price_kes = cache.price_kes
-			change_percent = cache.change_percent
+			price_native, price_currency = _native_quote_from_cache_row(cache)
+			price_kes = _convert_price_amount(price_native, price_currency, "KES") if price_native else 0
+			change_percent = cache.get("change_percent")
+
+	holding_ccy = (h.get("currency") or "USD").upper()
+	current_value = float(h.get("current_value") or 0)
+	value_kes = _to_kes(current_value, holding_ccy, str(h.get("date_added") or today()), strict=False) if current_value else 0.0
 
 	return {
 		"id": h.get("name"),
@@ -376,8 +398,10 @@ def _holding_to_dict(h) -> dict:
 			(h.get("asset_class") or "").strip()
 			or ((stock.get("instrument_type") if stock else "") or "")
 		),
-		"valueKES": float(h.get("value_kes") or 0),
-		"value": float(h.get("value_kes") or 0),  # forward-compatible alias
+		"currentValue": current_value,
+		"valueNative": current_value,
+		"valueKES": float(value_kes or 0),
+		"value": current_value,
 		"costBasisKES": float(h.get("cost_basis_kes") or 0),
 		"costBasis": float(h.get("cost_basis_kes") or 0),  # forward-compatible alias
 		"quantity": float(h.get("quantity") or 0),
@@ -397,9 +421,14 @@ def _holding_to_dict(h) -> dict:
 		"dateAdded": str(h.get("date_added") or today()),
 		"lastUpdated": str(h.get("last_updated") or ""),
 		"notes": h.get("notes") or "",
+		"currentPrice": float(h.get("current_price") or 0),
 		"currentPriceKES": float(price_kes or 0),
+		"cachePrice": float(price_native or 0),
+		"cacheCurrency": price_currency or "",
 		"changePercent": float(change_percent or 0),
-		"currency": h.get("currency") or "USD",
+		"currency": holding_ccy,
+		"initialInvestmentValue": float(h.get("initial_investment_value") or 0),
+		"avgBuyPrice": float(h.get("buying_price") or 0),
 	}
 
 
@@ -586,12 +615,85 @@ def _currency_exchange_db_rate(
 	return 0.0
 
 
+# Currencies Frankfurt (ERPNext Currency Exchange Settings) cannot price.
+# Calling get_exchange_rate with these as base/quote always 404s and spams Error Log.
+_FRANKFURT_UNSUPPORTED = frozenset({"KES", "UGX", "TZS", "RWF", "NGN", "GHS"})
+
+
+def _fx_cache() -> dict:
+	"""Per-request memo for FX lookups (avoids N Frankfurt round-trips during refresh)."""
+	cache = getattr(frappe.local, "_growie_fx_cache", None)
+	if cache is None:
+		cache = {}
+		frappe.local._growie_fx_cache = cache
+	return cache
+
+
+def _erpnext_get_exchange_rate(
+	from_currency: str, to_currency: str, transaction_date=None, args=None
+) -> float:
+	"""
+	Call ERPNext's get_exchange_rate (DB Currency Exchange + Frankfurt).
+
+	- Skips pairs Frankfurt cannot serve (e.g. anything with KES) — those 404 and
+	  fill Error Log with "Unable to fetch exchange rate".
+	- Fails silently (returns 0); never throws / msgprints to the user.
+	- Memoized per request.
+	"""
+	from_currency = (from_currency or "").upper().strip()
+	to_currency = (to_currency or "").upper().strip()
+	if not from_currency or not to_currency:
+		return 0.0
+	if from_currency == to_currency:
+		return 1.0
+
+	# Never hit Frankfurt with unsupported African/local currencies — always 404.
+	if from_currency in _FRANKFURT_UNSUPPORTED or to_currency in _FRANKFURT_UNSUPPORTED:
+		return 0.0
+
+	date_str = str(getdate(transaction_date or today()))
+	cache_key = (from_currency, to_currency, date_str, args or "")
+	cache = _fx_cache()
+	if cache_key in cache:
+		return cache[cache_key]
+
+	try:
+		from erpnext.setup.utils import get_exchange_rate
+	except Exception:
+		cache[cache_key] = 0.0
+		return 0.0
+
+	was_muted = bool(getattr(frappe.flags, "mute_messages", False))
+	frappe.flags.mute_messages = True
+	_orig_log_error = frappe.log_error
+
+	def _silent_log_error(*_a, **_k):
+		return None
+
+	# Prevent ERPNext's get_exchange_rate from writing Error Log on 404.
+	frappe.log_error = _silent_log_error  # type: ignore[assignment]
+	try:
+		rate = flt(get_exchange_rate(from_currency, to_currency, date_str, args))
+		rate = rate if rate and rate > 0 else 0.0
+	except Exception:
+		rate = 0.0
+	finally:
+		frappe.log_error = _orig_log_error  # type: ignore[assignment]
+		frappe.flags.mute_messages = was_muted
+
+	cache[cache_key] = rate
+	return rate
+
+
 def _resolve_rate_to_kes(from_currency: str, on_date: str = None) -> float:
 	"""
 	Return how many KES equal 1 unit of from_currency.
 
-	Tries direct and inverse Currency Exchange rows, multiple date fallbacks, then Growe Settings for USD.
-	Does not call ERPNext's get_exchange_rate API path (which msgprints when Frankfurt fails).
+	Order:
+	  1. Local Currency Exchange rows (direct / inverse) — supports KES
+	  2. For USD: Growe Settings usd_to_kes_rate
+	  3. Bridge via USD: ERPNext/Frankfurt src→USD × Growe USD→KES
+	     (never call Frankfurt with KES)
 	"""
 	src = (from_currency or "KES").upper().strip()
 	if src == "KES":
@@ -602,29 +704,53 @@ def _resolve_rate_to_kes(from_currency: str, on_date: str = None) -> float:
 	if requested != str(today()):
 		dates_to_try.append(str(today()))
 
+	cache = _fx_cache()
+	memo_key = ("to_kes", src, requested)
+	if memo_key in cache:
+		return cache[memo_key]
+
 	for date_str in dates_to_try:
 		for args in (None, "for_buying", "for_selling"):
 			direct = _currency_exchange_db_rate(src, "KES", date_str, args)
 			if direct > 0:
+				cache[memo_key] = direct
 				return direct
 			inverse = _currency_exchange_db_rate("KES", src, date_str, args)
 			if inverse > 0:
-				return 1.0 / inverse
+				rate = 1.0 / inverse
+				cache[memo_key] = rate
+				return rate
 
-	if src == "USD":
-		return _growe_usd_to_kes_fallback()
-
-	# Bridge via USD using DB rows when available (e.g. EUR→USD × USD→KES).
 	usd_kes = _growe_usd_to_kes_fallback()
+	if src == "USD":
+		cache[memo_key] = usd_kes
+		return usd_kes
+
+	# Bridge via USD with Frankfurt (EUR→USD etc.) — never KES there.
 	for date_str in dates_to_try:
 		for args in (None, "for_buying", "for_selling"):
 			to_usd = _currency_exchange_db_rate(src, "USD", date_str, args)
 			if to_usd > 0:
-				return to_usd * usd_kes
+				rate = to_usd * usd_kes
+				cache[memo_key] = rate
+				return rate
 			from_usd = _currency_exchange_db_rate("USD", src, date_str, args)
 			if from_usd > 0:
-				return usd_kes / from_usd
+				rate = usd_kes / from_usd
+				cache[memo_key] = rate
+				return rate
+		erp_to_usd = _erpnext_get_exchange_rate(src, "USD", date_str)
+		if erp_to_usd > 0:
+			rate = erp_to_usd * usd_kes
+			cache[memo_key] = rate
+			return rate
+		erp_from_usd = _erpnext_get_exchange_rate("USD", src, date_str)
+		if erp_from_usd > 0:
+			rate = usd_kes / erp_from_usd
+			cache[memo_key] = rate
+			return rate
 
+	cache[memo_key] = 0.0
 	return 0.0
 
 
@@ -632,7 +758,7 @@ def kes_per_unit_foreign(from_currency: str, on_date: str = None, *, strict: boo
 	"""
 	How many KES equal 1 unit of from_currency.
 
-	strict=False: never throw; use Growe Settings USD rate as last resort (for UI display).
+	strict=False: never throw; if no rate found, return 1.0 (identity) silently.
 	strict=True: throw if no rate (for trades / accounting).
 	"""
 	src = (from_currency or "KES").upper().strip()
@@ -649,13 +775,8 @@ def kes_per_unit_foreign(from_currency: str, on_date: str = None, *, strict: boo
 			.format(src, on_date or today())
 		)
 
-	# Display / read paths: show holdings even when Currency Exchange is empty on this server.
-	frappe.logger("growie.portfolio").warning(
-		"Using USD→KES fallback for %s on %s (no Currency Exchange row)",
-		src,
-		on_date or today(),
-	)
-	return _growe_usd_to_kes_fallback()
+	# Missing rate is OK — fail silently and treat as 1 (caller keeps original units).
+	return 1.0
 
 
 def _to_kes(amount: float, from_currency: str, on_date: str = None, strict: bool = True) -> float:
@@ -850,7 +971,7 @@ def get_holdings():
 			"name",
 			"asset_class",
 			"asset_name",
-			"value_kes",
+			"current_value",
 			"cost_basis_kes",
 			"quantity",
 			"ticker",
@@ -882,7 +1003,7 @@ def get_portfolio_summary():
 			"name",
 			"asset_class",
 			"asset_name",
-			"value_kes",
+			"current_value",
 			"cost_basis_kes",
 			"quantity",
 			"ticker",
@@ -952,33 +1073,33 @@ def add_holding(
 	if not frappe.db.exists("Growe Stock", asset_name):
 		frappe.throw(_(f"Stock '{asset_name}' not found. Please select a valid stock."))
 
-	ticker = frappe.db.get_value("Growe Stock", asset_name, "ticker") or ""
+	stock = frappe.db.get_value(
+		"Growe Stock",
+		asset_name,
+		["ticker", "us_ticker_number"],
+		as_dict=True,
+	) or {}
+	ticker = stock.get("ticker") or ""
+	us_ticker = (stock.get("us_ticker_number") or "").strip()
 	ac_label = _resolve_asset_category_label(asset_class)
 	use_date = date_added or today()
 	qty = float(quantity or 0)
-
-	# Use cached market price to compute current and original values.
-	cache = frappe.db.get_value(
-		"Growe Price Cache",
-		ticker,
-		["price_kes", "price_usd"],
-		as_dict=True,
-	) if ticker else None
-	price_in_currency = 0.0
 	ccy = (currency or "USD").upper()
-	if cache:
-		if ccy == "KES":
-			price_in_currency = float(cache.price_kes or 0)
-		elif ccy == "USD":
-			price_in_currency = float(cache.price_usd or 0)
-		else:
-			kes_px = float(cache.price_kes or 0)
-			if kes_px > 0:
-				kpu = kes_per_unit_foreign(ccy, use_date, strict=False)
-				price_in_currency = kes_px / kpu if kpu > 0 else 0.0
 
-	value_in_currency = qty * price_in_currency
-	value_kes = _to_kes(value_in_currency, ccy, use_date) if value_in_currency else 0
+	# Cache first (ticker / us_ticker / stock link); fetch Kenya via Mansa / Global via providers.
+	from growie_app.api.price import price_in_holding_currency
+
+	# Live quote → holding currency uses today's FX (purchase date is for cost only).
+	price_in_currency = price_in_holding_currency(
+		ticker,
+		ccy,
+		str(today()),
+		stock_name=asset_name,
+		us_ticker_number=us_ticker,
+		fetch_if_missing=True,
+	)
+
+	value_in_currency = qty * price_in_currency if price_in_currency > 0 else 0.0
 
 	doc = frappe.get_doc({
 		"doctype": "Growe Holding",
@@ -986,8 +1107,9 @@ def add_holding(
 		"asset_class": ac_label,
 		"asset_name": asset_name,
 		"ticker": ticker,
-		"value_kes": float(value_kes),
-		"cost_basis_kes": float(value_kes),
+		"us_ticker_number": us_ticker,
+		"current_value": float(value_in_currency),
+		"cost_basis_kes": float(value_in_currency),
 		"quantity": qty,
 		"currency": ccy,
 		"notes": notes or "",
@@ -996,6 +1118,7 @@ def add_holding(
 	})
 	if price_in_currency > 0:
 		doc.buying_price = price_in_currency
+		doc.current_price = price_in_currency
 	doc.flags.ignore_permissions = True
 	doc.insert()
 
@@ -1003,9 +1126,7 @@ def add_holding(
 		from growie_app.investment_app.holding_ledger import create_holding_transaction
 
 		unit = price_in_currency if price_in_currency > 0 else (
-			(value_kes / qty) / kes_per_unit_foreign(ccy, use_date, strict=False)
-			if ccy != "KES" and qty > 0
-			else (value_kes / qty if qty > 0 else 0)
+			(value_in_currency / qty) if qty > 0 else 0
 		)
 		create_holding_transaction(
 			member=member,
@@ -1044,7 +1165,15 @@ def update_holding(
 		if not frappe.db.exists("Growe Stock", asset_name):
 			frappe.throw(_(f"Stock '{asset_name}' not found."))
 		doc.asset_name = asset_name
-		doc.ticker = frappe.db.get_value("Growe Stock", asset_name, "ticker") or ""
+		stock = frappe.db.get_value(
+			"Growe Stock",
+			asset_name,
+			["ticker", "us_ticker_number"],
+			as_dict=True,
+		) or {}
+		doc.ticker = stock.get("ticker") or ""
+		if stock.get("us_ticker_number"):
+			doc.us_ticker_number = stock.us_ticker_number
 
 	if currency is not None:
 		doc.currency = (currency or "USD").upper()
@@ -1055,28 +1184,26 @@ def update_holding(
 	if notes is not None:
 		doc.notes = notes
 
-	# Recompute derived values from current cache and entered quantity.
+	# Recompute from cache, fetching via Kenya/Global providers when cache is empty.
+	from growie_app.api.price import price_in_holding_currency
+
 	ticker = doc.ticker or ""
-	cache = frappe.db.get_value(
-		"Growe Price Cache",
-		ticker,
-		["price_kes", "price_usd"],
-		as_dict=True,
-	) if ticker else None
 	ccy = (doc.currency or "USD").upper()
 	qty = float(doc.quantity or 0)
-	if cache and qty > 0:
-		if ccy == "KES":
-			price_in_currency = float(cache.price_kes or 0)
-		elif ccy == "USD":
-			price_in_currency = float(cache.price_usd or 0)
-		else:
-			kes_px = float(cache.price_kes or 0)
-			kpu = kes_per_unit_foreign(ccy, str(doc.date_added), strict=False)
-			price_in_currency = kes_px / kpu if kpu > 0 else 0.0
+	price_in_currency = price_in_holding_currency(
+		ticker,
+		ccy,
+		str(today()),
+		stock_name=doc.asset_name or "",
+		us_ticker_number=doc.us_ticker_number or "",
+		fetch_if_missing=True,
+	)
+	if price_in_currency > 0 and qty > 0:
 		value_in_currency = qty * price_in_currency
-		doc.value_kes = _to_kes(value_in_currency, ccy, str(doc.date_added))
-		doc.cost_basis_kes = doc.value_kes
+		doc.current_value = value_in_currency
+		doc.current_price = price_in_currency
+		if not flt(doc.cost_basis_kes):
+			doc.cost_basis_kes = value_in_currency
 
 	doc.last_updated = now_datetime()
 	doc.flags.ignore_permissions = True
@@ -1093,10 +1220,20 @@ def get_holding_movement(holding_name: str, period: str = "1y"):
 	if doc.investor != member:
 		frappe.throw(_("You are not authorised to view this holding."), frappe.PermissionError)
 
-	start_value = float(doc.cost_basis_kes or 0)
-	current_value = float(doc.value_kes or 0)
 	start_date = str(doc.date_added or today())
 	end_date = str(today())
+	ccy = (doc.currency or "USD").upper()
+	start_value = float(doc.cost_basis_kes or 0)
+	# Series uses valueKES; convert native current_value when needed.
+	current_native = float(doc.current_value or 0)
+	current_value = (
+		current_native
+		if ccy == "KES"
+		else float(_to_kes(current_native, ccy, end_date, strict=False) or 0)
+	)
+	if ccy != "KES" and start_value and abs(start_value - current_native) < 1e-9:
+		# cost_basis already native after migration — convert for chart consistency
+		start_value = float(_to_kes(start_value, ccy, start_date, strict=False) or 0)
 
 	return {
 		"holdingId": doc.name,

@@ -32,7 +32,7 @@ Finnhub (finnhub.io):
   Response: {"c":261.74,"h","l","o","pc":259.48,"t"} — c=current, pc=previous close
   One HTTP request per symbol; free tier ~60 calls/minute — spaced requests.
   Symbols: Finnhub-native (e.g. AAPL); optional Growe Stock.api_symbol. Quote `c` is USD;
-  Growe Price Cache still stores price_usd and price_kes using your USD/KES setting when syncing.
+  Growe Price Cache stores the quote as price + currency (provider currency); conversions happen on read.
 
 RapidAPI — Nairobi Stock Exchange (NSE only):
   Host: nairobi-stock-exchange-nse.p.rapidapi.com
@@ -364,9 +364,9 @@ def _prices_from_cache_for_tickers(tickers: list) -> dict:
 		tu = (t or "").upper().strip()
 		if not tu:
 			continue
-		cache = frappe.db.get_value("Growe Price Cache", tu, "price_kes")
-		if cache:
-			prices[tu] = float(cache)
+		kes = _price_kes_from_cache(tu)
+		if kes:
+			prices[tu] = kes
 	return prices
 
 
@@ -933,7 +933,15 @@ def _apply_stock_link_to_cache(cache, ticker: str, stock_meta: dict | None = Non
 	meta = (stock_meta or {}).get(ticker_u) if stock_meta else None
 	if not meta:
 		meta = _stock_row_for_ticker(ticker_u)
+	# Repair invalid / legacy stock links (e.g. stock = ticker when name is TICKER-EXCH).
+	if (not meta or not meta.get("name")) and cache.get("stock"):
+		if frappe.db.exists("Growe Stock", cache.stock):
+			return
+		meta = _stock_row_for_ticker(ticker_u or (cache.ticker or ""))
 	if not meta or not meta.get("name"):
+		# Clear invalid link so save does not fail LinkValidationError.
+		if cache.get("stock") and not frappe.db.exists("Growe Stock", cache.stock):
+			cache.stock = None
 		return
 
 	cache.stock = meta["name"]
@@ -975,6 +983,400 @@ def _provider_uses_us_ticker(provider: dict | None) -> bool:
 	return bool(int((provider or {}).get("use_us_ticker") or 0))
 
 
+def _cache_row_usable(row) -> bool:
+	"""True when Growe Price Cache has a usable live price + currency."""
+	if not row:
+		return False
+	# New schema: price + currency
+	if float(row.get("price") or 0) > 0 and (row.get("currency") or "").strip():
+		return True
+	# Legacy fallback during migration
+	return float(row.get("price_kes") or 0) > 0 or float(row.get("price_usd") or 0) > 0
+
+
+_PRICE_CACHE_FIELDS = [
+	"name",
+	"ticker",
+	"stock",
+	"price",
+	"currency",
+	"change_percent",
+	"market",
+	"source",
+	"fetched_at",
+]
+
+
+def _convert_price_amount(amount: float, from_ccy: str, to_ccy: str, on_date: str | None = None) -> float:
+	"""Convert a unit/amount between currencies; missing FX → assume rate 1 (silent)."""
+	from growie_app.api.portfolio import (
+		_currency_exchange_db_rate,
+		_erpnext_get_exchange_rate,
+		_growe_usd_to_kes_fallback,
+		kes_per_unit_foreign,
+	)
+
+	amount = float(amount or 0)
+	if amount <= 0:
+		return 0.0
+	src = (from_ccy or "KES").upper().strip()
+	dst = (to_ccy or "KES").upper().strip()
+	if src == dst:
+		return amount
+	on_date = on_date or str(today())
+
+	# 1) DB Currency Exchange (supports KES pairs when you maintain them)
+	db = _currency_exchange_db_rate(src, dst, on_date)
+	if db > 0:
+		return amount * db
+	db_inv = _currency_exchange_db_rate(dst, src, on_date)
+	if db_inv > 0:
+		return amount / db_inv
+
+	# 2) ERPNext / Frankfurt direct (skipped automatically for KES pairs)
+	direct = _erpnext_get_exchange_rate(src, dst, on_date)
+	if direct > 0:
+		return amount * direct
+	inv = _erpnext_get_exchange_rate(dst, src, on_date)
+	if inv > 0:
+		return amount / inv
+
+	# 3) Bridge via USD for non-KES pairs (e.g. EUR→KES via EURUSD × Growe USD→KES)
+	if src != "USD" and dst != "USD":
+		to_usd = _erpnext_get_exchange_rate(src, "USD", on_date) or _currency_exchange_db_rate(src, "USD", on_date)
+		from_usd = _erpnext_get_exchange_rate("USD", dst, on_date) or _currency_exchange_db_rate("USD", dst, on_date)
+		if to_usd > 0 and from_usd > 0:
+			return amount * to_usd * from_usd
+		# USD→KES via settings when dst is KES
+		if dst == "KES" and to_usd > 0:
+			return amount * to_usd * _growe_usd_to_kes_fallback()
+		if src == "KES" and from_usd > 0:
+			# KES → dst: convert via USD
+			usd_amt = amount / _growe_usd_to_kes_fallback()
+			return usd_amt * from_usd
+
+	if dst == "KES":
+		kpu = kes_per_unit_foreign(src, on_date, strict=False)
+		# kes_per_unit_foreign returns 1.0 when missing — identity
+		return amount * kpu
+	if src == "KES":
+		kpu = kes_per_unit_foreign(dst, on_date, strict=False)
+		return amount / kpu if kpu > 0 else amount
+
+	# Missing FX: fail silently, assume rate 1
+	return amount
+
+
+def _native_quote_from_cache_row(row: dict | None) -> tuple[float, str]:
+	"""Return (price, currency) preferring new fields; fall back to legacy KES/USD columns."""
+	if not row:
+		return 0.0, ""
+	price = float(row.get("price") or 0)
+	ccy = (row.get("currency") or "").upper().strip()
+	if price > 0 and ccy:
+		return price, ccy
+	pusd = float(row.get("price_usd") or 0)
+	pkes = float(row.get("price_kes") or 0)
+	if pusd > 0:
+		return pusd, "USD"
+	if pkes > 0:
+		return pkes, "KES"
+	return 0.0, ""
+
+
+def _price_kes_from_cache(ticker: str = "", stock_name: str = "") -> float:
+	row = _get_price_cache_row(ticker, stock_name=stock_name)
+	price, ccy = _native_quote_from_cache_row(row)
+	if price <= 0:
+		return 0.0
+	return _convert_price_amount(price, ccy, "KES")
+
+
+
+def _get_price_cache_row(ticker: str = "", stock_name: str = "") -> dict | None:
+	"""
+	Load a usable Growe Price Cache row.
+
+	Cache is now named by Growe Stock (autoname=field:stock). Still also match by
+	ticker field for legacy rows / callers that only have a ticker.
+	"""
+	stock_name = (stock_name or "").strip()
+	if stock_name:
+		row = frappe.db.get_value(
+			"Growe Price Cache",
+			{"stock": stock_name},
+			_PRICE_CACHE_FIELDS,
+			as_dict=True,
+		)
+		if _cache_row_usable(row):
+			return row
+		# Doc named by stock
+		if frappe.db.exists("Growe Price Cache", stock_name):
+			row = frappe.db.get_value(
+				"Growe Price Cache", stock_name, _PRICE_CACHE_FIELDS, as_dict=True
+			)
+			if _cache_row_usable(row):
+				return row
+
+	tu = (ticker or "").upper().strip()
+	if not tu:
+		return None
+	row = frappe.db.get_value(
+		"Growe Price Cache",
+		{"ticker": tu},
+		_PRICE_CACHE_FIELDS,
+		as_dict=True,
+	)
+	if _cache_row_usable(row):
+		return row
+	# Legacy: doc name was ticker
+	row = frappe.db.get_value(
+		"Growe Price Cache",
+		tu,
+		_PRICE_CACHE_FIELDS,
+		as_dict=True,
+	)
+	return row if _cache_row_usable(row) else None
+
+
+
+
+def _resolve_stock_for_price(
+	ticker: str = "",
+	stock_name: str = "",
+	us_ticker_number: str = "",
+) -> dict | None:
+	"""Return Growe Stock meta used for price routing + alternate cache lookups."""
+	fields = [
+		"name",
+		"ticker",
+		"exchange_platform",
+		"us_ticker_number",
+		"api_symbol",
+		"currency",
+		"market",
+	]
+	if stock_name and frappe.db.exists("Growe Stock", stock_name):
+		row = frappe.db.get_value("Growe Stock", stock_name, fields, as_dict=True)
+		if row:
+			return row
+
+	tu = (ticker or "").upper().strip()
+	if tu:
+		rows = frappe.get_all(
+			"Growe Stock",
+			filters={"ticker": tu},
+			fields=fields,
+			order_by="is_active desc, modified desc",
+			limit=1,
+		)
+		if rows:
+			return rows[0]
+
+	us = (us_ticker_number or "").strip().upper()
+	if us:
+		rows = frappe.get_all(
+			"Growe Stock",
+			filters={"us_ticker_number": us},
+			fields=fields,
+			order_by="is_active desc, modified desc",
+			limit=1,
+		)
+		if rows:
+			return rows[0]
+		# Some sheets store US ticker in api_symbol as well.
+		rows = frappe.get_all(
+			"Growe Stock",
+			filters={"api_symbol": us},
+			fields=fields,
+			order_by="is_active desc, modified desc",
+			limit=1,
+		)
+		if rows:
+			return rows[0]
+	return None
+
+
+def _lookup_price_cache(
+	ticker: str = "",
+	stock_name: str = "",
+	us_ticker_number: str = "",
+) -> dict | None:
+	"""
+	Find a usable Growe Price Cache row for this instrument.
+
+	Lookup order:
+	  1. Cache keyed by ticker
+	  2. Cache keyed by us_ticker_number / api_symbol
+	  3. Cache linked to Growe Stock (stock = stock_name)
+	  4. Growe Stock matched by us_ticker → that stock's ticker in cache
+	"""
+	stock = _resolve_stock_for_price(ticker, stock_name, us_ticker_number)
+	primary = (ticker or (stock.ticker if stock else "") or "").upper().strip()
+	us = (
+		(us_ticker_number or "").strip().upper()
+		or ((stock.us_ticker_number if stock else "") or "").strip().upper()
+		or ((stock.api_symbol if stock else "") or "").strip().upper()
+	)
+	stock_link = stock_name or (stock.name if stock else "")
+
+	candidates: list[str] = []
+	for key in (primary, us):
+		if key and key not in candidates:
+			candidates.append(key)
+	if stock_link:
+		row = _get_price_cache_row(primary, stock_name=stock_link)
+		if row:
+			return row
+
+	for key in candidates:
+		row = _get_price_cache_row(key)
+		if row:
+			return row
+
+	if us and not stock:
+		alt = _resolve_stock_for_price(us_ticker_number=us)
+		if alt and (alt.ticker or "").upper() != primary:
+			row = _get_price_cache_row(alt.ticker, stock_name=alt.name)
+			if row:
+				return row
+	return None
+
+
+def ensure_live_price_for_ticker(
+	ticker: str = "",
+	stock_name: str = "",
+	us_ticker_number: str = "",
+	*,
+	fetch_if_missing: bool = True,
+) -> dict | None:
+	"""
+	Ensure Growe Price Cache has a live price for this ticker before saving a holding.
+
+	1. Check cache by ticker, us_ticker_number, and Growe Stock link.
+	2. If missing and fetch_if_missing: call active providers —
+	   Kenya/NSE → Mansa (and other NSE providers), Global → Finnhub/Marketstack/etc.
+	3. Returns {ticker, price_kes, price_usd, change_percent, source, fetched} or None.
+	"""
+	stock = _resolve_stock_for_price(ticker, stock_name, us_ticker_number)
+	primary = (ticker or (stock.ticker if stock else "") or "").upper().strip()
+	if not primary and not stock_name and not us_ticker_number:
+		return None
+
+	cached = _lookup_price_cache(primary, stock_name or (stock.name if stock else ""), us_ticker_number)
+	if cached:
+		price, ccy = _native_quote_from_cache_row(cached)
+		price_kes = _convert_price_amount(price, ccy, "KES") if price > 0 else 0.0
+		price_usd = _convert_price_amount(price, ccy, "USD") if price > 0 else 0.0
+		return {
+			"ticker": (cached.get("ticker") or primary).upper(),
+			"price": price,
+			"currency": ccy,
+			"price_kes": price_kes,
+			"price_usd": price_usd,
+			"change_percent": float(cached.get("change_percent") or 0),
+			"source": cached.get("source") or "",
+			"fetched": False,
+		}
+
+	if not fetch_if_missing or not primary:
+		return None
+
+	exchange = (stock.exchange_platform if stock else None) or ""
+	bucket = _price_fetch_bucket(exchange)
+	# Internal fetch paths use "NSE" / "Global"; cache select stores Kenya / Global.
+	market = "NSE" if bucket == "NSE" else "Global"
+
+	sym_map: dict = {}
+	us = (
+		(us_ticker_number or "").strip()
+		or ((stock.us_ticker_number if stock else "") or "").strip()
+		or ((stock.api_symbol if stock else "") or "").strip()
+	)
+	if us:
+		sym_map[primary] = us.upper()
+
+	stock_meta = {
+		primary: {
+			"name": stock.name if stock else "",
+			"exchange_platform": exchange,
+			"us_ticker_number": us,
+			"api_symbol": ((stock.api_symbol if stock else "") or "").strip(),
+		}
+	}
+
+	try:
+		prices = _fetch_and_store(
+			market,
+			[primary],
+			sym_map=sym_map,
+			stock_meta=stock_meta,
+		)
+	except Exception as exc:
+		frappe.logger("growie.price").warning(
+			"ensure_live_price_for_ticker(%s) failed: %s", primary, exc
+		)
+		frappe.log_error(
+			title=f"Ensure live price failed ({primary})",
+			message=frappe.get_traceback(),
+		)
+		return None
+
+	if not prices:
+		frappe.logger("growie.price").info(
+			"ensure_live_price_for_ticker(%s): no quote from %s providers",
+			primary,
+			market,
+		)
+		return None
+
+	row = _get_price_cache_row(primary)
+	if not row:
+		return None
+	price, ccy = _native_quote_from_cache_row(row)
+	return {
+		"ticker": primary,
+		"price": price,
+		"currency": ccy,
+		"price_kes": _convert_price_amount(price, ccy, "KES") if price > 0 else 0.0,
+		"price_usd": _convert_price_amount(price, ccy, "USD") if price > 0 else 0.0,
+		"change_percent": float(row.get("change_percent") or 0),
+		"source": row.get("source") or "",
+		"fetched": True,
+	}
+
+
+def price_in_holding_currency(
+	ticker: str,
+	currency: str,
+	on_date: str = None,
+	*,
+	stock_name: str = "",
+	us_ticker_number: str = "",
+	fetch_if_missing: bool = False,
+) -> float:
+	"""Return unit price in the holding currency, optionally fetching if cache is empty."""
+	cache = ensure_live_price_for_ticker(
+		ticker,
+		stock_name=stock_name,
+		us_ticker_number=us_ticker_number,
+		fetch_if_missing=fetch_if_missing,
+	)
+	if not cache:
+		return 0.0
+	src_price = float(cache.get("price") or 0)
+	src_ccy = (cache.get("currency") or "").upper()
+	if src_price <= 0 or not src_ccy:
+		# Legacy alias keys
+		ccy = (currency or "USD").upper()
+		if ccy == "KES":
+			return float(cache.get("price_kes") or 0)
+		if ccy == "USD":
+			return float(cache.get("price_usd") or 0)
+		return 0.0
+	return _convert_price_amount(src_price, src_ccy, currency or "USD", on_date)
+
+
 def _symbol_map_for_provider(
 	provider: dict | None,
 	base_map: dict | None,
@@ -984,10 +1386,12 @@ def _symbol_map_for_provider(
 	"""
 	Resolve per-ticker API symbols for a provider.
 
-	If use_us_ticker is set: send Growe Stock.us_ticker_number (fallback to normal ticker).
-	Otherwise: keep existing api_symbol overrides from base_map.
+	If use_us_ticker is set (or provider is Marketstack): send Growe Stock
+	us_ticker_number (e.g. ADYEN.AS). Otherwise keep api_symbol overrides from base_map.
 	"""
-	if not _provider_uses_us_ticker(provider):
+	# Marketstack expects Yahoo-style us_ticker_number for non-US listings.
+	force_us = _provider_key(provider or {}) == "marketstack"
+	if not _provider_uses_us_ticker(provider) and not force_us:
 		return dict(base_map or {})
 
 	out: dict = {}
@@ -1024,9 +1428,11 @@ def _backfill_price_cache_stock_links(tickers: list, stock_meta: dict | None = N
 	meta = stock_meta or _stock_meta_for_tickers(tickers)
 	for ticker in tickers:
 		tu = (ticker or "").upper().strip()
-		if not tu or not frappe.db.exists("Growe Price Cache", tu):
+		stock_name = ((meta.get(tu) or {}).get("name") or "").strip()
+		row = _get_price_cache_row(tu, stock_name=stock_name)
+		if not tu or not row:
 			continue
-		cache = frappe.get_doc("Growe Price Cache", tu)
+		cache = frappe.get_doc("Growe Price Cache", row["name"])
 		if cache.stock and cache.get("exchange_platform"):
 			continue
 		before_stock = cache.stock
@@ -1039,6 +1445,112 @@ def _backfill_price_cache_stock_links(tickers: list, stock_meta: dict | None = N
 	return updated
 
 
+def _archive_previous_cache_price(cache) -> None:
+	"""
+	Push the current main price into Growe Historical Price before overwriting.
+
+	One row per calendar date + currency (same-day refresh updates that day's row).
+	"""
+	from frappe.utils import getdate
+
+	arch_price, arch_ccy = _native_quote_from_cache_row(
+		{
+			"price": cache.get("price"),
+			"currency": cache.get("currency"),
+			"price_kes": cache.get("price_kes"),
+			"price_usd": cache.get("price_usd"),
+		}
+	)
+	if arch_price <= 0 or not arch_ccy:
+		return
+
+	as_of = getdate(cache.get("fetched_at") or today())
+	for row in cache.get("growe_historical_price") or []:
+		if getdate(row.date) == as_of and (row.currency or "").upper() == arch_ccy:
+			row.price = round(arch_price, 6)
+			return
+
+	cache.append(
+		"growe_historical_price",
+		{
+			"date": as_of,
+			"currency": arch_ccy,
+			"price": round(arch_price, 6),
+		},
+	)
+
+
+def _load_or_new_price_cache(ticker: str, stock_name: str = "", stock_meta: dict | None = None):
+	"""Get existing Growe Price Cache by stock (preferred) or ticker; else new doc."""
+	ticker = (ticker or "").upper().strip()
+	meta = (stock_meta or {}).get(ticker) if stock_meta else None
+	if not stock_name and meta:
+		stock_name = (meta.get("name") or "").strip()
+	if not stock_name:
+		stock_row = _stock_row_for_ticker(ticker)
+		stock_name = (stock_row.get("name") if stock_row else "") or ""
+
+	# 1) Doc named by stock (current autoname)
+	if stock_name and frappe.db.exists("Growe Price Cache", stock_name):
+		return frappe.get_doc("Growe Price Cache", stock_name)
+
+	# 2) Doc linked by stock field
+	if stock_name:
+		rows = frappe.get_all(
+			"Growe Price Cache",
+			filters={"stock": stock_name},
+			fields=["name"],
+			limit=1,
+		)
+		if rows:
+			return frappe.get_doc("Growe Price Cache", rows[0].name)
+
+	# 3) Legacy: doc named by / linked by ticker
+	if ticker:
+		rows = frappe.get_all(
+			"Growe Price Cache",
+			filters={"ticker": ticker},
+			fields=["name", "stock"],
+			limit=1,
+		)
+		if rows:
+			return frappe.get_doc("Growe Price Cache", rows[0].name)
+		if frappe.db.exists("Growe Price Cache", ticker):
+			return frappe.get_doc("Growe Price Cache", ticker)
+
+	cache = frappe.new_doc("Growe Price Cache")
+	cache.ticker = ticker
+	if stock_name:
+		cache.stock = stock_name
+	return cache
+
+
+def _ensure_cache_named_by_stock(cache, stock_name: str) -> object:
+	"""
+	Price Cache autoname is field:stock. Rename legacy ticker-named rows once stock is known.
+	Returns the (possibly renamed) document.
+	"""
+	stock_name = (stock_name or "").strip()
+	if not stock_name or cache.is_new():
+		if stock_name:
+			cache.stock = stock_name
+		return cache
+
+	cache.stock = stock_name
+	if cache.name == stock_name:
+		return cache
+
+	# Another doc already owns this stock name — keep updating that one and drop duplicate.
+	if frappe.db.exists("Growe Price Cache", stock_name) and cache.name != stock_name:
+		# Prefer keeping historical rows from the target; caller will re-load.
+		return frappe.get_doc("Growe Price Cache", stock_name)
+
+	old_name = cache.name
+	cache.save()  # persist stock before rename
+	frappe.rename_doc("Growe Price Cache", old_name, stock_name, force=True, merge=False)
+	return frappe.get_doc("Growe Price Cache", stock_name)
+
+
 def _upsert_cache(
 	ticker: str,
 	market: str,
@@ -1047,31 +1559,48 @@ def _upsert_cache(
 	source: str,
 	stock_meta: dict | None = None,
 ):
-	"""Insert or overwrite Growe Price Cache — always replace price and change % on refresh."""
+	"""
+	Upsert Growe Price Cache for a ticker/stock.
+
+	Before overwriting the main price fields, archive the previous snapshot into
+	the Growe Historical Price child table (date + currency + price).
+	"""
 	ticker = (ticker or "").upper().strip()
 	if not ticker:
 		return
 
-	price = price_data["price"]
+	price = float(price_data["price"] or 0)
 	currency = (price_data.get("currency") or "KES").upper()
 	change_pct = float(price_data.get("change_percent", 0) or 0)
+	if price <= 0:
+		return
 
-	price_kes = price if currency == "KES" else price * usd_to_kes
-	price_usd = price if currency == "USD" else price / usd_to_kes
+	stock_name = ""
+	meta = (stock_meta or {}).get(ticker) if stock_meta else None
+	if meta:
+		stock_name = (meta.get("name") or "").strip()
+	if not stock_name:
+		stock_row = _stock_row_for_ticker(ticker)
+		stock_name = (stock_row.get("name") if stock_row else "") or ""
 
-	if frappe.db.exists("Growe Price Cache", ticker):
-		cache = frappe.get_doc("Growe Price Cache", ticker)
-	else:
-		cache = frappe.new_doc("Growe Price Cache")
-		cache.ticker = ticker
-
+	cache = _load_or_new_price_cache(ticker, stock_name=stock_name, stock_meta=stock_meta)
 	_apply_stock_link_to_cache(cache, ticker, stock_meta)
+	if stock_name:
+		cache = _ensure_cache_named_by_stock(cache, stock_name)
+
+	# Archive previous live quote before replacing (existing rows only).
+	if not cache.is_new():
+		_archive_previous_cache_price(cache)
 
 	from growie_app.utils.market_labels import canonical_market_value
 
+	# Store the provider quote as-is (flexible currency — no forced KES/USD columns).
+	cache.ticker = ticker
+	if stock_name:
+		cache.stock = stock_name
 	cache.market = canonical_market_value(market)
-	cache.price_kes = round(price_kes, 4)
-	cache.price_usd = round(price_usd, 6)
+	cache.currency = currency
+	cache.price = round(price, 6)
 	cache.change_percent = change_pct
 	cache.source = source
 	cache.fetched_at = now_datetime()
@@ -1084,11 +1613,13 @@ def _upsert_cache(
 
 # ── Holding value updater ─────────────────────────────────────────────────────
 
-def _update_holdings_for_ticker(ticker: str, price_kes: float):
-	from growie_app.api.portfolio import kes_per_unit_foreign
+def _update_holdings_for_ticker(ticker: str, price_kes: float = 0.0):
+	"""
+	Revalue open holdings for a ticker after a price refresh.
 
-	if price_kes <= 0:
-		return
+	`current_price` / `current_value` are always in the holding's own currency.
+	`price_kes` is unused; kept for call-site compatibility.
+	"""
 	holdings = frappe.get_all(
 		"Growe Holding",
 		filters={"ticker": ticker, "sold": 0, "quantity": [">", 0]},
@@ -1096,19 +1627,23 @@ def _update_holdings_for_ticker(ticker: str, price_kes: float):
 	)
 	for h in holdings:
 		doc = frappe.get_doc("Growe Holding", h.name)
-		qty = float(doc.quantity or 0)
+		qty = float(doc.quantity or 0) or float(doc.share_breakdown or 0)
 		if qty <= 0:
 			continue
 		ccy = (doc.currency or "USD").upper()
-		on_date = str(doc.date_added or today())
-		if ccy == "KES":
-			doc.value_kes = round(qty * price_kes, 2)
-		else:
-			kpu = kes_per_unit_foreign(ccy, on_date, strict=False)
-			if kpu > 0:
-				doc.value_kes = round(qty * (price_kes / kpu), 2)
-			else:
-				doc.value_kes = round(qty * price_kes, 2)
+		# Live quotes always convert with today's FX — not purchase date_added.
+		px = price_in_holding_currency(
+			ticker,
+			ccy,
+			str(today()),
+			stock_name=doc.asset_name or "",
+			us_ticker_number=doc.us_ticker_number or "",
+			fetch_if_missing=False,
+		)
+		if px <= 0:
+			continue
+		doc.current_price = px
+		doc.current_value = round(qty * px, 6)
 		doc.last_updated = now_datetime()
 		doc.flags.ignore_permissions = True
 		doc.save()
@@ -1160,21 +1695,20 @@ def _ticker_cache_incomplete(ticker: str) -> bool:
 	row = frappe.db.get_value(
 		"Growe Price Cache",
 		{"ticker": ticker},
-		["price_kes", "price_usd", "change_percent"],
+		["price", "currency", "change_percent"],
 		as_dict=True,
 	)
 	if not row:
 		row = frappe.db.get_value(
 			"Growe Price Cache",
 			{"ticker": (ticker or "").upper()},
-			["price_kes", "price_usd", "change_percent"],
+			["price", "currency", "change_percent"],
 			as_dict=True,
 		)
 	if not row:
 		return True
-	pk = float(row.get("price_kes") or 0)
-	pusd = float(row.get("price_usd") or 0)
-	if not (pk > 0 or pusd > 0):
+	price, ccy = _native_quote_from_cache_row(row)
+	if price <= 0 or not ccy:
 		return True
 	if row.get("change_percent") is None:
 		return True
@@ -1185,9 +1719,8 @@ def _cache_dict_is_complete_quote(cache: dict) -> bool:
 	"""Markets API: include a stock only when cache has price + non-null change %."""
 	if not cache:
 		return False
-	pk = float(cache.get("price_kes") or 0)
-	pusd = float(cache.get("price_usd") or 0)
-	if not (pk > 0 or pusd > 0):
+	price, ccy = _native_quote_from_cache_row(cache)
+	if price <= 0 or not ccy:
 		return False
 	return cache.get("change_percent") is not None
 
@@ -1504,15 +2037,15 @@ def _execute_refresh_prices(
 		)
 		all_prices = {}
 		for t in set(nse_tickers) | set(global_tickers):
-			cache = frappe.db.get_value("Growe Price Cache", t, "price_kes")
-			if cache:
-				all_prices[t] = float(cache)
+			kes = _price_kes_from_cache(t)
+			if kes:
+				all_prices[t] = kes
 		eligible = list(dict.fromkeys((nse_tickers or []) + (global_tickers or [])))
 
 	for t in set(nse_tickers) | set(global_tickers):
-		cache = frappe.db.get_value("Growe Price Cache", t, "price_kes")
-		if cache:
-			_update_holdings_for_ticker(t, float(cache))
+		kes = _price_kes_from_cache(t)
+		if kes:
+			_update_holdings_for_ticker(t, kes)
 
 	_backfill_price_cache_stock_links(all_tickers, stock_meta)
 
@@ -1604,9 +2137,9 @@ def _execute_refresh_stock_prices() -> dict:
 		"Global", global_tickers, gmap, stock_meta=stock_meta
 	)
 	for t in set(nse_tickers) | set(global_tickers):
-		cache = frappe.db.get_value("Growe Price Cache", t, "price_kes")
-		if cache:
-			_update_holdings_for_ticker(t, float(cache))
+		kes = _price_kes_from_cache(t)
+		if kes:
+			_update_holdings_for_ticker(t, kes)
 
 	_backfill_price_cache_stock_links(all_tickers, stock_meta)
 
@@ -1695,7 +2228,7 @@ def get_price_cache():
 	"""Return all cached prices."""
 	return frappe.get_all(
 		"Growe Price Cache",
-		fields=["ticker", "market", "exchange_platform", "price_kes", "price_usd", "change_percent", "source", "fetched_at"],
+		fields=["ticker", "stock", "market", "exchange_platform", "price", "currency", "change_percent", "source", "fetched_at"],
 		order_by="market asc, ticker asc",
 	)
 
@@ -1707,7 +2240,7 @@ def get_market_indices():
 	return frappe.get_all(
 		"Growe Price Cache",
 		filters=[["ticker", "in", index_tickers]],
-		fields=["ticker", "market", "price_kes", "price_usd", "change_percent", "fetched_at"],
+		fields=["ticker", "market", "price", "currency", "change_percent", "fetched_at"],
 	)
 
 
@@ -1835,7 +2368,7 @@ def get_stocks_with_prices(market: str = None, sector: str = None, limit: int = 
 			cache_rows = frappe.get_all(
 				"Growe Price Cache",
 				filters=[["ticker", "in", list(ticker_keys)]],
-				fields=["ticker", "price_kes", "price_usd", "change_percent", "source", "fetched_at"],
+				fields=["ticker", "price", "currency", "change_percent", "source", "fetched_at"],
 			)
 			for r in cache_rows:
 				key = (r.ticker or "").upper()
@@ -1849,16 +2382,20 @@ def get_stocks_with_prices(market: str = None, sector: str = None, limit: int = 
 		cache = price_map.get(tk) or {}
 		if not _cache_dict_is_complete_quote(cache):
 			continue
+		px, cache_ccy = _native_quote_from_cache_row(cache)
+		price_kes = _convert_price_amount(px, cache_ccy, "KES") if px > 0 else 0.0
+		price_usd = _convert_price_amount(px, cache_ccy, "USD") if px > 0 else 0.0
 		result.append({
 			"name":          s.name,
 			"ticker":        s.ticker,
 			"companyName":   s.company_name or s.ticker,
 			"market":        s.market,
 			"sector":        s.sector or "",
-			"currency":      s.currency or "KES",
+			"currency":      cache_ccy or s.currency or "KES",
 			"apiSymbol":     s.api_symbol or "",
-			"priceKES":      float(cache.get("price_kes") or 0),
-			"priceUSD":      float(cache.get("price_usd") or 0),
+			"price":         px,
+			"priceKES":      price_kes,
+			"priceUSD":      price_usd,
 			"changePercent": float(cache.get("change_percent") or 0),
 			"source":        cache.get("source") or "",
 			"fetchedAt":     str(cache.get("fetched_at") or ""),

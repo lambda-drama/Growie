@@ -124,37 +124,39 @@ def _market_tag_for_holding(holding_doc) -> str:
 	return ""
 
 
-def _price_in_currency(ticker: str, currency: str, on_date: str) -> float:
-	cache = (
-		frappe.db.get_value(
-			"Growe Price Cache",
-			ticker,
-			["price_kes", "price_usd"],
-			as_dict=True,
-		)
-		if ticker
-		else None
+def _price_in_currency(
+	ticker: str,
+	currency: str,
+	on_date: str,
+	*,
+	stock_name: str = "",
+	us_ticker_number: str = "",
+	fetch_if_missing: bool = False,
+) -> float:
+	"""Read unit price from cache; optionally fetch when missing (use on save/revalue)."""
+	from growie_app.api.price import price_in_holding_currency
+
+	return price_in_holding_currency(
+		ticker,
+		currency,
+		on_date,
+		stock_name=stock_name,
+		us_ticker_number=us_ticker_number,
+		fetch_if_missing=fetch_if_missing,
 	)
-	if not cache:
-		return 0.0
-	ccy = (currency or "USD").upper()
-	if ccy == "KES":
-		return float(cache.price_kes or 0)
-	if ccy == "USD":
-		return float(cache.price_usd or 0)
-	kes_px = float(cache.price_kes or 0)
-	if kes_px > 0:
-		kpu = kes_per_unit_foreign(ccy, on_date, strict=False)
-		return kes_px / kpu if kpu > 0 else 0.0
-	return 0.0
 
 
 def _stack_holding_row(h) -> dict:
 	row = _holding_to_dict(h)
 	qty = float(row.get("quantity") or 0)
-	# Legacy field names: amounts follow ``holding.currency`` (often USD from Excel import).
-	cost_native = float(row.get("costBasisKES") or 0)
-	value_native = float(row.get("valueKES") or 0)
+	# Amounts follow holding.currency (current_value / cost_basis are native).
+	cost_native = float(row.get("costBasis") or row.get("costBasisKES") or 0)
+	value_native = float(
+		row.get("currentValue")
+		or row.get("valueNative")
+		or row.get("value")
+		or 0
+	)
 	currency = (row.get("currency") or "USD").upper()
 	rate_date = str(today())
 	purchase_date = str(row.get("dateAdded") or today())
@@ -178,7 +180,7 @@ def _stack_holding_row(h) -> dict:
 	if current_native <= 0 and qty > 0 and value_native > 0:
 		current_native = value_native / qty
 
-	# Prefer market value in holding currency (stored value_kes may be KES after price refresh).
+	# Prefer live unit price × qty; fall back to stored current_value (holding currency).
 	if current_native > 0 and qty > 0:
 		value_native = current_native * qty
 	elif value_native <= 0 and qty > 0:
@@ -268,16 +270,24 @@ def _assert_holding_owner(holding_name: str, member: str):
 
 
 def _revalue_holding(doc, on_date: str = None):
-	"""Refresh value_kes from price cache × quantity."""
-	on_date = on_date or str(doc.date_added or today())
+	"""Refresh current_value from price cache × quantity (holding currency)."""
+	# Live mark-to-market uses today's FX; on_date only kept for callers / cost paths.
+	_ = on_date
 	ticker = doc.ticker or ""
 	qty = flt(doc.quantity)
 	ccy = (doc.currency or "USD").upper()
 	if not ticker or qty <= 0:
 		return
-	px = _price_in_currency(ticker, ccy, on_date)
+	px = _price_in_currency(
+		ticker,
+		ccy,
+		str(today()),
+		stock_name=getattr(doc, "asset_name", None) or "",
+		us_ticker_number=getattr(doc, "us_ticker_number", None) or "",
+		fetch_if_missing=True,
+	)
 	if px > 0:
-		doc.value_kes = _to_kes(qty * px, ccy, on_date)
+		doc.current_value = qty * px
 		doc.current_price = px
 	doc.last_updated = now_datetime()
 
@@ -351,9 +361,11 @@ def _execute_refresh_stack_prices(
 	)
 
 	for t in set(nse_tickers) | set(global_tickers):
-		cache = frappe.db.get_value("Growe Price Cache", t, "price_kes")
-		if cache:
-			_update_holdings_for_ticker(t, float(cache))
+		from growie_app.api.price import _price_kes_from_cache
+
+		kes = _price_kes_from_cache(t)
+		if kes:
+			_update_holdings_for_ticker(t, kes)
 
 	_backfill_price_cache_stock_links(
 		list(set(nse_tickers) | set(global_tickers)), stock_meta
@@ -436,7 +448,7 @@ def get_stack_overview():
 			"asset_class",
 			"asset_name",
 			"ticker",
-			"value_kes",
+			"current_value",
 			"cost_basis_kes",
 			"quantity",
 			"currency",
@@ -490,7 +502,7 @@ def get_stack_class(asset_class: str):
 			"asset_class",
 			"asset_name",
 			"ticker",
-			"value_kes",
+			"current_value",
 			"cost_basis_kes",
 			"quantity",
 			"currency",
@@ -545,7 +557,7 @@ def get_stack_position(holding_name: str):
 			"asset_class",
 			"asset_name",
 			"ticker",
-			"value_kes",
+			"current_value",
 			"cost_basis_kes",
 			"quantity",
 			"currency",
@@ -1036,7 +1048,7 @@ def record_buy(
 			holding_name = created["id"]
 			doc = frappe.get_doc("Growe Holding", holding_name)
 		else:
-			cost_kes = _to_kes(qty * unit, ccy, date_str)
+			cost_native = qty * unit
 			ticker = frappe.db.get_value("Growe Stock", asset_name, "ticker") or ""
 			doc = frappe.get_doc(
 				{
@@ -1047,9 +1059,10 @@ def record_buy(
 					"ticker": ticker,
 					"quantity": qty,
 					"currency": ccy,
-					"cost_basis_kes": cost_kes,
-					"value_kes": cost_kes,
+					"cost_basis_kes": cost_native,
+					"current_value": cost_native,
 					"buying_price": unit,
+					"current_price": unit,
 					"date_added": use_date,
 					"notes": notes or "",
 					"last_updated": now_datetime(),
@@ -1143,7 +1156,7 @@ def record_sell(
 		doc.cost_basis_kes = 0
 		doc.sold = 1
 		doc.sold_date = use_date
-		doc.value_kes = 0
+		doc.current_value = 0
 	else:
 		doc.sold = 0
 		doc.sold_date = None
@@ -1208,7 +1221,7 @@ def _recompute_holding_from_transactions(holding_name: str):
 	if qty <= 0:
 		doc.quantity = 0
 		doc.cost_basis_kes = 0
-		doc.value_kes = 0
+		doc.current_value = 0
 		doc.buying_price = 0
 		doc.sold = 1
 		doc.sold_date = last_sell_date or doc.sold_date
