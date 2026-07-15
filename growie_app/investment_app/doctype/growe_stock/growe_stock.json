@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "creation": "2026-04-24 15:40:26.806940",
+ "creation": "2026-07-16 00:25:13.196657",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -9,16 +9,16 @@
   "company_name",
   "market",
   "instrument_type",
-  "region",
   "exchange_platform",
+  "region",
   "verified",
   "by_unsubscribed_member",
   "column_break_enxt",
+  "industry",
   "sector",
   "currency",
   "is_active",
   "country",
-  "industry",
   "preferred_data_provider",
   "source",
   "us_ticker_number",
@@ -65,6 +65,7 @@
    "options": "Growe Asset Category"
   },
   {
+   "fetch_from": "exchange_platform.region",
    "fieldname": "region",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -82,6 +83,7 @@
   },
   {
    "description": "e.g., Energy, Banking, Telecom",
+   "fetch_from": "industry.sector",
    "fieldname": "sector",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -174,7 +176,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-07-15 00:02:12.278287",
+ "modified": "2026-07-16 01:00:34.883832",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Stock",

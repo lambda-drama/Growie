@@ -12,6 +12,7 @@ export interface GroweStock {
   currency: string     // KES | USD
   region?: string
   exchange_platform?: string
+  exchange_platform_name?: string
 }
 
 export interface PortfolioSummary {

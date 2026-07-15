@@ -18,7 +18,10 @@ export interface Holding {
   marketTag?: string
   region?: string
   country?: string
+  /** Growe Exchange Platform link (usually ISO MIC, e.g. XAMS). */
   exchangePlatform?: string
+  /** Human exchange name (e.g. Euronext Amsterdam). Prefer for UI. */
+  exchangePlatformName?: string
   sector?: string
   industry?: string
   /** Growe Stock instrument_type link label (Stock, ETF, Money Market Fund, …). */

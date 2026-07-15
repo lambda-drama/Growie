@@ -208,6 +208,11 @@ def _stack_holding_row(h) -> dict:
 	market = row.get("marketTag") or ""
 	region = row.get("region") or ""
 	exchange_platform = row.get("exchangePlatform") or ""
+	exchange_platform_name = row.get("exchangePlatformName") or ""
+	if exchange_platform and not exchange_platform_name:
+		from growie_app.api.portfolio import _exchange_platform_display_name
+
+		exchange_platform_name = _exchange_platform_display_name(exchange_platform)
 	sector = row.get("sector") or ""
 
 	if currency != "KES" and value_in_kes <= 0 and value_native > 0:
@@ -223,6 +228,7 @@ def _stack_holding_row(h) -> dict:
 			),
 			"region": region,
 			"exchangePlatform": exchange_platform,
+			"exchangePlatformName": exchange_platform_name,
 			"sector": sector,
 			"instrumentType": row.get("instrumentType") or "stock",
 			"broker": (row.get("broker") or "").strip(),
@@ -716,27 +722,43 @@ def get_regions(query: str = "", limit: int = 50):
 
 @frappe.whitelist()
 def get_exchange_platforms(query: str = "", limit: int = 50):
+	"""Return exchange platforms for pickers — prefer human platform_name in the UI."""
+	limit = int(limit or 50)
 	if query:
 		q = f"%{query.strip()}%"
-		return frappe.db.sql(
+		rows = frappe.db.sql(
 			"""
-			SELECT name
+			SELECT name, platform_name, exchange_code
 			FROM `tabGrowe Exchange Platform`
 			WHERE name LIKE %(q)s
-				OR platform_name LIKE %(q)s
-				OR exchange_code LIKE %(q)s
-			ORDER BY name ASC
+				OR IFNULL(platform_name, '') LIKE %(q)s
+				OR IFNULL(exchange_code, '') LIKE %(q)s
+			ORDER BY IFNULL(platform_name, name) ASC
 			LIMIT %(limit)s
 			""",
-			{"q": q, "limit": int(limit)},
+			{"q": q, "limit": limit},
 			as_dict=True,
 		)
-	return frappe.get_all(
-		"Growe Exchange Platform",
-		fields=["name"],
-		order_by="name asc",
-		limit=int(limit),
-	)
+	else:
+		rows = frappe.get_all(
+			"Growe Exchange Platform",
+			fields=["name", "platform_name", "exchange_code"],
+			order_by="platform_name asc",
+			limit=limit,
+		)
+	out = []
+	for r in rows:
+		code = (r.get("name") or "").strip()
+		label = (r.get("platform_name") or "").strip() or code
+		out.append(
+			{
+				"name": code,
+				"platform_name": label,
+				"exchange_code": (r.get("exchange_code") or code or "").strip(),
+				"label": label,
+			}
+		)
+	return out
 
 
 @frappe.whitelist()
@@ -1014,6 +1036,7 @@ def record_buy(
 	transaction_date: str = None,
 	notes: str = None,
 	reference: str = None,
+	broker: str = None,
 ):
 	member = _member_name()
 	qty = flt(quantity)
@@ -1024,11 +1047,14 @@ def record_buy(
 	date_str = str(use_date)
 	ccy = (currency or "USD").upper()
 	unit = flt(unit_price)
+	broker_name = (broker or "").strip()
 	add_to_existing = bool(holding_name)
 
 	if add_to_existing:
 		_assert_holding_owner(holding_name, member)
 		doc = frappe.get_doc("Growe Holding", holding_name)
+		if broker_name and not (doc.broker or "").strip():
+			doc.broker = broker_name[:140]
 	else:
 		if not asset_name:
 			frappe.throw(_("Select a stock or fund for this buy."))
@@ -1047,6 +1073,10 @@ def record_buy(
 			)
 			holding_name = created["id"]
 			doc = frappe.get_doc("Growe Holding", holding_name)
+			if broker_name:
+				doc.broker = broker_name[:140]
+				doc.flags.ignore_permissions = True
+				doc.save()
 		else:
 			cost_native = qty * unit
 			ticker = frappe.db.get_value("Growe Stock", asset_name, "ticker") or ""
@@ -1065,6 +1095,7 @@ def record_buy(
 					"current_price": unit,
 					"date_added": use_date,
 					"notes": notes or "",
+					"broker": broker_name[:140] if broker_name else "",
 					"last_updated": now_datetime(),
 				}
 			)

@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select'
 import { DisplayCurrencyPicker } from '@/components/currency/display-currency-picker'
 import { StackStockPicker } from '@/components/stack/stack-stock-picker'
-import { recordBuy, recordSell, getExchangePlatforms } from '@/services/stack'
+import { recordBuy, recordSell, getExchangePlatforms, type ExchangePlatformOption } from '@/services/stack'
 import { getAssetCategories } from '@/services/portfolio'
 import { categoryToPickerSlug } from '@/lib/asset-categories'
 import { STACK_BUY_BUTTON_CLASS, STACK_SELL_BUTTON_CLASS } from '@/lib/stack-ui'
@@ -45,7 +45,16 @@ interface TradeDialogProps {
 const DEFAULT_CATEGORY = 'Stock'
 const ALL_EXCHANGES = '__all__'
 
-const FALLBACK_EXCHANGES = ['NSE', 'NYSE', 'NASDAQ', 'LSE', 'Euronext', 'JSE', 'HKEX', 'JPX']
+const FALLBACK_EXCHANGES: ExchangePlatformOption[] = [
+  { value: 'NSE', label: 'NSE' },
+  { value: 'NYSE', label: 'NYSE' },
+  { value: 'NASDAQ', label: 'NASDAQ' },
+  { value: 'LSE', label: 'LSE' },
+  { value: 'Euronext', label: 'Euronext' },
+  { value: 'JSE', label: 'JSE' },
+  { value: 'HKEX', label: 'HKEX' },
+  { value: 'JPX', label: 'JPX' },
+]
 
 const FALLBACK_CATEGORIES = [
   { name: 'Stock', label: 'Stock' },
@@ -69,7 +78,7 @@ export function TradeDialog({
   const isNew = mode === 'buy-new'
 
   const [assetCategories, setAssetCategories] = useState(FALLBACK_CATEGORIES)
-  const [exchangePlatforms, setExchangePlatforms] = useState<string[]>(FALLBACK_EXCHANGES)
+  const [exchangePlatforms, setExchangePlatforms] = useState<ExchangePlatformOption[]>(FALLBACK_EXCHANGES)
   const [assetCategory, setAssetCategory] = useState(DEFAULT_CATEGORY)
   const [exchangePlatform, setExchangePlatform] = useState('')
   const [stockName, setStockName] = useState('')
@@ -80,6 +89,7 @@ export function TradeDialog({
   const [tradeDate, setTradeDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [notes, setNotes] = useState('')
   const [reference, setReference] = useState('')
+  const [broker, setBroker] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -135,6 +145,7 @@ export function TradeDialog({
     setTradeDate(format(new Date(), 'yyyy-MM-dd'))
     setNotes('')
     setReference('')
+    setBroker(holding?.broker || '')
   }, [open, holding, defaultAssetClass])
 
   const handleStockSelect = (stock: GroweStock, inferred?: AssetClass) => {
@@ -183,6 +194,7 @@ export function TradeDialog({
           transactionDate: tradeDate,
           notes,
           reference,
+          broker: broker.trim() || undefined,
         })
       }
       onSuccess?.()
@@ -242,9 +254,9 @@ export function TradeDialog({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={ALL_EXCHANGES}>All exchanges</SelectItem>
-                    {exchangePlatforms.map((name) => (
-                      <SelectItem key={name} value={name}>
-                        {name}
+                    {exchangePlatforms.map((ex) => (
+                      <SelectItem key={ex.value} value={ex.value}>
+                        {ex.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -296,6 +308,17 @@ export function TradeDialog({
                 value={currency}
                 onSelect={setCurrency}
                 triggerClassName="w-full justify-between h-10"
+              />
+            </div>
+          )}
+
+          {!isSell && (
+            <div className="grid gap-2">
+              <Label>Broker</Label>
+              <Input
+                value={broker}
+                onChange={(e) => setBroker(e.target.value)}
+                placeholder="e.g. BUX, Scope Markets, AIB"
               />
             </div>
           )}
