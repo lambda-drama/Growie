@@ -69,16 +69,27 @@ function StockRow({ stock }: { stock: StockWithPrice }) {
         </span>
       </div>
 
-      {/* Price */}
+      {/* Price — show provider quote currency flexibly */}
       <div className="w-28 shrink-0 text-right">
         {hasPriceData ? (
           <>
             <p className="text-sm font-semibold">
-              {stock.currency === 'USD'
-                ? `$${stock.priceUSD.toFixed(2)}`
-                : `KSh ${stock.priceKES.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
+              {(() => {
+                const ccy = (stock.currency || 'KES').toUpperCase()
+                const px =
+                  typeof stock.price === 'number' && stock.price > 0
+                    ? stock.price
+                    : ccy === 'USD'
+                      ? stock.priceUSD
+                      : stock.priceKES
+                if (ccy === 'USD') return `$${px.toFixed(2)}`
+                if (ccy === 'KES') {
+                  return `KSh ${px.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                }
+                return `${ccy} ${px.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+              })()}
             </p>
-            {stock.currency === 'USD' && stock.priceKES > 0 && (
+            {(stock.currency || '').toUpperCase() !== 'KES' && stock.priceKES > 0 && (
               <p className="text-xs text-muted-foreground">
                 KSh {stock.priceKES.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </p>

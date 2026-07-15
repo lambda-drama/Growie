@@ -173,18 +173,27 @@ def marketstack_mic(exchange_platform: str | None, market: str = "Global") -> st
 
 
 def _currency_for_row(row: dict, mic: str | None) -> str:
-	ex = (row.get("exchange") or mic or "").upper()
+	# Marketstack v2 includes price_currency on EOD rows (e.g. EUR for ADYEN.AS).
+	pc = (row.get("price_currency") or row.get("currency") or "").upper().strip()
+	if len(pc) == 3 and pc.isalpha():
+		return pc
+	ex = (row.get("exchange") or row.get("exchange_code") or mic or "").upper()
 	if ex in _MIC_CURRENCY:
 		return _MIC_CURRENCY[ex]
 	return "USD"
+
+
+# Yahoo / Marketstack exchange suffixes kept as-is (e.g. ADYEN.AS, VOD.L).
+# Only strip Alpha Vantage Nairobi ``.NR`` — that API wants bare ticker + XNAI.
+_MARKETSTACK_STRIP_SUFFIXES = (".NR",)
 
 
 def _marketstack_api_symbol(ticker: str, symbol_override_map: dict | None) -> str:
 	"""
 	Resolve the symbol sent to Marketstack.
 
-	Uses plain tickers on the exchange MIC. Ignores Alpha Vantage-style ``.NR``
-	suffixes and other vendor-specific api_symbol values.
+	Prefer us_ticker_number / override when provided (e.g. ADYEN.AS). Plain ADYEN
+	is often rejected for non-US listings; the dotted Yahoo form is what works.
 	"""
 	tu = (ticker or "").upper().strip()
 	if not tu:
@@ -195,14 +204,34 @@ def _marketstack_api_symbol(ticker: str, symbol_override_map: dict | None) -> st
 		if ":" in override:
 			override = override.split(":", 1)[1].strip()
 		sym = override.upper()
-		# Alpha Vantage Nairobi suffix — Marketstack wants bare ticker + XNAI MIC.
-		if sym.endswith(".NR"):
-			sym = sym[:-3]
-		# Skip Finnhub-style or other dotted vendor ids unless they look like tickers.
-		if "." in sym and not sym.endswith(".NR"):
-			return tu
+		for suffix in _MARKETSTACK_STRIP_SUFFIXES:
+			if sym.endswith(suffix):
+				sym = sym[: -len(suffix)]
+				break
 		return sym or tu
 	return tu
+
+
+def _map_response_to_internal(response_symbol: str, api_to_internal: dict[str, str]) -> str | None:
+	"""
+	Map Marketstack response symbol back to our ticker.
+
+	Marketstack often returns the base symbol (ADYEN) even when requested as ADYEN.AS.
+	"""
+	sym = (response_symbol or "").upper().strip()
+	if not sym:
+		return None
+	if sym in api_to_internal:
+		return api_to_internal[sym]
+	for req, internal in api_to_internal.items():
+		req_u = (req or "").upper()
+		if not req_u:
+			continue
+		if req_u == sym or req_u.startswith(sym + ".") or sym.startswith(req_u + "."):
+			return internal
+		if req_u.split(".", 1)[0] == sym:
+			return internal
+	return None
 
 
 def _iter_eod_rows(body) -> list[dict]:
@@ -447,9 +476,16 @@ def fetch_marketstack_prices(
 			chunk = api_symbols[i : i + _BATCH_SIZE]
 			try:
 				fetched = _fetch_eod_latest_batch(provider, api_key, chunk, mic)
+				# Some plans reject MIC+symbol pairs; retry without exchange filter.
+				if not fetched and mic:
+					fetched = _fetch_eod_latest_batch(provider, api_key, chunk, None)
 				for api_sym, quote in fetched.items():
-					internal = api_to_internal.get(api_sym) or api_sym
-					results[internal] = quote
+					# Response may be base ticker (ADYEN) while we requested us_ticker (ADYEN.AS).
+					internal = _map_response_to_internal(api_sym, api_to_internal)
+					if not internal and len(chunk) == 1:
+						internal = api_to_internal.get(chunk[0])
+					if internal:
+						results[internal] = quote
 			except Exception as exc:
 				_log_price_fetch_error("Marketstack", ",".join(chunk[:5]), exc)
 			_throttle(provider)
