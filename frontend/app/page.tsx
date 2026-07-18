@@ -50,6 +50,8 @@ function hashTab(): string {
   const raw = window.location.hash.replace('#', '').trim()
   /** Support `#news?insight=GI-….` deep links — tab name is always before `?`. */
   const path = raw.split('?')[0].trim().toLowerCase()
+  /** Portfolio nav is hidden; map leftover `#portfolio` history/bookmarks to My Stack. */
+  if (path === 'portfolio') return 'stack'
   return ALL_TABS.includes(path) ? path : ''
 }
 
