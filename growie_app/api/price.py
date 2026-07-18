@@ -71,7 +71,8 @@ Marketstack (marketstack.com / APILayer):
   Latest EOD: GET /eod/latest?symbols=AAPL,MSFT&exchange=XNAS&access_key={key}
   Response: {"data":[{"symbol":"AAPL","close":…,"exchange":"XNAS",…}]}
   Batch up to 100 symbols per request; optional exchange MIC filter.
-  Uses Growe Stock exchange_platform → MIC (XNYS, XNAS, XAMS, XPAR, XNAI for Nairobi NSE, …).
+  Global only — Kenya/NSE tickers are never sent (use RapidAPI/Mansa/etc.).
+  Uses Growe Stock exchange_platform → MIC (XNYS, XNAS, XAMS, XPAR, …).
 
 Dispatch is determined by the "api_provider" Select field on the Growe Price API record.
 """
@@ -273,7 +274,7 @@ _PROVIDER_MARKETS: dict[str, frozenset] = {
 	"mansa markets": frozenset({"NSE"}),
 	"fcs api": frozenset({"NSE", "GLOBAL"}),
 	"twelve data": frozenset({"NSE", "GLOBAL"}),
-	"marketstack": frozenset({"NSE", "GLOBAL"}),
+	"marketstack": frozenset({"GLOBAL"}),
 	"finnhub": frozenset({"GLOBAL"}),
 	"eoddata": frozenset({"GLOBAL"}),
 	"goldman sachs": frozenset({"GLOBAL"}),

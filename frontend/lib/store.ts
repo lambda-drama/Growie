@@ -115,7 +115,8 @@ export const useAppStore = create<AppState>((set) => ({
   // UI
   activeTab: 'landing',
   setActiveTab: (tab) => {
-    const t = tab.trim().toLowerCase()
+    /** Portfolio is retired from nav — keep the view for later, route users to My Stack. */
+    const t = tab.trim().toLowerCase() === 'portfolio' ? 'stack' : tab.trim().toLowerCase()
     set({ activeTab: t })
     if (typeof window === 'undefined') return
 
@@ -130,6 +131,13 @@ export const useAppStore = create<AppState>((set) => ({
     }
     /** Already sitting on this tab with no nested route — skip redundant `#tab` rewrite. */
     if (curPath === t && !hasQuery) {
+      return
+    }
+
+    /** Replace `#portfolio` in history so swipe-back never resurfaces the hidden page. */
+    if (curPath === 'portfolio' || tab.trim().toLowerCase() === 'portfolio') {
+      const url = `${window.location.pathname}${window.location.search}#${t}`
+      window.history.replaceState(window.history.state, '', url)
       return
     }
 

@@ -13,7 +13,7 @@ Configure Growe Price API:
 Auth: access_key query param on every request.
 
 Sends Growe Exchange Platform ISO Mic as ``exchange`` on every request.
-Nairobi NSE (Kenya) maps to MIC XNAI — not the Indian NSE (XNSE).
+Global / non-Kenya only — Nairobi (XNAI) tickers are skipped here.
 """
 
 from __future__ import annotations
@@ -408,10 +408,17 @@ def _group_by_mic(
 	exchange_by_ticker: dict[str, str],
 	market: str,
 ) -> dict[str | None, list[str]]:
-	"""Group internal tickers by Marketstack MIC (None = no exchange filter)."""
+	"""Group internal tickers by Marketstack MIC (None = no exchange filter).
+
+	Kenya/Nairobi (NSE / XNAI) is never included — Marketstack is Global-only.
+	"""
 	from growie_app.api.price import _is_nse_exchange, _normalize_market_label
 
 	market_norm = _normalize_market_label(market)
+	# Marketstack must not quote Kenya stocks (wrong currency / wrong listing).
+	if market_norm == "NSE":
+		return {}
+
 	groups: dict[str | None, list[str]] = {}
 
 	for symbol in symbols:
@@ -419,10 +426,7 @@ def _group_by_mic(
 		if not tu:
 			continue
 		ex_platform = exchange_by_ticker.get(tu)
-		is_kenya = _is_nse_exchange(ex_platform)
-		if market_norm == "NSE" and not is_kenya:
-			continue
-		if market_norm == "GLOBAL" and is_kenya:
+		if _is_nse_exchange(ex_platform):
 			continue
 		mic = marketstack_mic(ex_platform, market)
 		groups.setdefault(mic, []).append(tu)

@@ -131,6 +131,8 @@
    "fieldtype": "Column Break"
   },
   {
+   "default": "\n",
+   "fetch_from": "exchange_platform.country",
    "fieldname": "country",
    "fieldtype": "Link",
    "label": "Country",
@@ -176,7 +178,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-07-16 01:00:34.883832",
+ "modified": "2026-07-18 23:03:19.289157",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Stock",

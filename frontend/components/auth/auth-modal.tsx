@@ -189,7 +189,7 @@ export function AuthModal() {
     const result = await login(loginForm.email, loginForm.password)
     if (result.success) {
       handleClose()
-      setActiveTab('portfolio')
+      setActiveTab('dashboard')
     } else {
       setServerError(result.message)
     }
@@ -211,7 +211,7 @@ export function AuthModal() {
 
     if (result.success) {
       handleClose()
-      setActiveTab('portfolio')
+      setActiveTab('dashboard')
     } else {
       setServerError(result.message)
     }

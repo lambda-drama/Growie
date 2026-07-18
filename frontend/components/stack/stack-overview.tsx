@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronRight, Plus, RefreshCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -39,6 +39,20 @@ interface StackOverviewProps {
   onOpenClass?: (summary: import('@/services/stack').StackClassSummary) => void
 }
 
+type StackOverviewDrill = {
+  bucket: string | null
+  country: string | null
+  group: string | null
+}
+
+const EMPTY_STACK_DRILL: StackOverviewDrill = { bucket: null, country: null, group: null }
+
+function readStackDrillFromHistory(): StackOverviewDrill | null {
+  if (typeof window === 'undefined') return null
+  const state = window.history.state as { groweStackDrill?: StackOverviewDrill } | null
+  return state?.groweStackDrill ?? null
+}
+
 export function StackOverview({ onOpenClass: _onOpenClass }: StackOverviewProps) {
   const { user } = useAuth()
   const { classes, isLoading: stackLoading, refresh, reload: reloadStack } = useStackOverview()
@@ -53,15 +67,77 @@ export function StackOverview({ onOpenClass: _onOpenClass }: StackOverviewProps)
   const [selectedOverviewBucket, setSelectedOverviewBucket] = useState<string | null>(null)
   const [selectedOverviewCountry, setSelectedOverviewCountry] = useState<string | null>(null)
   const [selectedOverviewGroupKey, setSelectedOverviewGroupKey] = useState<string | null>(null)
+  /** How many stack drill history entries this screen pushed (for reset / grouping change). */
+  const drillDepthRef = useRef(0)
+  const skippingPopRef = useRef(false)
+
+  const applyDrill = useCallback((drill: StackOverviewDrill) => {
+    setSelectedOverviewBucket(drill.bucket)
+    setSelectedOverviewCountry(drill.country)
+    setSelectedOverviewGroupKey(drill.group)
+  }, [])
+
+  const pushDrill = useCallback(
+    (drill: StackOverviewDrill) => {
+      applyDrill(drill)
+      if (typeof window === 'undefined') return
+      drillDepthRef.current += 1
+      window.history.pushState(
+        { ...(window.history.state || {}), groweStackDrill: drill },
+        '',
+        `${window.location.pathname}${window.location.search}#stack`
+      )
+    },
+    [applyDrill]
+  )
+
+  /** In-app back: step browser history so swipe-back and the Back button stay aligned. */
+  const popDrill = useCallback(() => {
+    if (typeof window === 'undefined') return
+    if (drillDepthRef.current > 0 || readStackDrillFromHistory()) {
+      window.history.back()
+      return
+    }
+    applyDrill(EMPTY_STACK_DRILL)
+  }, [applyDrill])
+
+  const resetDrill = useCallback(() => {
+    applyDrill(EMPTY_STACK_DRILL)
+    const depth = drillDepthRef.current
+    if (typeof window === 'undefined' || depth <= 0) {
+      drillDepthRef.current = 0
+      return
+    }
+    skippingPopRef.current = true
+    drillDepthRef.current = 0
+    window.history.go(-depth)
+    // history.go is async; clear the skip flag after pops settle
+    window.setTimeout(() => {
+      skippingPopRef.current = false
+    }, 0)
+  }, [applyDrill])
+
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => {
+      if (skippingPopRef.current) return
+      const drill = (e.state as { groweStackDrill?: StackOverviewDrill } | null)?.groweStackDrill
+      if (drillDepthRef.current > 0) drillDepthRef.current -= 1
+      applyDrill(drill ?? EMPTY_STACK_DRILL)
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [applyDrill])
 
   useEffect(() => {
     if (!stackDrilldown) return
     setStackGroupingMode(stackDrilldown.groupingMode)
-    setSelectedOverviewBucket(stackDrilldown.bucket)
-    setSelectedOverviewCountry(null)
-    setSelectedOverviewGroupKey(null)
+    pushDrill({
+      bucket: stackDrilldown.bucket,
+      country: null,
+      group: null,
+    })
     setStackDrilldown(null)
-  }, [stackDrilldown, setStackDrilldown, setStackGroupingMode])
+  }, [stackDrilldown, setStackDrilldown, setStackGroupingMode, pushDrill])
 
   const openTrade = (mode: TradeMode, holding?: StackHolding) => {
     setTradeMode(mode)
@@ -252,9 +328,7 @@ export function StackOverview({ onOpenClass: _onOpenClass }: StackOverviewProps)
                 variant={stackGroupingMode === mode ? 'default' : 'outline'}
                 onClick={() => {
                   setStackGroupingMode(mode)
-                  setSelectedOverviewBucket(null)
-                  setSelectedOverviewCountry(null)
-                  setSelectedOverviewGroupKey(null)
+                  resetDrill()
                 }}
               >
                 {label}
@@ -268,9 +342,7 @@ export function StackOverview({ onOpenClass: _onOpenClass }: StackOverviewProps)
                 className="text-muted-foreground"
                 onClick={() => {
                   setStackGroupingMode(mode)
-                  setSelectedOverviewBucket(null)
-                  setSelectedOverviewCountry(null)
-                  setSelectedOverviewGroupKey(null)
+                  resetDrill()
                 }}
               >
                 {label}
@@ -285,7 +357,7 @@ export function StackOverview({ onOpenClass: _onOpenClass }: StackOverviewProps)
               kesToDisplayMultiplier={kesToDisplayMultiplier}
               onOpenCategory={(category) => {
                 setStackGroupingMode('assetCategory')
-                setSelectedOverviewBucket(category)
+                pushDrill({ bucket: category, country: null, group: null })
               }}
             />
           ) : (
@@ -303,9 +375,7 @@ export function StackOverview({ onOpenClass: _onOpenClass }: StackOverviewProps)
                         type="button"
                         className="flex w-full items-center gap-3 px-3 py-3.5 text-left transition-colors hover:bg-muted/50 sm:gap-4 sm:px-4 sm:py-4"
                         onClick={() => {
-                          setSelectedOverviewBucket(row.label)
-                          setSelectedOverviewCountry(null)
-                          setSelectedOverviewGroupKey(null)
+                          pushDrill({ bucket: row.label, country: null, group: null })
                         }}
                       >
                       <StackBucketIcon
@@ -349,11 +419,7 @@ export function StackOverview({ onOpenClass: _onOpenClass }: StackOverviewProps)
                     variant="ghost"
                     size="sm"
                     className="px-1"
-                    onClick={() => {
-                      setSelectedOverviewBucket(null)
-                      setSelectedOverviewCountry(null)
-                      setSelectedOverviewGroupKey(null)
-                    }}
+                    onClick={popDrill}
                   >
                     Back to {groupingListTitle(stackGroupingMode)}
                   </Button>
@@ -371,24 +437,28 @@ export function StackOverview({ onOpenClass: _onOpenClass }: StackOverviewProps)
                       onSell={(h) => openTrade('sell', h)}
                       groupingMode={stackGroupingMode}
                       selectedBucketKey={selectedOverviewBucket}
-                      onSelectBucket={setSelectedOverviewBucket}
-                      onBackToBuckets={() => {
-                        setSelectedOverviewBucket(null)
-                        setSelectedOverviewCountry(null)
-                        setSelectedOverviewGroupKey(null)
-                      }}
+                      onSelectBucket={(bucket) =>
+                        pushDrill({ bucket, country: null, group: null })
+                      }
+                      onBackToBuckets={popDrill}
                       selectedCountryKey={selectedOverviewCountry}
-                      onSelectCountry={(country) => {
-                        setSelectedOverviewCountry(country)
-                        setSelectedOverviewGroupKey(null)
-                      }}
-                      onBackToCountries={() => {
-                        setSelectedOverviewCountry(null)
-                        setSelectedOverviewGroupKey(null)
-                      }}
+                      onSelectCountry={(country) =>
+                        pushDrill({
+                          bucket: selectedOverviewBucket,
+                          country,
+                          group: null,
+                        })
+                      }
+                      onBackToCountries={popDrill}
                       selectedGroupKey={selectedOverviewGroupKey}
-                      onSelectGroup={setSelectedOverviewGroupKey}
-                      onBackToGroups={() => setSelectedOverviewGroupKey(null)}
+                      onSelectGroup={(group) =>
+                        pushDrill({
+                          bucket: selectedOverviewBucket,
+                          country: selectedOverviewCountry,
+                          group,
+                        })
+                      }
+                      onBackToGroups={popDrill}
                     />
                   </div>
                   <StackClassHoldingsTable
@@ -401,24 +471,28 @@ export function StackOverview({ onOpenClass: _onOpenClass }: StackOverviewProps)
                     onSell={(h) => openTrade('sell', h)}
                     groupingMode={stackGroupingMode}
                     selectedBucketKey={selectedOverviewBucket}
-                    onSelectBucket={setSelectedOverviewBucket}
-                    onBackToBuckets={() => {
-                      setSelectedOverviewBucket(null)
-                      setSelectedOverviewCountry(null)
-                      setSelectedOverviewGroupKey(null)
-                    }}
+                    onSelectBucket={(bucket) =>
+                      pushDrill({ bucket, country: null, group: null })
+                    }
+                    onBackToBuckets={popDrill}
                     selectedCountryKey={selectedOverviewCountry}
-                    onSelectCountry={(country) => {
-                      setSelectedOverviewCountry(country)
-                      setSelectedOverviewGroupKey(null)
-                    }}
-                    onBackToCountries={() => {
-                      setSelectedOverviewCountry(null)
-                      setSelectedOverviewGroupKey(null)
-                    }}
+                    onSelectCountry={(country) =>
+                      pushDrill({
+                        bucket: selectedOverviewBucket,
+                        country,
+                        group: null,
+                      })
+                    }
+                    onBackToCountries={popDrill}
                     selectedGroupKey={selectedOverviewGroupKey}
-                    onSelectGroup={setSelectedOverviewGroupKey}
-                    onBackToGroups={() => setSelectedOverviewGroupKey(null)}
+                    onSelectGroup={(group) =>
+                      pushDrill({
+                        bucket: selectedOverviewBucket,
+                        country: selectedOverviewCountry,
+                        group,
+                      })
+                    }
+                    onBackToGroups={popDrill}
                   />
                 </div>
               )}
