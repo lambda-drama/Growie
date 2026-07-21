@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDateRelative } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { MARKET_GLOBAL, MARKET_KENYA, marketToFilterId, marketUiLabel } from '@/lib/market-labels'
 import { getStockPicks, type StockPickRaw } from '@/services/markets'
 import { getLearningBites, markBiteRead } from '@/services/insights'
 
@@ -97,16 +98,11 @@ export function NewsView() {
     load()
   }, [])
 
-  const filteredPicks = useMemo(
-    () =>
-      activeCategory === 'all'
-        ? picks
-        : picks.filter((p) => {
-            const m = (p.market ?? '').toLowerCase()
-            return activeCategory === 'kenya' ? m === 'nse' : m !== 'nse'
-          }),
-    [picks, activeCategory]
-  )
+  const filteredPicks = useMemo(() => {
+    if (activeCategory === 'all') return picks
+    const wanted = activeCategory === 'kenya' ? MARKET_KENYA : MARKET_GLOBAL
+    return picks.filter((p) => marketToFilterId(p.market) === wanted)
+  }, [picks, activeCategory])
 
   const focusedPick = useMemo(
     () =>
@@ -171,7 +167,9 @@ export function NewsView() {
                 {focusedPick.ticker}
               </span>
             )}
-            <span className="rounded bg-muted px-2 py-0.5 font-medium uppercase">{focusedPick.market}</span>
+            <span className="rounded bg-muted px-2 py-0.5 font-medium uppercase">
+              {marketUiLabel(focusedPick.market)}
+            </span>
             <span className={cn('rounded-full px-2 py-0.5 font-medium capitalize', sentiment.className)}>
               {sentiment.label}
             </span>
@@ -287,7 +285,9 @@ export function NewsView() {
                     {pick.ticker ? (
                       <span className="rounded bg-secondary/15 px-1.5 py-0.5 font-bold text-secondary normal-case">{pick.ticker}</span>
                     ) : null}
-                    <span className="rounded bg-muted px-1.5 py-0.5 font-semibold">{pick.market}</span>
+                    <span className="rounded bg-muted px-1.5 py-0.5 font-semibold">
+                      {marketUiLabel(pick.market)}
+                    </span>
                     <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold tracking-tight normal-case', sentiment.className)}>
                       {sentiment.label}
                     </span>

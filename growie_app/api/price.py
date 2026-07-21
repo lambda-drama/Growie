@@ -6,6 +6,7 @@ Mansa Markets (mansaapi.com):
   Auth: Authorization: Bearer {mansa_live_sk_…}
   Bulk:   GET /markets/exchanges/NSE/stocks
   Single: GET /markets/exchanges/NSE/stocks/{ticker}
+  History: GET /markets/exchanges/NSE/stocks/{ticker}/history?from=&to=
   Forex:  GET /markets/forex  (USD/KES pair)
   Response: {"success":true,"data":[{"ticker":"SCOM","price":33.45,"change_pct":1.52},…]}
 
@@ -69,10 +70,16 @@ Marketstack (marketstack.com / APILayer):
   Base: https://api.marketstack.com/v2
   Auth: ?access_key={key}
   Latest EOD: GET /eod/latest?symbols=AAPL,MSFT&exchange=XNAS&access_key={key}
+  Historical: GET /eod?symbols=AAPL&date_from=YYYY-MM-DD&date_to=YYYY-MM-DD&access_key={key}
   Response: {"data":[{"symbol":"AAPL","close":…,"exchange":"XNAS",…}]}
   Batch up to 100 symbols per request; optional exchange MIC filter.
   Global only — Kenya/NSE tickers are never sent (use RapidAPI/Mansa/etc.).
   Uses Growe Stock exchange_platform → MIC (XNYS, XNAS, XAMS, XPAR, …).
+
+Mansa Markets historical:
+  GET /markets/exchanges/NSE/stocks/{ticker}/history?from=YYYY-MM-DD&to=YYYY-MM-DD
+  Daily OHLCV; stored sparsely into Growe Price Cache → Growe Historical Price
+  using Growe Settings.monthly_interval_historical (dates per month).
 
 Dispatch is determined by the "api_provider" Select field on the Growe Price API record.
 """
@@ -2776,6 +2783,527 @@ def refresh_stock_prices(sync: int = 0):
 			"Price refresh started in the background. Updated prices will appear shortly."
 		),
 	}
+
+
+# ── Historical prices (Marketstack / Mansa → Growe Price Cache child table) ───
+
+def _monthly_interval_historical() -> int:
+	"""Dates to keep per calendar month from Growe Settings (default 2 = first + last)."""
+	try:
+		raw = frappe.db.get_single_value("Growe Settings", "monthly_interval_historical")
+	except Exception:
+		raw = None
+	try:
+		n = int(raw or 2)
+	except (TypeError, ValueError):
+		n = 2
+	return max(1, min(n, 8))
+
+
+def _sample_dates_in_month(year: int, month: int, interval: int, through=None) -> list:
+	"""Return ``interval`` calendar dates within a month (first/last when interval=2)."""
+	from calendar import monthrange
+	from frappe.utils import getdate
+
+	last_day = monthrange(year, month)[1]
+	interval = max(1, int(interval or 1))
+	if interval <= 1:
+		days = [last_day]
+	else:
+		days = []
+		for i in range(interval):
+			day = 1 + round(i * (last_day - 1) / (interval - 1))
+			days.append(int(day))
+		days = sorted(set(days))
+
+	out = []
+	cap = getdate(through) if through else None
+	for day in days:
+		d = getdate(f"{year:04d}-{month:02d}-{day:02d}")
+		if cap and d > cap:
+			continue
+		out.append(d)
+	return out
+
+
+def _sample_target_dates(date_from, date_to, interval: int) -> list:
+	"""All sample dates from earliest month through date_to."""
+	from frappe.utils import getdate
+
+	start = getdate(date_from)
+	end = getdate(date_to)
+	if not start or not end or start > end:
+		return []
+
+	targets = []
+	y, m = start.year, start.month
+	while (y < end.year) or (y == end.year and m <= end.month):
+		month_start = getdate(f"{y:04d}-{m:02d}-01")
+		# Skip samples before the holding start within the first month.
+		for d in _sample_dates_in_month(y, m, interval, through=end):
+			if d >= start:
+				targets.append(d)
+		if month_start > end:
+			break
+		m += 1
+		if m > 12:
+			m = 1
+			y += 1
+	return targets
+
+
+def _earliest_holding_dates_by_ticker(tickers: list | None = None) -> dict[str, object]:
+	"""Earliest open holding date_added per ticker (system-wide, for cache backfill)."""
+	from frappe.utils import getdate
+
+	filters = {"sold": 0, "quantity": [">", 0]}
+	rows = frappe.get_all(
+		"Growe Holding",
+		filters=filters,
+		fields=["ticker", "asset_class", "asset_name", "date_added"],
+	)
+	wanted = None
+	if tickers:
+		wanted = {(t or "").upper().strip() for t in tickers if (t or "").strip()}
+
+	out: dict[str, object] = {}
+	for r in rows:
+		if not _holding_is_stock_or_etf(r.get("asset_class"), r.get("asset_name")):
+			continue
+		t = (r.ticker or "").upper().strip()
+		if not t:
+			continue
+		if wanted is not None and t not in wanted:
+			continue
+		d = getdate(r.date_added) if r.date_added else None
+		if not d:
+			continue
+		prev = out.get(t)
+		if prev is None or d < prev:
+			out[t] = d
+	return out
+
+
+def _closest_on_or_before(rows: list[dict], target) -> dict | None:
+	"""Pick the latest EOD row on or before ``target``."""
+	from frappe.utils import getdate
+
+	target = getdate(target)
+	best = None
+	for row in rows:
+		d = getdate(row.get("date"))
+		if not d or d > target:
+			continue
+		if best is None or d > getdate(best["date"]):
+			best = row
+	return best
+
+
+def _subsample_historical_rows(daily_rows: list[dict], targets: list) -> list[dict]:
+	"""Keep one price per target sample date (nearest prior trading day)."""
+	from frappe.utils import getdate
+
+	if not daily_rows or not targets:
+		return []
+	sorted_rows = sorted(daily_rows, key=lambda r: getdate(r["date"]))
+	picked: list[dict] = []
+	seen = set()
+	for target in targets:
+		row = _closest_on_or_before(sorted_rows, target)
+		if not row:
+			continue
+		key = (getdate(row["date"]), (row.get("currency") or "").upper())
+		if key in seen:
+			continue
+		seen.add(key)
+		picked.append(
+			{
+				"date": getdate(row["date"]),
+				"price": float(row["price"]),
+				"currency": (row.get("currency") or "KES").upper(),
+			}
+		)
+	return picked
+
+
+def _merge_historical_into_cache(ticker: str, rows: list[dict], source: str, stock_meta: dict | None = None) -> int:
+	"""Upsert historical unit prices into Growe Price Cache child table. Returns rows written."""
+	from frappe.utils import getdate
+
+	ticker = (ticker or "").upper().strip()
+	if not ticker or not rows:
+		return 0
+
+	stock_name = ""
+	meta = (stock_meta or {}).get(ticker) if stock_meta else None
+	if meta:
+		stock_name = (meta.get("name") or "").strip()
+	if not stock_name:
+		stock_row = _stock_row_for_ticker(ticker)
+		stock_name = (stock_row.get("name") if stock_row else "") or ""
+
+	cache = _load_or_new_price_cache(ticker, stock_name=stock_name, stock_meta=stock_meta)
+	_apply_stock_link_to_cache(cache, ticker, stock_meta)
+	if stock_name:
+		cache = _ensure_cache_named_by_stock(cache, stock_name)
+
+	existing = {}
+	for child in cache.get("growe_historical_price") or []:
+		existing[(getdate(child.date), (child.currency or "").upper())] = child
+
+	written = 0
+	for row in rows:
+		as_of = getdate(row["date"])
+		ccy = (row.get("currency") or "KES").upper()
+		price = float(row.get("price") or 0)
+		if price <= 0 or not ccy:
+			continue
+		key = (as_of, ccy)
+		if key in existing:
+			if float(existing[key].price or 0) != round(price, 6):
+				existing[key].price = round(price, 6)
+				written += 1
+			continue
+		cache.append(
+			"growe_historical_price",
+			{"date": as_of, "currency": ccy, "price": round(price, 6)},
+		)
+		written += 1
+
+	if cache.is_new() and not (cache.get("price") or 0):
+		# New cache docs require a live price — seed from the latest historical row.
+		latest = max(rows, key=lambda r: getdate(r["date"]))
+		cache.ticker = ticker
+		if stock_name:
+			cache.stock = stock_name
+		from growie_app.utils.market_labels import canonical_market_value
+
+		bucket = _price_fetch_bucket((meta or {}).get("exchange_platform") if meta else None)
+		cache.market = canonical_market_value("Kenya" if bucket == "NSE" else "Global")
+		cache.currency = (latest.get("currency") or "KES").upper()
+		cache.price = round(float(latest["price"]), 6)
+		cache.source = source
+		cache.fetched_at = now_datetime()
+
+	if written or cache.is_new():
+		if source and not cache.source:
+			cache.source = source
+		cache.flags.ignore_permissions = True
+		if cache.is_new():
+			cache.insert()
+		else:
+			cache.save()
+	return written
+
+
+def _provider_supports_historical(provider: dict) -> bool:
+	key = _provider_key(provider)
+	return key in ("marketstack", "mansa markets")
+
+
+def _execute_fetch_historical_prices(
+	provider_name: str,
+	notify_user: str | None = None,
+) -> dict:
+	"""
+	Fetch historical EOD for held tickers via Marketstack or Mansa, subsample by
+	Growe Settings.monthly_interval_historical, and store in Growe Historical Price.
+	"""
+	from frappe.utils import getdate
+
+	p = _get_provider_by_name(provider_name)
+	if not p:
+		frappe.throw(_("Provider '{0}' not found.").format(provider_name))
+	if not int(p.get("is_active") or 0):
+		frappe.throw(_("Provider '{0}' is not active.").format(provider_name))
+	if not _provider_supports_historical(p):
+		frappe.throw(
+			_("Historical fetch is only supported for Marketstack and Mansa Markets.")
+		)
+
+	interval = _monthly_interval_historical()
+	nse_tickers, global_tickers, nse_map, global_map, stock_meta = _collect_tickers_for_live_prices()
+	eligible = _eligible_tickers_for_provider(p, nse_tickers, global_tickers)
+	earliest = _earliest_holding_dates_by_ticker(eligible)
+	eligible = [t for t in eligible if t in earliest]
+
+	if not eligible:
+		return {
+			"success": True,
+			"provider_name": provider_name,
+			"tickers_requested": 0,
+			"tickers_updated": 0,
+			"rows_written": 0,
+			"interval": interval,
+			"message": _("No open stock/ETF holdings for this provider to backfill."),
+		}
+
+	today_d = getdate(today())
+	key = _provider_key(p)
+	provider = dict(p)
+	tickers_updated = 0
+	rows_written = 0
+	errors: list[str] = []
+
+	# Group by shared earliest date when possible; still fetch per-ticker from its own start.
+	for i, ticker in enumerate(eligible):
+		start = earliest[ticker]
+		date_from = str(getdate(start))
+		date_to = str(today_d)
+		targets = _sample_target_dates(date_from, date_to, interval)
+		if not targets:
+			continue
+
+		sym_map = _symbol_map_for_provider(
+			provider,
+			{**(nse_map or {}), **(global_map or {})},
+			[ticker],
+			stock_meta=stock_meta,
+		)
+
+		try:
+			if key == "marketstack":
+				from growie_app.utils.marketstack_prices import fetch_marketstack_historical
+
+				fetched = fetch_marketstack_historical(
+					provider,
+					[ticker],
+					date_from,
+					date_to,
+					market="Global",
+					symbol_override_map=sym_map,
+					stock_meta=stock_meta,
+				)
+			else:
+				from growie_app.utils.mansa_prices import fetch_mansa_historical
+
+				fetched = fetch_mansa_historical(
+					provider,
+					[ticker],
+					date_from,
+					date_to,
+					market="NSE",
+				)
+		except Exception as exc:
+			errors.append(f"{ticker}: {exc}")
+			frappe.logger("growie.price").warning(
+				"Historical fetch failed for %s: %s", ticker, exc
+			)
+			continue
+
+		daily = fetched.get(ticker) or []
+		sampled = _subsample_historical_rows(daily, targets)
+		if not sampled:
+			continue
+		written = _merge_historical_into_cache(
+			ticker,
+			sampled,
+			source=provider.get("provider_name") or provider_name,
+			stock_meta=stock_meta,
+		)
+		if written:
+			tickers_updated += 1
+			rows_written += written
+
+		if notify_user and (i % 3 == 0 or i == len(eligible) - 1):
+			frappe.publish_realtime(
+				"growie_historical_fetch_progress",
+				{
+					"provider_name": provider_name,
+					"total": len(eligible),
+					"done": i + 1,
+					"last_ticker": ticker,
+				},
+				user=notify_user,
+				after_commit=False,
+			)
+
+	frappe.db.commit()
+	return {
+		"success": True,
+		"provider_name": provider_name,
+		"tickers_requested": len(eligible),
+		"tickers_updated": tickers_updated,
+		"rows_written": rows_written,
+		"interval": interval,
+		"errors": errors[:10],
+		"message": _(
+			"Historical prices saved for {0}/{1} ticker(s) ({2} row(s), {3}/month)."
+		).format(tickers_updated, len(eligible), rows_written, interval),
+	}
+
+
+def _run_fetch_historical_prices(provider_name: str, notify_user: str = None) -> dict:
+	if notify_user:
+		frappe.set_user(notify_user)
+	try:
+		result = _execute_fetch_historical_prices(
+			provider_name=provider_name,
+			notify_user=notify_user,
+		)
+		if notify_user:
+			frappe.publish_realtime(
+				"growie_historical_fetch_done",
+				result,
+				user=notify_user,
+				after_commit=True,
+			)
+		return result
+	except Exception as exc:
+		frappe.db.rollback()
+		frappe.log_error(title="Historical price fetch failed", message=frappe.get_traceback())
+		if notify_user:
+			frappe.publish_realtime(
+				"growie_historical_fetch_done",
+				{
+					"success": False,
+					"provider_name": provider_name,
+					"error": str(exc),
+				},
+				user=notify_user,
+				after_commit=True,
+			)
+		raise
+
+
+@frappe.whitelist()
+def fetch_historical_prices(provider_name: str, sync: int = 0):
+	"""
+	System Manager only: backfill Growe Historical Price from Marketstack or Mansa.
+
+	Uses Growe Settings.monthly_interval_historical (e.g. 2 = first + last of each month)
+	from each ticker's earliest open holding date through today.
+	"""
+	frappe.only_for("System Manager")
+	if not provider_name:
+		frappe.throw(_("provider_name is required."))
+
+	p = _get_provider_by_name(provider_name)
+	if not p:
+		frappe.throw(_("Provider '{0}' not found.").format(provider_name))
+	if not _provider_supports_historical(p):
+		frappe.throw(
+			_("Historical fetch is only supported for Marketstack and Mansa Markets.")
+		)
+
+	if int(sync or 0):
+		return _execute_fetch_historical_prices(
+			provider_name=provider_name,
+			notify_user=frappe.session.user,
+		)
+
+	nse_tickers, global_tickers, *_rest = _collect_tickers_for_live_prices()
+	eligible = _eligible_tickers_for_provider(p, nse_tickers, global_tickers)
+	_enqueue_price_refresh(
+		"growie_app.api.price._run_fetch_historical_prices",
+		f"growie_fetch_historical:{provider_name}",
+		provider_name=provider_name,
+		notify_user=frappe.session.user,
+	)
+	return {
+		"queued": True,
+		"provider_name": provider_name,
+		"tickers_requested": len(eligible),
+		"interval": _monthly_interval_historical(),
+		"message": _(
+			"Historical price fetch queued for {0} ticker(s). Progress will appear on this form."
+		).format(len(eligible)),
+	}
+
+
+@frappe.whitelist()
+def get_historical_prices(tickers: str | list | None = None):
+	"""
+	Return stored Growe Historical Price rows for the given tickers (or the
+	caller's open holdings). UI-only read — does not call market APIs.
+
+	Each ticker maps to ``[{date, price, currency, priceKES}, …]`` sorted by date.
+	"""
+	import json
+
+	if isinstance(tickers, str):
+		raw = tickers.strip()
+		if raw.startswith("["):
+			try:
+				tickers = json.loads(raw)
+			except ValueError:
+				tickers = [t.strip() for t in raw.split(",") if t.strip()]
+		elif raw:
+			tickers = [t.strip() for t in raw.split(",") if t.strip()]
+		else:
+			tickers = None
+
+	wanted: list[str] = []
+	if tickers:
+		wanted = list(dict.fromkeys((t or "").upper().strip() for t in tickers if (t or "").strip()))
+	else:
+		# Default: tickers in the current member's open holdings.
+		try:
+			from growie_app.api.portfolio import _member_name
+
+			member = _member_name()
+			rows = frappe.get_all(
+				"Growe Holding",
+				filters={"investor": member, "sold": 0, "quantity": [">", 0]},
+				fields=["ticker"],
+			)
+			wanted = list(
+				dict.fromkeys((r.ticker or "").upper().strip() for r in rows if (r.ticker or "").strip())
+			)
+		except Exception:
+			wanted = []
+
+	if not wanted:
+		return {}
+
+	out: dict[str, list[dict]] = {t: [] for t in wanted}
+	# Resolve cache parents by ticker (do not require a usable live quote).
+	cache_names: dict[str, str] = {}
+	for row in frappe.get_all(
+		"Growe Price Cache",
+		filters={"ticker": ["in", wanted]},
+		fields=["name", "ticker"],
+	):
+		t = (row.ticker or "").upper().strip()
+		if t and t not in cache_names:
+			cache_names[t] = row.name
+
+	for ticker in wanted:
+		parent = cache_names.get(ticker)
+		if not parent:
+			# Fallback: cache named by stock / legacy ticker name.
+			cache_row = _get_price_cache_row(ticker)
+			parent = (cache_row or {}).get("name")
+		if not parent:
+			continue
+		children = frappe.get_all(
+			"Growe Historical Price",
+			filters={
+				"parent": parent,
+				"parenttype": "Growe Price Cache",
+				"parentfield": "growe_historical_price",
+			},
+			fields=["date", "currency", "price"],
+			order_by="date asc",
+		)
+		series = []
+		for c in children:
+			price = float(c.price or 0)
+			ccy = (c.currency or "KES").upper()
+			if price <= 0:
+				continue
+			as_of = str(c.date)
+			price_kes = _convert_price_amount(price, ccy, "KES", as_of)
+			series.append(
+				{
+					"date": as_of,
+					"price": price,
+					"currency": ccy,
+					"priceKES": round(float(price_kes or 0), 6),
+				}
+			)
+		out[ticker] = series
+	return out
 
 
 @frappe.whitelist(allow_guest=True)

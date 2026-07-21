@@ -138,8 +138,77 @@ frappe.ui.form.on("Growe Price API", {
 			);
 		}, __("Actions"));
 
-		// ── Fetch NSE Index button (Mansa only) ──────────────────────────────────
+		// ── Fetch Historical Prices (Marketstack / Mansa, System Manager) ────────
 		const api_prov = (frm.doc.api_provider || "").toLowerCase();
+		if (
+			(api_prov.includes("marketstack") || api_prov.includes("mansa")) &&
+			frappe.user.has_role("System Manager")
+		) {
+			frm.add_custom_button(__("Fetch Historical Prices"), function () {
+				const intervalHint = __(
+					"Uses <b>Growe Settings → Monthly Interval Historical</b> " +
+						"(e.g. 2 = first and last date each month). " +
+						"Starts from each ticker's earliest open holding date. " +
+						"Stores rows in <b>Growe Price Cache → Growe Historical Price</b>."
+				);
+				const scopeHint = api_prov.includes("mansa")
+					? __("This provider backfills <b>Kenya / NSE</b> holdings only.")
+					: __("This provider backfills <b>Global</b> holdings only (Kenya skipped).");
+				frappe.confirm(
+					__(
+						"Fetch historical EOD prices with <b>{0}</b>? {1}<br><br>{2}",
+						[frm.doc.provider_name || frm.doc.name, scopeHint, intervalHint]
+					),
+					function () {
+						frm._historical_fetch_active = true;
+						_update_historical_fetch_progress(frm, { total: 0, done: 0 });
+						frappe.call({
+							method: "growie_app.api.price.fetch_historical_prices",
+							args: { provider_name: frm.doc.name },
+							callback: function (r) {
+								if (!r.message) {
+									frm._historical_fetch_active = false;
+									_clear_historical_fetch_progress(frm);
+									return;
+								}
+								if (r.message.queued) {
+									frappe.show_alert(
+										{
+											message:
+												r.message.message ||
+												__(
+													"Historical fetch queued for {0} ticker(s).",
+													[r.message.tickers_requested || 0]
+												),
+											indicator: "blue",
+										},
+										8
+									);
+									_update_historical_fetch_progress(frm, {
+										total: r.message.tickers_requested || 0,
+										done: 0,
+									});
+									return;
+								}
+								frm._historical_fetch_active = false;
+								_clear_historical_fetch_progress(frm);
+								frappe.msgprint({
+									title: __("✅ Historical Prices Saved"),
+									indicator: "green",
+									message: _format_historical_fetch_summary(r.message),
+								});
+							},
+							error: function () {
+								frm._historical_fetch_active = false;
+								_clear_historical_fetch_progress(frm);
+							},
+						});
+					}
+				);
+			}, __("Actions"));
+		}
+
+		// ── Fetch NSE Index button (Mansa only) ──────────────────────────────────
 		if (api_prov.includes("mansa")) {
 			frm.add_custom_button(__("Fetch NSE Index"), function () {
 				frappe.call({
@@ -225,12 +294,13 @@ frappe.ui.form.on("Growe Price API", {
 
 		if (api_prov.includes("marketstack")) {
 			frm.dashboard.add_comment(
-				__("<b>Marketstack</b> — latest end-of-day prices via <code>/eod/latest</code>. "
+				__("<b>Marketstack</b> — latest end-of-day prices via <code>/eod/latest</code>; "
+				   + "historical via <code>/eod</code> (Actions → Fetch Historical Prices). "
 				   + "API Key = your <code>access_key</code> from "
 				   + "<a href=\"https://marketstack.com/dashboard\" target=\"_blank\">marketstack.com</a>. "
 				   + "Sends <b>ISO Mic</b> as <code>exchange</code> from Growe Stock exchange platform. "
 				   + "With <b>Use US ticker</b>, symbols come from Growe Stock <b>US Ticker Number</b>. "
-				   + "Batch up to 100 symbols per request. Test with <code>AAPL</code> or <code>SCOM</code>. "
+				   + "Batch up to 100 symbols per request. Test with <code>AAPL</code>. "
 				   + "<a href=\"https://docs.apilayer.com/marketstack/docs/marketstack-api-v2-v-2-0-0\" target=\"_blank\">Docs</a>"),
 				"blue",
 				true
@@ -241,6 +311,8 @@ frappe.ui.form.on("Growe Price API", {
 			frm.dashboard.add_comment(
 				__("<b>Mansa Markets</b> — Nairobi NSE quotes via Bearer API key (<code>mansa_live_sk_…</code>). "
 				   + "Base URL must be <code>https://mansaapi.com/api/v1</code> (not <code>www</code>). "
+				   + "Historical: Actions → Fetch Historical Prices "
+				   + "(<code>/stocks/{ticker}/history</code>). "
 				   + "Test with <code>SCOM</code> and market <b>Kenya</b>. "
 				   + "<a href=\"https://mansaapi.com/docs\" target=\"_blank\">Docs</a>"),
 				"blue",
@@ -295,6 +367,15 @@ function _format_price_refresh_summary(data) {
 	);
 }
 
+function _format_historical_fetch_summary(data) {
+	return (
+		`<b>${__("Tickers updated")}</b>: ${data.tickers_updated || 0} / ${data.tickers_requested || 0}<br>` +
+		`<b>${__("Rows written")}</b>: ${data.rows_written || 0}<br>` +
+		`<b>${__("Monthly interval")}</b>: ${data.interval || "–"}<br>` +
+		(data.message ? `<p style="margin-top:8px">${frappe.utils.escape_html(data.message)}</p>` : "")
+	);
+}
+
 function _bind_price_refresh_realtime(frm) {
 	if (frm._growie_price_refresh_bound) {
 		return;
@@ -334,11 +415,45 @@ function _bind_price_refresh_realtime(frm) {
 			message: _format_price_refresh_summary(data),
 		});
 	});
+
+	frappe.realtime.on("growie_historical_fetch_progress", (data) => {
+		if (!frm._historical_fetch_active) return;
+		if (data.provider_name && data.provider_name !== frm.doc.name) return;
+		_update_historical_fetch_progress(frm, data);
+	});
+
+	frappe.realtime.on("growie_historical_fetch_done", (data) => {
+		if (data.provider_name && data.provider_name !== frm.doc.name) return;
+		frm._historical_fetch_active = false;
+		_clear_historical_fetch_progress(frm);
+
+		if (data.success === false) {
+			frappe.msgprint({
+				title: __("❌ Historical Fetch Failed"),
+				indicator: "red",
+				message: frappe.utils.escape_html(data.error || __("Unknown error")),
+			});
+			return;
+		}
+
+		frappe.msgprint({
+			title: __("✅ Historical Prices Saved"),
+			indicator: "green",
+			message: _format_historical_fetch_summary(data),
+		});
+	});
 }
 
 function _clear_price_refresh_progress(frm) {
 	frm.$wrapper.find(".growie-price-refresh-progress").remove();
 	frm.dashboard.clear_headline();
+}
+
+function _clear_historical_fetch_progress(frm) {
+	frm.$wrapper.find(".growie-historical-fetch-progress").remove();
+	if (!frm._price_refresh_active) {
+		frm.dashboard.clear_headline();
+	}
 }
 
 function _update_price_refresh_progress(frm, data) {
@@ -380,6 +495,41 @@ function _update_price_refresh_progress(frm, data) {
 		);
 	}
 	$bar.find(".growie-price-refresh-fill").css("width", `${pct}%`);
+}
+
+function _update_historical_fetch_progress(frm, data) {
+	const total = data.total || 0;
+	const done = data.done || 0;
+	const pct = total ? Math.min(100, Math.round((done / total) * 100)) : 0;
+	const last = data.last_ticker || "";
+	const $wrapper = frm.$wrapper.find(".form-message");
+
+	let $bar = $wrapper.find(".growie-historical-fetch-progress");
+	if (!$bar.length) {
+		frm.dashboard.clear_headline();
+		const html = `
+			<div class="growie-historical-fetch-progress" style="width:100%;max-width:720px;padding:2px 0;">
+				<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px;font-size:12px;line-height:1.3;">
+					<span class="growie-historical-fetch-label">${frappe.utils.escape_html(
+						__("Fetching historical prices…")
+					)}</span>
+					<span class="growie-historical-fetch-meta" style="white-space:nowrap;color:var(--text-muted);"></span>
+				</div>
+				<div style="height:8px;background:var(--gray-200,#e5e7eb);border-radius:4px;overflow:hidden;">
+					<div class="growie-historical-fetch-fill" style="height:100%;width:0;background:var(--green-500,#16a34a);border-radius:4px;transition:width 0.2s ease;"></div>
+				</div>
+			</div>`;
+		frm.dashboard.set_headline_alert(html, "green", true);
+		$bar = $wrapper.find(".growie-historical-fetch-progress");
+	}
+
+	const meta = total
+		? last
+			? `${done}/${total} (${pct}%) — ${frappe.utils.escape_html(last)}`
+			: `${done}/${total} (${pct}%)`
+		: __("Starting…");
+	$bar.find(".growie-historical-fetch-meta").text(meta);
+	$bar.find(".growie-historical-fetch-fill").css("width", `${pct}%`);
 }
 
 /**

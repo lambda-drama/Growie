@@ -505,3 +505,165 @@ def fetch_marketstack_prices(
 		)
 
 	return results
+
+
+def _parse_eod_history_row(row: dict, mic: str | None) -> dict | None:
+	"""Parse one Marketstack EOD row into {date, price, currency}."""
+	from frappe.utils import getdate
+
+	parsed = _parse_eod_row(row, mic)
+	if not parsed:
+		return None
+	raw_date = row.get("date") or row.get("datetime")
+	if not raw_date:
+		return None
+	try:
+		as_of = getdate(str(raw_date)[:10])
+	except Exception:
+		return None
+	return {
+		"date": as_of,
+		"price": parsed["price"],
+		"currency": parsed["currency"],
+	}
+
+
+def _fetch_eod_history_pages(
+	provider: dict,
+	api_key: str,
+	symbol: str,
+	mic: str | None,
+	date_from: str,
+	date_to: str,
+) -> list[dict]:
+	"""Paginate Marketstack /eod for one symbol over a date range."""
+	if provider.get("_rate_limited") or provider.get("_marketstack_auth_failed"):
+		return []
+
+	base = _service_base(provider)
+	url = f"{base}/eod"
+	limit = 1000
+	offset = 0
+	out: list[dict] = []
+
+	while True:
+		if provider.get("_rate_limited") or provider.get("_marketstack_auth_failed"):
+			break
+		params: dict = {
+			"access_key": api_key,
+			"symbols": symbol,
+			"date_from": date_from,
+			"date_to": date_to,
+			"sort": "ASC",
+			"limit": limit,
+			"offset": offset,
+		}
+		if mic:
+			params["exchange"] = mic
+
+		resp = requests.get(url, params=params, timeout=45)
+		if resp.status_code == 401:
+			_mark_marketstack_auth_failed(provider, "Unauthorized — check your Marketstack access_key.")
+			return out
+		if resp.status_code == 429:
+			_mark_marketstack_rate_limited(provider, "Too many requests")
+			return out
+		if not resp.ok:
+			# Retry once without exchange filter — some plans reject MIC+symbol pairs.
+			if mic and offset == 0:
+				return _fetch_eod_history_pages(
+					provider, api_key, symbol, None, date_from, date_to
+				)
+			frappe.logger("growie.price").warning(
+				"Marketstack eod HTTP %s for %s: %s",
+				resp.status_code,
+				symbol,
+				(resp.text or "")[:300],
+			)
+			break
+
+		try:
+			body = resp.json()
+		except ValueError:
+			break
+
+		if not isinstance(body, dict):
+			break
+		if body.get("error"):
+			msg = _marketstack_error_message(body)
+			if msg and re.search(r"(?i)limit|quota|rate", msg):
+				_mark_marketstack_rate_limited(provider, msg)
+			else:
+				frappe.logger("growie.price").warning("Marketstack eod error: %s", msg[:300])
+			break
+
+		rows = _iter_eod_rows(body)
+		if not rows:
+			break
+		for row in rows:
+			parsed = _parse_eod_history_row(row, mic)
+			if parsed:
+				out.append(parsed)
+
+		pagination = body.get("pagination") if isinstance(body.get("pagination"), dict) else {}
+		try:
+			count = int(pagination.get("count") or len(rows))
+			total = int(pagination.get("total") or 0)
+		except (TypeError, ValueError):
+			count = len(rows)
+			total = 0
+		offset += count
+		if count < limit or (total and offset >= total):
+			break
+		_throttle(provider)
+
+	return out
+
+
+def fetch_marketstack_historical(
+	provider: dict,
+	symbols: list,
+	date_from: str,
+	date_to: str,
+	market: str = "Global",
+	symbol_override_map: dict | None = None,
+	stock_meta: dict | None = None,
+) -> dict[str, list[dict]]:
+	"""
+	Fetch historical EOD closes via Marketstack ``/eod``.
+
+	Returns ``{internal_ticker: [{date, price, currency}, …]}``.
+	Global / non-Kenya only.
+	"""
+	from growie_app.api.price import _log_price_fetch_error
+
+	api_key = _provider_api_key(provider)
+	if not api_key:
+		frappe.logger("growie.price").warning(
+			"Marketstack %s: set API Key before fetching historical prices.",
+			provider.get("provider_name") or provider.get("name"),
+		)
+		return {}
+
+	exchange_by_ticker = _load_exchange_map(symbols, stock_meta=stock_meta)
+	groups = _group_by_mic(symbols, exchange_by_ticker, market)
+	results: dict[str, list[dict]] = {}
+
+	for mic, tickers in groups.items():
+		if provider.get("_rate_limited"):
+			break
+		for ticker in tickers:
+			if provider.get("_rate_limited"):
+				break
+			api_sym = _symbol_for_ticker(ticker, symbol_override_map)
+			try:
+				rows = _fetch_eod_history_pages(
+					provider, api_key, api_sym, mic, date_from, date_to
+				)
+				if rows:
+					results[ticker] = rows
+			except Exception as exc:
+				_log_price_fetch_error("Marketstack historical", ticker, exc)
+			_throttle(provider)
+
+	return results

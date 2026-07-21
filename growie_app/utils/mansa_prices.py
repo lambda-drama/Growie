@@ -308,3 +308,108 @@ def fetch_mansa_kes_per_usd(provider: dict) -> float | None:
 		if pair in ("KES/USD", "KES-USD"):
 			return 1.0 / rate
 	return None
+
+
+def _parse_history_point(item: dict, currency: str = "KES") -> dict | None:
+	"""Parse one Mansa history point into {date, price, currency}."""
+	from frappe.utils import getdate
+
+	if not isinstance(item, dict):
+		return None
+	raw_date = item.get("date") or item.get("trade_date") or item.get("t")
+	if not raw_date:
+		return None
+	try:
+		as_of = getdate(str(raw_date)[:10])
+	except Exception:
+		return None
+	try:
+		close = float(
+			item.get("adj_close")
+			or item.get("close")
+			or item.get("price")
+			or item.get("value")
+			or 0
+		)
+	except (TypeError, ValueError):
+		close = 0.0
+	if close <= 0:
+		return None
+	return {
+		"date": as_of,
+		"price": close,
+		"currency": (currency or "KES").upper(),
+	}
+
+
+def fetch_mansa_historical(
+	provider: dict,
+	symbols: list,
+	date_from: str,
+	date_to: str,
+	market: str = "NSE",
+) -> dict[str, list[dict]]:
+	"""
+	Fetch daily OHLCV history from Mansa for NSE tickers.
+
+	``GET /markets/exchanges/NSE/stocks/{ticker}/history?from=&to=``
+	Returns ``{ticker: [{date, price, currency}, …]}``.
+	"""
+	from growie_app.api.price import _log_price_fetch_error, _normalize_market_label
+
+	if _normalize_market_label(market) != "NSE":
+		return {}
+
+	api_key = _provider_api_key(provider)
+	if not api_key:
+		frappe.logger("growie.price").warning(
+			"Mansa %s: set API Key before fetching historical prices.",
+			provider.get("provider_name") or provider.get("name"),
+		)
+		return {}
+
+	exchange = _DEFAULT_EXCHANGE
+	wanted = {(s or "").upper().strip() for s in symbols if (s or "").strip()}
+	results: dict[str, list[dict]] = {}
+	base = _service_base(provider)
+
+	for sym in sorted(wanted):
+		if provider.get("_rate_limited") or provider.get("_mansa_auth_failed"):
+			break
+		url = f"{base}/markets/exchanges/{exchange}/stocks/{sym}/history"
+		try:
+			body = _request_json(
+				provider,
+				url,
+				params={"from": date_from, "to": date_to, "order": "asc", "limit": 20000},
+			)
+		except Exception as exc:
+			_log_price_fetch_error("Mansa historical", sym, exc)
+			continue
+		if not body:
+			continue
+
+		data = body.get("data")
+		currency = "KES"
+		points = []
+		if isinstance(data, dict):
+			currency = (data.get("currency") or currency).upper()
+			points = data.get("points") or data.get("history") or []
+			meta = body.get("meta") if isinstance(body.get("meta"), dict) else {}
+			if meta.get("currency"):
+				currency = str(meta["currency"]).upper()
+		elif isinstance(data, list):
+			points = data
+
+		if not isinstance(points, list):
+			continue
+
+		rows: list[dict] = []
+		for item in points:
+			parsed = _parse_history_point(item, currency)
+			if parsed:
+				rows.append(parsed)
+		if rows:
+			results[sym] = rows
+
+	return results

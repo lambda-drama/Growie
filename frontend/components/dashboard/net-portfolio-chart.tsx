@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -13,6 +13,10 @@ import {
 import { useDisplayMoney } from '@/lib/store'
 import { formatCurrency, formatPercentage } from '@/lib/format'
 import { getNetPortfolioSeries } from '@/lib/dashboard-data'
+import {
+  getHistoricalPrices,
+  type HistoricalPriceMap,
+} from '@/services/portfolio'
 import type { Holding } from '@/types'
 import { TrendingUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -31,15 +35,46 @@ interface NetPortfolioChartProps {
 export function NetPortfolioChart({ holdings, gainPercent }: NetPortfolioChartProps) {
   const { currency, kesToDisplayMultiplier } = useDisplayMoney()
   const [range, setRange] = useState('6')
+  const [historical, setHistorical] = useState<HistoricalPriceMap>({})
+
+  const tickersKey = useMemo(() => {
+    const tickers = [
+      ...new Set(
+        holdings
+          .map((h) => (h.ticker || '').toUpperCase().trim())
+          .filter(Boolean)
+      ),
+    ].sort()
+    return tickers.join(',')
+  }, [holdings])
+
+  useEffect(() => {
+    if (!tickersKey) {
+      setHistorical({})
+      return
+    }
+    let cancelled = false
+    getHistoricalPrices(tickersKey.split(','))
+      .then((map) => {
+        if (!cancelled) setHistorical(map)
+      })
+      .catch(() => {
+        if (!cancelled) setHistorical({})
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [tickersKey])
 
   const months = RANGES.find((r) => r.value === range)?.months ?? 6
   const data = useMemo(
-    () => getNetPortfolioSeries(holdings, months),
-    [holdings, months]
+    () => getNetPortfolioSeries(holdings, months, historical),
+    [holdings, months, historical]
   )
 
   const latestValue = data[data.length - 1]?.valueKES ?? 0
   const isPositive = gainPercent >= 0
+  const usingHistory = Object.values(historical).some((rows) => rows?.length > 0)
 
   return (
     <Card className="lg:col-span-2">
@@ -62,6 +97,9 @@ export function NetPortfolioChart({ holdings, gainPercent }: NetPortfolioChartPr
               </span>
             )}
           </div>
+          {usingHistory ? (
+            <p className="mt-1 text-xs text-muted-foreground">Mark-to-market from stored historical prices</p>
+          ) : null}
         </div>
         <Select value={range} onValueChange={setRange}>
           <SelectTrigger className="h-8 w-[120px] text-xs">
