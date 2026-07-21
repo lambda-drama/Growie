@@ -1,5 +1,6 @@
 import type { Holding, AssetClass } from '@/types'
 import type { PortfolioSummary } from '@/services/portfolio'
+import type { HistoricalPriceMap } from '@/services/portfolio'
 import { assetCategoryLabelForHolding, bucketLabelForHolding } from '@/lib/stack-grouping'
 import { computeWeightedPortfolioReturn } from '@/lib/stack-holdings-summary'
 import type { StackHolding } from '@/services/stack'
@@ -183,8 +184,12 @@ export function computeMonthOverMonthGrowth(
   return { monthlyGrowthKES, monthlyGrowthPercent }
 }
 
-export function getNetPortfolioSeries(holdings: Holding[], monthCount = 6): NetPortfolioPoint[] {
-  const buckets = buildTimelineBuckets(holdings, 'monthly')
+export function getNetPortfolioSeries(
+  holdings: Holding[],
+  monthCount = 6,
+  historicalByTicker?: HistoricalPriceMap
+): NetPortfolioPoint[] {
+  const buckets = buildTimelineBuckets(holdings, 'monthly', new Date(), historicalByTicker)
   const slice = buckets.slice(-monthCount)
   return slice.map((b, i) => {
     const prev = i > 0 ? slice[i - 1].totalMarket : b.totalMarket

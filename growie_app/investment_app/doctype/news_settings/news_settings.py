@@ -15,6 +15,7 @@ from growie_app.utils.news_ingest import (
 	fetch_article_plain_text,
 	fetch_articles_for_configured_site,
 	infer_insight_market,
+	canonicalize_insight_market,
 	normalize_title_key,
 )
 
@@ -154,13 +155,19 @@ def fetch_best_news_now():
 
 		read_mins = _estimated_read_minutes(final_bite if rewrite else (summary + final_bite))
 
-		market = infer_insight_market(
-			site_label=site_label,
-			source_url=link,
-			title=insight_title,
-			summary=summary,
-			commentary_html=final_commentary,
+		market = canonicalize_insight_market(
+			infer_insight_market(
+				site_label=site_label,
+				source_url=link,
+				title=insight_title,
+				summary=summary,
+				commentary_html=final_commentary,
+			)
 		)
+
+		# Prefer AI market when rewrite returned a valid Kenya/Global value.
+		if rewrite and isinstance(rew, dict) and rew.get("market"):
+			market = canonicalize_insight_market(rew.get("market"))
 
 		try:
 			insight = frappe.get_doc(
@@ -206,12 +213,14 @@ def fetch_best_news_now():
 
 @frappe.whitelist()
 def reclassify_insight_markets():
-	"""Fix market tags on existing insights (e.g. legacy rows saved as Global)."""
+	"""Fix market tags on existing insights (e.g. legacy NSE / Global mislabels)."""
 	updated = 0
 	for row in frappe.get_all("Growe Insight", fields=["name", "title", "commentary", "market"]):
-		inferred = infer_insight_market(title=row.title or "", commentary_html=row.commentary or "")
-		if inferred != (row.market or ""):
-			frappe.db.set_value("Growe Insight", row.name, "market", inferred, update_modified=False)
+		target = canonicalize_insight_market(
+			infer_insight_market(title=row.title or "", commentary_html=row.commentary or "")
+		)
+		if target != (row.market or ""):
+			frappe.db.set_value("Growe Insight", row.name, "market", target, update_modified=False)
 			updated += 1
 	frappe.db.commit()
 	return {"updated": updated}

@@ -252,7 +252,7 @@ RULES:
   "insight_commentary_html": ONLY <p>...</p> blocks (2–4 short paragraphs): what moved, why it matters, one practical takeaway. The last <p> must mention that investing involves risks and this is not regulated financial advice.
   "learning_bite_title": pedagogical title (different phrasing from insight_title).
   "topic_tag": one short label such as Markets, Earnings, Rates, FX, or NSE.
-  "market": exactly "NSE" if the story is about the Nairobi Securities Exchange / Kenyan equities; otherwise "Global".
+  "market": exactly "Kenya" if the story is about the Nairobi Securities Exchange / Kenyan equities; otherwise "Global".
   "article_html": full standalone article as HTML (<p>, optional <ul><li>, <strong>, <h3>); 6–14 short paragraphs educating the reader.
 
 HTML safety: use only tags p, ul, li, strong, em, br, h3 — no onclick, iframe, img, script, style, svg."""
@@ -324,8 +324,13 @@ def rewrite_news_article_for_ingestion(
 		max_output_tokens=tok_budget,
 	)
 	data = _extract_json_object_from_llm(raw)
+	from growie_app.utils.news_ingest import canonicalize_insight_market
+
 	market_raw = (data.get("market") or "").strip()
-	market = market_raw if market_raw in ("NSE", "Global") else ""
+	# Accept Kenya / Global / legacy NSE from the model.
+	market = canonicalize_insight_market(market_raw) if market_raw else ""
+	if market_raw and market_raw.strip().lower() not in ("kenya", "nse", "global"):
+		market = ""
 
 	out = {
 		"insight_title": (data.get("insight_title") or "").strip(),

@@ -17,20 +17,18 @@ export const MARKET_FILTER_OPTIONS = [
 
 /** Map API/stored market to filter tab id. */
 export function marketToFilterId(market: string | undefined | null): MarketFilter | null {
-  const m = (market || '').trim()
-  if (m === MARKET_KENYA || m === LEGACY_MARKET_KENYA) return MARKET_KENYA
-  if (m === MARKET_GLOBAL) return MARKET_GLOBAL
-  if (m === MARKET_ETF) return MARKET_ETF
+  const m = (market || '').trim().toLowerCase()
+  if (m === 'kenya' || m === 'nse') return MARKET_KENYA
+  if (m === 'global') return MARKET_GLOBAL
+  if (m === 'etf') return MARKET_ETF
   return null
 }
 
 /** User-facing label for a market routing value. */
 export function marketUiLabel(market: string | undefined | null): string {
-  const m = (market || '').trim()
-  if (m === MARKET_KENYA || m === LEGACY_MARKET_KENYA) return MARKET_KENYA
-  if (m === MARKET_GLOBAL) return MARKET_GLOBAL
-  if (m === MARKET_ETF) return MARKET_ETF
-  return m || MARKET_KENYA
+  const id = marketToFilterId(market)
+  if (id) return id
+  return (market || '').trim() || MARKET_KENYA
 }
 
 /** Value sent to APIs when filtering Kenya-market instruments. */

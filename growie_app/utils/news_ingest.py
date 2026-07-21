@@ -333,9 +333,9 @@ def infer_insight_market(
 	commentary_html: str = "",
 ) -> str:
 	"""
-	Return Growe Insight market: NSE or Global.
+	Return Growe Insight market: Kenya or Global.
 
-	Legacy ingest always saved Global; infer from source site, URL, and article text.
+	NSE / Kenyan equity stories → Kenya; everything else → Global.
 	"""
 	blob = " ".join(
 		[
@@ -350,16 +350,27 @@ def infer_insight_market(
 		return "Global"
 
 	if NSE_SOURCE_HINTS.search(blob) or NSE_CONTENT_HINTS.search(blob):
-		return "NSE"
+		return "Kenya"
 
 	if re.search(r"\bnse\b", blob, re.I) and re.search(
 		r"nairobi|kenya|kenyan|\.co\.ke|kes\s+\d", blob, re.I
 	):
-		return "NSE"
+		return "Kenya"
 
 	if source_url and re.search(r"\.co\.ke\b", source_url, re.I):
-		return "NSE"
+		return "Kenya"
 
+	return "Global"
+
+
+def canonicalize_insight_market(market: str | None) -> str:
+	"""Normalize legacy NSE / Kenya / Global labels for Growe Insight.market."""
+	raw = (market or "").strip()
+	key = raw.lower()
+	if key in ("kenya", "nse"):
+		return "Kenya"
+	if key == "global":
+		return "Global"
 	return "Global"
 
 

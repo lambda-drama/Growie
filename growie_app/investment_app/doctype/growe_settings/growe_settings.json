@@ -1,13 +1,14 @@
 {
  "actions": [],
  "allow_rename": 1,
- "creation": "2026-04-23 01:13:35.005967",
+ "creation": "2026-07-16 00:25:10.942217",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
   "active_ai_provider",
   "column_break_qsfs",
   "default_stock_api",
+  "monthly_interval_historical",
   "pricing_section",
   "pro_tier_price_kes",
   "column_break_ebrg",
@@ -140,13 +141,13 @@
    "fieldname": "holdings_import_help",
    "fieldtype": "HTML",
    "label": "Stock holdings import",
-   "options": "<p class=\"text-muted\">Use <b>Holdings → Upload stock holdings</b> to import an Excel file for a Growe Member. Expected columns: Purchase Dates, Investment, Ticker Number, <b>API Ticker Number</b> (stored as US Ticker Number), ISO MIC Exchange, Broker, Shares Breakdown, Buying Price, Goal.</p>"
+   "options": "<p class=\"text-muted\">Use <b>Holdings \u2192 Upload stock holdings</b> to import an Excel file for a Growe Member. Expected columns: Purchase Dates, Investment, Ticker Number, <b>API Ticker Number</b> (stored as US Ticker Number), ISO MIC Exchange, Broker, Shares Breakdown, Buying Price, Goal.</p>"
   },
   {
    "fieldname": "exchange_platform_migration_help",
    "fieldtype": "HTML",
    "label": "Exchange platform IDs",
-   "options": "<p class=\"text-muted\">Legacy Growe Exchange Platform records used <code>platform_name</code> as the document ID (e.g. <code>NASDAQ</code>, <code>LSE</code>). New records use <code>exchange_code</code> (e.g. <code>XNAS</code>, <code>XLON</code>).</p><p class=\"text-muted\">Use the button below to rename existing platforms in the background, update Growe Stock and price-cache links, merge duplicates, then refresh Growe Stock names. Platforms without an <code>exchange_code</code> are skipped — fill those in first.</p>"
+   "options": "<p class=\"text-muted\">Legacy Growe Exchange Platform records used <code>platform_name</code> as the document ID (e.g. <code>NASDAQ</code>, <code>LSE</code>). New records use <code>exchange_code</code> (e.g. <code>XNAS</code>, <code>XLON</code>).</p><p class=\"text-muted\">Use the button below to rename existing platforms in the background, update Growe Stock and price-cache links, merge duplicates, then refresh Growe Stock names. Platforms without an <code>exchange_code</code> are skipped \u2014 fill those in first.</p>"
   },
   {
    "fieldname": "last_exchange_platform_migration",
@@ -165,13 +166,21 @@
    "fieldtype": "Small Text",
    "label": "Last stock naming migration",
    "read_only": 1
+  },
+  {
+   "default": "2",
+   "description": "How many historical price dates to keep per calendar month (e.g. 2 = first and last day). Used by Desk \u2192 Growe Price API \u2192 Fetch Historical Prices.",
+   "fieldname": "monthly_interval_historical",
+   "fieldtype": "Int",
+   "label": "Monthly Interval Historical",
+   "non_negative": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-04-29 22:14:41.934589",
+ "modified": "2026-07-22 01:21:37.204359",
  "modified_by": "Administrator",
  "module": "Investment App",
  "name": "Growe Settings",

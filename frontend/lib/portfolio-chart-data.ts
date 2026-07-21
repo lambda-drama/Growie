@@ -1,9 +1,11 @@
 /**
- * Bucketed portfolio metrics from first investment → now (no historical price API).
- * Market value per bucket = sum of current valueKES for lots acquired on or before bucket end.
- * Invested = sum of costBasisKES for same lots (snapshot-style, today's marks on positions held).
+ * Bucketed portfolio metrics from first investment → now.
+ * When historical unit prices are available (Growe Price Cache child table),
+ * past buckets use qty × historical priceKES. Otherwise falls back to
+ * cumulative cost for past months and current market for the latest month.
  */
 import type { Holding } from '@/types'
+import type { HistoricalPriceMap, HistoricalPricePoint } from '@/services/portfolio'
 
 export type ChartPeriod = 'monthly' | 'yearly'
 
@@ -118,10 +120,34 @@ function tickerKey(h: Holding): string {
   return (h.ticker || h.name || h.id).trim() || h.id
 }
 
+/** Closest historical unit price on or before ``asOf`` (KES). */
+export function historicalUnitPriceKES(
+  series: HistoricalPricePoint[] | undefined,
+  asOf: Date
+): number | null {
+  if (!series?.length) return null
+  const asOfTs = asOf.getTime()
+  let best: HistoricalPricePoint | null = null
+  for (const row of series) {
+    const t = new Date(row.date).getTime()
+    if (Number.isNaN(t) || t > asOfTs) continue
+    if (!best || t > new Date(best.date).getTime()) best = row
+  }
+  if (!best) return null
+  const kes = Number(best.priceKES)
+  return kes > 0 ? kes : null
+}
+
+function hasUsableHistorical(map: HistoricalPriceMap | undefined): boolean {
+  if (!map) return false
+  return Object.values(map).some((rows) => rows?.length > 0)
+}
+
 function aggregateAtDate(
   holdings: Holding[],
   asOf: Date,
-  valuation: 'cost' | 'market',
+  valuation: 'cost' | 'market' | 'historical',
+  historicalByTicker?: HistoricalPriceMap,
 ): {
   totalMarket: number
   totalInvested: number
@@ -135,7 +161,19 @@ function aggregateAtDate(
   for (const h of subset) {
     const cost = h.costAtAvgKES ?? h.costBasisKES ?? 0
     const market = h.valueInKES ?? h.valueKES ?? 0
-    const amount = valuation === 'market' ? market : cost
+    let amount = valuation === 'market' ? market : cost
+
+    if (valuation === 'historical') {
+      const ticker = (h.ticker || '').toUpperCase().trim()
+      const unit = historicalUnitPriceKES(historicalByTicker?.[ticker], asOf)
+      if (unit != null && h.quantity > 0) {
+        amount = unit * h.quantity
+      } else {
+        // Missing history for this lot/date — keep cost so the series stays continuous.
+        amount = cost > 0 ? cost : market
+      }
+    }
+
     totalMarket += amount
     totalInvested += cost
     const k = tickerKey(h)
@@ -148,19 +186,26 @@ export function buildTimelineBuckets(
   holdings: Holding[],
   period: ChartPeriod,
   through: Date = new Date(),
+  historicalByTicker?: HistoricalPriceMap,
 ): TimelineBucket[] {
   const first = getFirstInvestmentDate(holdings)
   if (!first) return []
 
   const dates = period === 'monthly' ? getMonthEndDates(first, through) : getYearEndDates(first, through)
+  const useHistorical = hasUsableHistorical(historicalByTicker)
 
   return dates.map((asOf, index) => {
     const isLatest = index === dates.length - 1
-    const valuation = isLatest ? 'market' : 'cost'
+    const valuation: 'cost' | 'market' | 'historical' = isLatest
+      ? 'market'
+      : useHistorical
+        ? 'historical'
+        : 'cost'
     const { totalMarket, totalInvested, byTickerMarket } = aggregateAtDate(
       holdings,
       asOf,
       valuation,
+      historicalByTicker,
     )
     const sortKey = asOf.getTime()
     if (period === 'monthly') {

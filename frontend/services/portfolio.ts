@@ -355,6 +355,33 @@ export async function getHoldingMovement(holdingId: string, period: '1m' | '1y' 
   return null
 }
 
+export interface HistoricalPricePoint {
+  date: string
+  price: number
+  currency: string
+  priceKES: number
+}
+
+/** Stored Growe Historical Price rows (UI read-only — does not call market APIs). */
+export type HistoricalPriceMap = Record<string, HistoricalPricePoint[]>
+
+export async function getHistoricalPrices(tickers?: string[]): Promise<HistoricalPriceMap> {
+  const params = new URLSearchParams()
+  if (tickers?.length) {
+    params.set('tickers', tickers.join(','))
+  }
+  const qs = params.toString()
+  const response = await fetch(
+    `/api/method/growie_app.api.price.get_historical_prices${qs ? `?${qs}` : ''}`,
+    { credentials: 'include', headers: { Accept: 'application/json' } }
+  )
+  const resData = await response.json()
+  if (resData?.message && typeof resData.message === 'object') {
+    return resData.message as HistoricalPriceMap
+  }
+  return {}
+}
+
 export interface KesCurrencyMultiplier {
   multiplier: number
   currency: string
